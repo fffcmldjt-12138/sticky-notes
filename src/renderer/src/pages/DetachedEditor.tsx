@@ -52,6 +52,7 @@ export function DetachedEditor({ itemId }: { itemId: string }): React.JSX.Elemen
   if (item.type === 'note') {
     return (
       <NoteEditor
+        detached
         item={item}
         onSave={(patch) => void save(patch)}
         onBack={attach}
@@ -62,6 +63,7 @@ export function DetachedEditor({ itemId }: { itemId: string }): React.JSX.Elemen
 
   return (
     <TodoEditor
+      detached
       item={item}
       onSave={(patch) => void save(patch)}
       onAddTask={async () => {

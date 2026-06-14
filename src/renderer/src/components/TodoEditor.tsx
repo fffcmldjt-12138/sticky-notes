@@ -32,6 +32,7 @@ interface Props {
   onReorderTasks(taskIds: string[]): void
   onBack(): void
   onDelete(): void
+  detached?: boolean
 }
 
 export function TodoEditor({
@@ -42,7 +43,8 @@ export function TodoEditor({
   onDeleteTask,
   onReorderTasks,
   onBack,
-  onDelete
+  onDelete,
+  detached = false
 }: Props): React.JSX.Element {
   const [draft, setDraft] = useState(item)
   const onSaveRef = useRef(onSave)
@@ -75,15 +77,32 @@ export function TodoEditor({
     onReorderTasks(arrayMove(draft.tasks, oldIndex, newIndex).map((task) => task.id))
   }
 
+  function saveAndBack(): void {
+    onSaveRef.current({
+      title: draft.title,
+      headerColor: draft.headerColor,
+      bodyTheme: draft.bodyTheme
+    })
+    onBack()
+  }
+
   return (
     <section className={`editor body-${draft.bodyTheme}`}>
-      <div className="editor-header" style={{ backgroundColor: draft.headerColor }}>
-        <button className="icon-button" onClick={onBack} aria-label="返回">‹</button>
+      <div
+        className={`editor-header ${detached ? 'detached-header' : ''}`}
+        style={{ backgroundColor: draft.headerColor }}
+      >
+        {detached
+          ? <span className="editor-header-spacer" />
+          : <button className="icon-button" onClick={saveAndBack} aria-label="返回">‹</button>}
         <input
+          aria-label="标题"
           value={draft.title}
           onChange={(event) => setDraft({ ...draft, title: event.target.value })}
         />
-        <button className="icon-button danger" onClick={onDelete} aria-label="删除">×</button>
+        {detached
+          ? <button className="icon-button" onClick={saveAndBack} aria-label="关闭">×</button>
+          : <button className="icon-button danger" onClick={onDelete} aria-label="删除">×</button>}
       </div>
       <div className="editor-toolbar">
         <HeaderColorPicker

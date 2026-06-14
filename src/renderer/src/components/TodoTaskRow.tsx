@@ -1,7 +1,6 @@
 import { CSS } from '@dnd-kit/utilities'
 import { useSortable } from '@dnd-kit/sortable'
 import type { TodoTask, TodoTaskPatch } from '../../../shared/models'
-import { MarkdownEditor } from './MarkdownEditor'
 
 function toLocalInput(iso: string | null): string {
   if (!iso) return ''
@@ -51,10 +50,12 @@ export function TodoTaskRow({
       <button className="task-delete-button" onClick={onDelete} aria-label="删除任务">
         ×
       </button>
-      <MarkdownEditor
-        compact
+      <input
+        className="task-content-input"
+        aria-label="任务内容"
+        type="text"
         value={task.contentMarkdown}
-        onChange={(contentMarkdown) => onUpdate({ contentMarkdown })}
+        onChange={(event) => onUpdate({ contentMarkdown: event.target.value })}
       />
       <label className="task-reminder">
         提醒时间
@@ -75,4 +76,3 @@ export function TodoTaskRow({
     </div>
   )
 }
-

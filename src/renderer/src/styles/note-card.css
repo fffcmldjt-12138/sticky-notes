@@ -68,7 +68,20 @@
 .task-drag-handle { grid-column: 1; width: 28px; height: 30px; border-radius: 7px; background: transparent; color: #89919d; cursor: grab; touch-action: none; }
 .task-delete-button { grid-column: 4; width: 28px; height: 28px; border-radius: 7px; background: rgba(179,38,76,.1); color: #b3264c; }
 .todo-task-row > input[type="checkbox"] { grid-column: 2; margin-top: 8px; }
-.todo-task-row > .markdown-editor-shell { grid-column: 3 / 4; min-width: 0; }
+.task-content-input {
+  grid-column: 3 / 4;
+  min-width: 0;
+  width: 100%;
+  height: 36px;
+  padding: 7px 9px;
+  border: 1px solid rgba(127,127,127,.22);
+  border-radius: 8px;
+  background: rgba(255,255,255,.7);
+  color: inherit;
+  outline: none;
+}
+.task-content-input:focus { border-color: #5b8def; box-shadow: 0 0 0 2px rgba(91,141,239,.14); }
+.body-dark .task-content-input { background: rgba(255,255,255,.08); }
 .task-reminder { grid-column: 2 / 5; display: grid; grid-template-columns: auto 1fr; gap: 8px; align-items: center; color: #7d8591; font-size: 11px; }
 .task-reminder input { min-width: 0; padding: 6px; border: 1px solid rgba(127,127,127,.2); border-radius: 7px; }
 .add-task-button { justify-self: stretch; }

@@ -8,6 +8,7 @@ import { TodoEditor } from './components/TodoEditor'
 import { SettingsPanel } from './pages/SettingsPanel'
 import { StickyPanel } from './pages/StickyPanel'
 import { DetachedEditor } from './pages/DetachedEditor'
+import { upsertItem } from './lib/itemList'
 
 export default function App(): React.JSX.Element {
   const params = new URLSearchParams(window.location.search)
@@ -21,7 +22,6 @@ function PanelApp(): React.JSX.Element {
   const [createOpen, setCreateOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [config, setConfig] = useState<AppConfig | null>(null)
-  const [pendingCreate, setPendingCreate] = useState<NoteType | null>(null)
   const [pendingRename, setPendingRename] = useState<StickyItem | null>(null)
   const [contextMenu, setContextMenu] = useState<{
     item: StickyItem
@@ -38,12 +38,7 @@ function PanelApp(): React.JSX.Element {
 
   useEffect(() => {
     const removeChanged = window.stickyApi.onItemChanged((changed) => {
-      setItems((current) => {
-        const exists = current.some((item) => item.id === changed.id)
-        return exists
-          ? current.map((item) => item.id === changed.id ? changed : item)
-          : [changed, ...current]
-      })
+      setItems((current) => upsertItem(current, changed))
     })
     const removeDeleted = window.stickyApi.onItemDeleted((itemId) => {
       setItems((current) => current.filter((item) => item.id !== itemId))
@@ -57,14 +52,14 @@ function PanelApp(): React.JSX.Element {
 
   const createItem = useCallback(async (type: NoteType, title?: string) => {
     const item = await window.stickyApi.notes.create(type, title)
-    setItems((current) => [item, ...current])
+    setItems((current) => upsertItem(current, item))
     setSelectedId(item.id)
     setCreateOpen(false)
   }, [])
 
   useEffect(
-    () => window.stickyApi.onOpenEditor((type) => setPendingCreate(type)),
-    []
+    () => window.stickyApi.onOpenEditor((type) => void createItem(type)),
+    [createItem]
   )
 
   const selected = items.find((item) => item.id === selectedId) ?? null
@@ -72,7 +67,6 @@ function PanelApp(): React.JSX.Element {
     selected ||
     createOpen ||
     settingsOpen ||
-    pendingCreate ||
     pendingRename ||
     contextMenu
   )
@@ -189,8 +183,7 @@ function PanelApp(): React.JSX.Element {
           {createOpen && (
             <CreateMenu
               onCreate={(type) => {
-                setPendingCreate(type)
-                setCreateOpen(false)
+                void createItem(type)
               }}
               onClose={() => setCreateOpen(false)}
             />
@@ -224,16 +217,6 @@ function PanelApp(): React.JSX.Element {
           position={{ x: contextMenu.x, y: contextMenu.y }}
           onAction={(action) => void handleCardAction(contextMenu.item, action)}
           onClose={() => setContextMenu(null)}
-        />
-      )}
-      {pendingCreate && (
-        <TitleDialog
-          type={pendingCreate}
-          onConfirm={(title) => {
-            void createItem(pendingCreate, title)
-            setPendingCreate(null)
-          }}
-          onCancel={() => setPendingCreate(null)}
         />
       )}
       {pendingRename && (

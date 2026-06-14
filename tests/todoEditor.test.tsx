@@ -62,7 +62,7 @@ describe('TodoEditor', () => {
     })
   })
 
-  it('renders one drag handle and one Markdown editor per task', async () => {
+  it('renders one drag handle and one plain text input per task', () => {
     render(
       <TodoEditor
         item={todo}
@@ -77,6 +77,31 @@ describe('TodoEditor', () => {
     )
 
     expect(screen.getAllByLabelText('拖动排序')).toHaveLength(2)
-    expect(await screen.findAllByLabelText('Markdown 编辑器')).toHaveLength(2)
+    expect(screen.getAllByLabelText('任务内容')).toHaveLength(2)
+    expect(screen.queryByLabelText('Markdown 编辑器')).not.toBeInTheDocument()
+  })
+
+  it('updates task content from the plain text input', () => {
+    const onUpdateTask = vi.fn()
+    render(
+      <TodoEditor
+        item={todo}
+        onSave={vi.fn()}
+        onAddTask={vi.fn()}
+        onUpdateTask={onUpdateTask}
+        onDeleteTask={vi.fn()}
+        onReorderTasks={vi.fn()}
+        onBack={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+
+    fireEvent.change(screen.getAllByLabelText('任务内容')[0], {
+      target: { value: 'Updated task' }
+    })
+
+    expect(onUpdateTask).toHaveBeenCalledWith('task_1', {
+      contentMarkdown: 'Updated task'
+    })
   })
 })
