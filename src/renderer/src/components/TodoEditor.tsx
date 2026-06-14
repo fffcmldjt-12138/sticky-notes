@@ -1,4 +1,19 @@
 import { useEffect, useRef, useState } from 'react'
+import {
+  DndContext,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy
+} from '@dnd-kit/sortable'
 import type {
   StickyItemPatch,
   TodoItem,
@@ -6,6 +21,7 @@ import type {
 } from '../../../shared/models'
 import { BodyThemeToggle } from './BodyThemeToggle'
 import { HeaderColorPicker } from './HeaderColorPicker'
+import { TodoTaskRow } from './TodoTaskRow'
 
 interface Props {
   item: TodoItem
@@ -13,15 +29,9 @@ interface Props {
   onAddTask(): void
   onUpdateTask(taskId: string, patch: TodoTaskPatch): void
   onDeleteTask(taskId: string): void
+  onReorderTasks(taskIds: string[]): void
   onBack(): void
   onDelete(): void
-}
-
-function toLocalInput(iso: string | null): string {
-  if (!iso) return ''
-  const date = new Date(iso)
-  const offset = date.getTimezoneOffset() * 60_000
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16)
 }
 
 export function TodoEditor({
@@ -30,11 +40,16 @@ export function TodoEditor({
   onAddTask,
   onUpdateTask,
   onDeleteTask,
+  onReorderTasks,
   onBack,
   onDelete
 }: Props): React.JSX.Element {
   const [draft, setDraft] = useState(item)
   const onSaveRef = useRef(onSave)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
 
   useEffect(() => setDraft(item), [item])
   useEffect(() => {
@@ -50,6 +65,15 @@ export function TodoEditor({
     }, 500)
     return () => window.clearTimeout(timer)
   }, [draft])
+
+  function handleDragEnd(event: DragEndEvent): void {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    const oldIndex = draft.tasks.findIndex((task) => task.id === active.id)
+    const newIndex = draft.tasks.findIndex((task) => task.id === over.id)
+    if (oldIndex < 0 || newIndex < 0) return
+    onReorderTasks(arrayMove(draft.tasks, oldIndex, newIndex).map((task) => task.id))
+  }
 
   return (
     <section className={`editor body-${draft.bodyTheme}`}>
@@ -71,42 +95,30 @@ export function TodoEditor({
           onChange={(bodyTheme) => setDraft({ ...draft, bodyTheme })}
         />
       </div>
-      <div className="todo-task-list">
-        {draft.tasks.map((task) => (
-          <div className="todo-task-row" key={task.id}>
-            <input
-              type="checkbox"
-              checked={task.completed}
-              onChange={(event) =>
-                onUpdateTask(task.id, { completed: event.target.checked })
-              }
-            />
-            <textarea
-              value={task.contentMarkdown}
-              onChange={(event) =>
-                onUpdateTask(task.id, { contentMarkdown: event.target.value })
-              }
-              placeholder="输入待办内容"
-            />
-            <input
-              type="datetime-local"
-              value={toLocalInput(task.remindAt)}
-              onChange={(event) =>
-                onUpdateTask(task.id, {
-                  remindAt: event.target.value
-                    ? new Date(event.target.value).toISOString()
-                    : null,
-                  reminded: false
-                })
-              }
-            />
-            <button onClick={() => onDeleteTask(task.id)} aria-label="删除任务">×</button>
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={draft.tasks.map((task) => task.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="todo-task-list">
+            {draft.tasks.map((task) => (
+              <TodoTaskRow
+                key={task.id}
+                task={task}
+                onUpdate={(patch) => onUpdateTask(task.id, patch)}
+                onDelete={() => onDeleteTask(task.id)}
+              />
+            ))}
+            <button className="primary-button add-task-button" onClick={onAddTask}>
+              ＋ 添加任务
+            </button>
           </div>
-        ))}
-        <button className="primary-button add-task-button" onClick={onAddTask}>
-          ＋ 添加任务
-        </button>
-      </div>
+        </SortableContext>
+      </DndContext>
       <span className="save-status">自动保存</span>
     </section>
   )

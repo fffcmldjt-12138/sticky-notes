@@ -124,6 +124,17 @@ export default function App(): React.JSX.Element {
               )
             }
           }}
+          onReorderTasks={async (taskIds) => {
+            const updated = await window.stickyApi.notes.reorderTodoTasks(
+              selected.id,
+              taskIds
+            )
+            if (updated) {
+              setItems((current) =>
+                current.map((item) => item.id === updated.id ? updated : item)
+              )
+            }
+          }}
           onBack={() => setSelectedId(null)}
           onDelete={() => void remove(selected)}
         />
