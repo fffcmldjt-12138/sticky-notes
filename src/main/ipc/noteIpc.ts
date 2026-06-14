@@ -9,7 +9,10 @@ import type { NoteStore } from '../services/NoteStore'
 
 export function registerNoteIpc(store: NoteStore): void {
   ipcMain.handle(ipcChannels.notesList, () => store.list())
-  ipcMain.handle(ipcChannels.notesCreate, (_event, type: NoteType) => store.create(type))
+  ipcMain.handle(
+    ipcChannels.notesCreate,
+    (_event, type: NoteType, title?: string) => store.create(type, title)
+  )
   ipcMain.handle(
     ipcChannels.notesUpdate,
     (_event, id: string, patch: StickyItemPatch) => store.update(id, patch)

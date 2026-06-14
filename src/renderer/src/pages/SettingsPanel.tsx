@@ -12,7 +12,7 @@ export function SettingsPanel({
   return (
     <section className="settings-panel">
       <header className="panel-header">
-        <button className="icon-button" onClick={onBack}>‹</button>
+        <button className="icon-button no-drag" onClick={onBack} aria-label="返回">‹</button>
         <h1>设置</h1>
         <span />
       </header>
@@ -24,4 +24,3 @@ export function SettingsPanel({
     </section>
   )
 }
-

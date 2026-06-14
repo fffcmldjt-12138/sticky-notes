@@ -18,6 +18,7 @@
 .panel-header h1 { margin: 0; font-size: 22px; letter-spacing: -.5px; }
 .panel-header span { font-size: 12px; color: #7c8491; }
 .header-actions { display: flex; gap: 8px; -webkit-app-region: no-drag; }
+.panel-header button, .editor-header button, .editor-header input { -webkit-app-region: no-drag; }
 
 .card-list {
   height: calc(100% - 76px);
@@ -79,4 +80,15 @@
 .settings-card strong, .settings-card small { display: block; }
 .settings-card small { color: #818895; margin-top: 3px; }
 .settings-note { margin: 12px 20px; font-size: 12px; color: #858c98; }
-
+.dialog-backdrop { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; padding: 20px; background: rgba(19, 24, 33, .38); }
+.title-dialog { width: 100%; padding: 18px; display: grid; gap: 14px; border-radius: 16px; background: white; box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+.title-dialog h2 { margin: 0; font-size: 18px; }
+.title-dialog label { display: grid; gap: 6px; font-size: 13px; font-weight: 700; }
+.title-dialog input { width: 100%; padding: 10px 12px; border: 1px solid #d9dee6; border-radius: 9px; outline: none; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.dialog-actions button { padding: 8px 12px; border-radius: 9px; }
+.card-context-menu { position: fixed; z-index: 30; width: 190px; padding: 6px; display: grid; gap: 2px; border: 1px solid #dde2e9; border-radius: 12px; background: white; box-shadow: 0 14px 40px rgba(24,31,43,.22); }
+.card-context-menu button, .context-color { padding: 9px 10px; display: flex; justify-content: space-between; align-items: center; border-radius: 8px; background: transparent; color: #252b35; text-align: left; font-size: 13px; }
+.card-context-menu button:hover, .context-color:hover { background: #f1f3f6; }
+.context-color input { width: 28px; height: 22px; padding: 0; border: 0; background: transparent; }
+.danger-menu-item { color: #b3264c !important; }

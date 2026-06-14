@@ -6,7 +6,7 @@ import { ipcChannels } from '../shared/ipcChannels'
 const api: StickyApi = {
   notes: {
     list: () => ipcRenderer.invoke(ipcChannels.notesList),
-    create: (type) => ipcRenderer.invoke(ipcChannels.notesCreate, type),
+    create: (type, title) => ipcRenderer.invoke(ipcChannels.notesCreate, type, title),
     update: (id, patch) => ipcRenderer.invoke(ipcChannels.notesUpdate, id, patch),
     delete: (id) => ipcRenderer.invoke(ipcChannels.notesDelete, id),
     addTodoTask: (todoId, contentMarkdown) =>

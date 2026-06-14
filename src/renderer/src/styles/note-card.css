@@ -1,4 +1,4 @@
-.note-card {
+.sticky-card {
   width: 100%;
   border-radius: 14px;
   overflow: hidden;
@@ -6,9 +6,10 @@
   box-shadow: 0 5px 16px rgba(35, 42, 54, .09);
   transition: transform .16s ease, box-shadow .16s ease;
 }
-button.note-card:hover, .todo-card:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(35, 42, 54, .14); }
-.note-card header, .card-open {
+.sticky-card:hover { transform: translateY(-1px); box-shadow: 0 8px 22px rgba(35, 42, 54, .14); }
+.sticky-card-header {
   width: 100%;
+  min-height: 54px;
   padding: 10px 12px;
   display: flex;
   align-items: center;
@@ -17,10 +18,10 @@ button.note-card:hover, .todo-card:hover { transform: translateY(-1px); box-shad
 }
 .type-badge { padding: 2px 6px; border-radius: 5px; background: rgba(255,255,255,.42); font-size: 10px; font-weight: 800; }
 .card-title { font-weight: 750; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.card-body { padding: 12px; }
-.card-body p, .todo-check span { margin: 0; font-size: 13px; line-height: 1.55; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
-.card-body time { display: block; margin-top: 10px; color: #8a919c; font-size: 11px; }
-.body-dark .card-body time { color: #aab1bc; }
+.sticky-card-body { padding: 12px; }
+.sticky-card-body p, .todo-check span { margin: 0; font-size: 13px; line-height: 1.55; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.sticky-card-body time { display: block; margin-top: 10px; color: #8a919c; font-size: 11px; }
+.body-dark .sticky-card-body time { color: #aab1bc; }
 .todo-check { display: flex; align-items: flex-start; gap: 8px; }
 .todo-check input { margin-top: 3px; accent-color: #5b8def; }
 .todo-card.completed .card-title, .todo-card.completed .todo-check span { text-decoration: line-through; opacity: .65; }
@@ -36,6 +37,8 @@ button.note-card:hover, .todo-card:hover { transform: translateY(-1px); box-shad
 .color-blue { background: #5b8def; color: #235ab6; }
 .color-green { background: #55b985; color: #238354; }
 .color-pink { background: #e783a8; color: #aa3763; }
+.custom-color-button { position: relative; width: 22px; height: 22px; display: grid; place-items: center; border: 1px dashed currentColor; border-radius: 50%; overflow: hidden; }
+.custom-color-button input { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
 .segmented { display: flex; padding: 3px; border-radius: 9px; background: rgba(127,127,127,.14); }
 .segmented button { flex: 1; padding: 7px 12px; border-radius: 7px; background: transparent; color: inherit; }
 .segmented button.active { background: white; color: #252a32; box-shadow: 0 2px 6px rgba(0,0,0,.08); }

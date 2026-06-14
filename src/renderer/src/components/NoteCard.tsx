@@ -1,22 +1,24 @@
 import type { NoteItem } from '../../../shared/models'
+import { StickyCard } from './StickyCard'
 
 export function NoteCard({
   item,
-  onOpen
+  onOpen,
+  onContextMenu
 }: {
   item: NoteItem
   onOpen(): void
+  onContextMenu(event: React.MouseEvent<HTMLElement>): void
 }): React.JSX.Element {
   return (
-    <button className={`note-card body-${item.bodyTheme}`} onClick={onOpen}>
-      <header style={{ backgroundColor: item.headerColor }}>
-        <span className="type-badge">笔记</span>
-        <span className="card-title">{item.title || '无标题笔记'}</span>
-      </header>
-      <div className="card-body">
-        <p>{item.contentMarkdown || '点击开始记录 Markdown 内容...'}</p>
-        <time>{new Date(item.updatedAt).toLocaleString('zh-CN', { dateStyle: 'short', timeStyle: 'short' })}</time>
-      </div>
-    </button>
+    <StickyCard item={item} onOpen={onOpen} onContextMenu={onContextMenu}>
+      <p>{item.contentMarkdown || '点击开始记录 Markdown 内容...'}</p>
+      <time>
+        {new Date(item.updatedAt).toLocaleString('zh-CN', {
+          dateStyle: 'short',
+          timeStyle: 'short'
+        })}
+      </time>
+    </StickyCard>
   )
 }
