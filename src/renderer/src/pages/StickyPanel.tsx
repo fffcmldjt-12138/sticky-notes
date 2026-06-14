@@ -6,12 +6,14 @@ export function StickyPanel({
   items,
   onOpen,
   onToggleTodo,
-  onContextMenu
+  onContextMenu,
+  onDetach
 }: {
   items: StickyItem[]
   onOpen(item: StickyItem): void
   onToggleTodo(item: StickyItem, taskId: string, completed: boolean): void
   onContextMenu(item: StickyItem, event: React.MouseEvent<HTMLElement>): void
+  onDetach(item: StickyItem): void
 }): React.JSX.Element {
   if (!items.length) {
     return (
@@ -32,6 +34,7 @@ export function StickyPanel({
             item={item}
             onOpen={() => onOpen(item)}
             onContextMenu={(event) => onContextMenu(item, event)}
+            onDetach={() => onDetach(item)}
           />
         ) : (
           <TodoCard
@@ -40,6 +43,7 @@ export function StickyPanel({
             onOpen={() => onOpen(item)}
             onToggle={(taskId, completed) => onToggleTodo(item, taskId, completed)}
             onContextMenu={(event) => onContextMenu(item, event)}
+            onDetach={() => onDetach(item)}
           />
         )
       )}

@@ -1,41 +1,72 @@
 import { ipcMain } from 'electron'
 import type {
   NoteType,
+  StickyItem,
   StickyItemPatch,
   TodoTaskPatch
 } from '../../shared/models'
 import { ipcChannels } from '../../shared/ipcChannels'
 import type { NoteStore } from '../services/NoteStore'
 
-export function registerNoteIpc(store: NoteStore): void {
+interface NoteIpcEvents {
+  changed(item: StickyItem): void
+  deleted(itemId: string): void
+}
+
+export function registerNoteIpc(store: NoteStore, events: NoteIpcEvents): void {
   ipcMain.handle(ipcChannels.notesList, () => store.list())
   ipcMain.handle(
     ipcChannels.notesCreate,
-    (_event, type: NoteType, title?: string) => store.create(type, title)
+    async (_event, type: NoteType, title?: string) => {
+      const item = await store.create(type, title)
+      events.changed(item)
+      return item
+    }
   )
   ipcMain.handle(
     ipcChannels.notesUpdate,
-    (_event, id: string, patch: StickyItemPatch) => store.update(id, patch)
+    async (_event, id: string, patch: StickyItemPatch) => {
+      const item = await store.update(id, patch)
+      if (item) events.changed(item)
+      return item
+    }
   )
-  ipcMain.handle(ipcChannels.notesDelete, (_event, id: string) => store.delete(id))
+  ipcMain.handle(ipcChannels.notesDelete, async (_event, id: string) => {
+    const deleted = await store.delete(id)
+    if (deleted) events.deleted(id)
+    return deleted
+  })
   ipcMain.handle(
     ipcChannels.todoTaskAdd,
-    (_event, todoId: string, contentMarkdown?: string) =>
-      store.addTodoTask(todoId, contentMarkdown)
+    async (_event, todoId: string, contentMarkdown?: string) => {
+      const task = await store.addTodoTask(todoId, contentMarkdown)
+      const item = (await store.list()).find((entry) => entry.id === todoId)
+      if (item) events.changed(item)
+      return task
+    }
   )
   ipcMain.handle(
     ipcChannels.todoTaskUpdate,
-    (_event, todoId: string, taskId: string, patch: TodoTaskPatch) =>
-      store.updateTodoTask(todoId, taskId, patch)
+    async (_event, todoId: string, taskId: string, patch: TodoTaskPatch) => {
+      const item = await store.updateTodoTask(todoId, taskId, patch)
+      if (item) events.changed(item)
+      return item
+    }
   )
   ipcMain.handle(
     ipcChannels.todoTaskDelete,
-    (_event, todoId: string, taskId: string) =>
-      store.deleteTodoTask(todoId, taskId)
+    async (_event, todoId: string, taskId: string) => {
+      const item = await store.deleteTodoTask(todoId, taskId)
+      if (item) events.changed(item)
+      return item
+    }
   )
   ipcMain.handle(
     ipcChannels.todoTaskReorder,
-    (_event, todoId: string, taskIds: string[]) =>
-      store.reorderTodoTasks(todoId, taskIds)
+    async (_event, todoId: string, taskIds: string[]) => {
+      const item = await store.reorderTodoTasks(todoId, taskIds)
+      if (item) events.changed(item)
+      return item
+    }
   )
 }

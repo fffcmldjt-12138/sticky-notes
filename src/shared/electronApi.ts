@@ -33,6 +33,10 @@ export interface StickyApi {
     cancelCollapse(): void
     hide(): void
     suspendAutoHide(suspended: boolean): void
+    detach(itemId: string): Promise<void>
+    attach(itemId: string): Promise<void>
   }
   onOpenEditor(callback: (type: NoteType) => void): () => void
+  onItemChanged(callback: (item: StickyItem) => void): () => void
+  onItemDeleted(callback: (itemId: string) => void): () => void
 }

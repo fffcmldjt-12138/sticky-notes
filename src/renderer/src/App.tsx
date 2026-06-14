@@ -7,8 +7,15 @@ import { TitleDialog } from './components/TitleDialog'
 import { TodoEditor } from './components/TodoEditor'
 import { SettingsPanel } from './pages/SettingsPanel'
 import { StickyPanel } from './pages/StickyPanel'
+import { DetachedEditor } from './pages/DetachedEditor'
 
 export default function App(): React.JSX.Element {
+  const params = new URLSearchParams(window.location.search)
+  const detachedId = params.get('mode') === 'detached' ? params.get('id') : null
+  return detachedId ? <DetachedEditor itemId={detachedId} /> : <PanelApp />
+}
+
+function PanelApp(): React.JSX.Element {
   const [items, setItems] = useState<StickyItem[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
@@ -29,6 +36,25 @@ export default function App(): React.JSX.Element {
     void window.stickyApi.config.get().then(setConfig)
   }, [loadItems])
 
+  useEffect(() => {
+    const removeChanged = window.stickyApi.onItemChanged((changed) => {
+      setItems((current) => {
+        const exists = current.some((item) => item.id === changed.id)
+        return exists
+          ? current.map((item) => item.id === changed.id ? changed : item)
+          : [changed, ...current]
+      })
+    })
+    const removeDeleted = window.stickyApi.onItemDeleted((itemId) => {
+      setItems((current) => current.filter((item) => item.id !== itemId))
+      setSelectedId((current) => current === itemId ? null : current)
+    })
+    return () => {
+      removeChanged()
+      removeDeleted()
+    }
+  }, [])
+
   const createItem = useCallback(async (type: NoteType, title?: string) => {
     const item = await window.stickyApi.notes.create(type, title)
     setItems((current) => [item, ...current])
@@ -42,7 +68,14 @@ export default function App(): React.JSX.Element {
   )
 
   const selected = items.find((item) => item.id === selectedId) ?? null
-  const suspendAutoHide = Boolean(selected || createOpen || settingsOpen)
+  const suspendAutoHide = Boolean(
+    selected ||
+    createOpen ||
+    settingsOpen ||
+    pendingCreate ||
+    pendingRename ||
+    contextMenu
+  )
   useEffect(() => {
     window.stickyApi.window.suspendAutoHide(suspendAutoHide)
   }, [suspendAutoHide])
@@ -76,7 +109,9 @@ export default function App(): React.JSX.Element {
     }
     if (action.type === 'delete') await remove(item)
     if (action.type === 'detach') {
-      await save(item.id, { detached: !item.detached })
+      if (item.detached) await window.stickyApi.window.attach(item.id)
+      else await window.stickyApi.window.detach(item.id)
+      await loadItems()
     }
   }
 
@@ -179,6 +214,7 @@ export default function App(): React.JSX.Element {
             onContextMenu={(item, event) =>
               setContextMenu({ item, x: event.clientX, y: event.clientY })
             }
+            onDetach={(item) => void window.stickyApi.window.detach(item.id)}
           />
         </>
       )}

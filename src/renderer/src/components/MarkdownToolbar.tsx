@@ -59,9 +59,21 @@ export function MarkdownToolbar({
       {button('{ }', '代码块：```', editor.isActive('codeBlock'), () =>
         editor.chain().focus().toggleCodeBlock().run()
       )}
+      {button('链接', '链接：[文字](地址)', editor.isActive('link'), () => {
+        const previousUrl = editor.getAttributes('link').href as string | undefined
+        const url = window.prompt('请输入链接地址', previousUrl ?? 'https://')
+        if (url === null) return
+        if (!url.trim()) {
+          editor.chain().focus().extendMarkRange('link').unsetLink().run()
+          return
+        }
+        editor.chain().focus().extendMarkRange('link').setLink({ href: url.trim() }).run()
+      })}
+      {button('取消链接', '移除链接', false, () =>
+        editor.chain().focus().extendMarkRange('link').unsetLink().run()
+      )}
       {button('↶', '撤销', false, () => editor.chain().focus().undo().run())}
       {button('↷', '重做', false, () => editor.chain().focus().redo().run())}
     </div>
   )
 }
-

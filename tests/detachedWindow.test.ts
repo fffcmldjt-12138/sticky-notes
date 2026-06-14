@@ -1,0 +1,109 @@
+import { describe, expect, it, vi } from 'vitest'
+import type { NoteItem, WindowBounds } from '../src/shared/models'
+import {
+  DetachedWindowService,
+  ensureVisibleBounds,
+  type DetachedWindowHandle
+} from '../src/main/services/DetachedWindowService'
+
+const item: NoteItem = {
+  id: 'note_1',
+  type: 'note',
+  title: 'Detached',
+  contentMarkdown: 'Text',
+  headerColor: '#f2c94c',
+  bodyTheme: 'light',
+  pinned: false,
+  detached: false,
+  windowBounds: null,
+  syncedToSiyuan: false,
+  createdAt: '2026-06-14T09:00:00.000Z',
+  updatedAt: '2026-06-14T09:00:00.000Z'
+}
+
+function fakeWindow(): DetachedWindowHandle & {
+  emit(event: 'close' | 'move' | 'resize'): void
+} {
+  const listeners = new Map<string, () => void>()
+  return {
+    focus: vi.fn(),
+    show: vi.fn(),
+    close: vi.fn(),
+    destroy: vi.fn(),
+    getBounds: vi.fn().mockReturnValue({ x: 100, y: 100, width: 320, height: 420 }),
+    on: vi.fn((event, listener) => listeners.set(event, listener)),
+    emit: (event) => listeners.get(event)?.()
+  }
+}
+
+describe('DetachedWindowService', () => {
+  it('creates one window and focuses it on repeated detach', async () => {
+    const window = fakeWindow()
+    const factory = { create: vi.fn().mockReturnValue(window) }
+    const store = { update: vi.fn().mockResolvedValue(item) }
+    const service = new DetachedWindowService(
+      store,
+      factory,
+      () => [{ x: 0, y: 0, width: 1920, height: 1040 }]
+    )
+
+    await service.detach(item)
+    await service.detach({ ...item, detached: true })
+
+    expect(factory.create).toHaveBeenCalledTimes(1)
+    expect(window.focus).toHaveBeenCalledOnce()
+    expect(store.update).toHaveBeenCalledWith('note_1', {
+      detached: true,
+      windowBounds: expect.any(Object)
+    })
+  })
+
+  it('marks an item attached when its window is closed by the user', async () => {
+    const window = fakeWindow()
+    const store = { update: vi.fn().mockResolvedValue(item) }
+    const service = new DetachedWindowService(
+      store,
+      { create: vi.fn().mockReturnValue(window) },
+      () => [{ x: 0, y: 0, width: 1920, height: 1040 }]
+    )
+
+    await service.detach(item)
+    window.emit('close')
+    await Promise.resolve()
+
+    expect(store.update).toHaveBeenLastCalledWith('note_1', {
+      detached: false,
+      windowBounds: expect.any(Object)
+    })
+  })
+
+  it('clamps off-screen bounds into a visible display', () => {
+    const result = ensureVisibleBounds(
+      { x: 5000, y: 5000, width: 320, height: 420 },
+      [{ x: 0, y: 0, width: 1920, height: 1040 }]
+    )
+
+    expect(result).toEqual({ x: 1600, y: 620, width: 320, height: 420 })
+  })
+
+  it('preserves detached state when application shutdown closes windows', async () => {
+    const window = fakeWindow()
+    const store = { update: vi.fn().mockResolvedValue(item) }
+    const service = new DetachedWindowService(
+      store,
+      { create: vi.fn().mockReturnValue(window) },
+      () => [{ x: 0, y: 0, width: 1920, height: 1040 }]
+    )
+
+    await service.detach(item)
+    store.update.mockClear()
+    service.beginShutdown()
+    window.emit('close')
+    await Promise.resolve()
+
+    expect(store.update).not.toHaveBeenCalledWith(
+      'note_1',
+      expect.objectContaining({ detached: false })
+    )
+  })
+})

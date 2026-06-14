@@ -14,5 +14,9 @@ export const ipcChannels = {
   windowCancelCollapse: 'window:cancel-collapse',
   windowHide: 'window:hide',
   windowSuspendAutoHide: 'window:suspend-auto-hide',
-  openEditor: 'app:open-editor'
+  windowDetach: 'window:detach',
+  windowAttach: 'window:attach',
+  openEditor: 'app:open-editor',
+  itemChanged: 'notes:item-changed',
+  itemDeleted: 'notes:item-deleted'
 } as const

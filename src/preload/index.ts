@@ -1,6 +1,11 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { StickyApi } from '../shared/electronApi'
-import type { AppConfig, NoteType, StickyItemPatch } from '../shared/models'
+import type {
+  AppConfig,
+  NoteType,
+  StickyItem,
+  StickyItemPatch
+} from '../shared/models'
 import { ipcChannels } from '../shared/ipcChannels'
 
 const api: StickyApi = {
@@ -29,13 +34,27 @@ const api: StickyApi = {
     cancelCollapse: () => ipcRenderer.send(ipcChannels.windowCancelCollapse),
     hide: () => ipcRenderer.send(ipcChannels.windowHide),
     suspendAutoHide: (value) =>
-      ipcRenderer.send(ipcChannels.windowSuspendAutoHide, value)
+      ipcRenderer.send(ipcChannels.windowSuspendAutoHide, value),
+    detach: (itemId) => ipcRenderer.invoke(ipcChannels.windowDetach, itemId),
+    attach: (itemId) => ipcRenderer.invoke(ipcChannels.windowAttach, itemId)
   },
   onOpenEditor: (callback: (type: NoteType) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, type: NoteType): void =>
       callback(type)
     ipcRenderer.on(ipcChannels.openEditor, listener)
     return () => ipcRenderer.removeListener(ipcChannels.openEditor, listener)
+  },
+  onItemChanged: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, item: StickyItem): void =>
+      callback(item)
+    ipcRenderer.on(ipcChannels.itemChanged, listener)
+    return () => ipcRenderer.removeListener(ipcChannels.itemChanged, listener)
+  },
+  onItemDeleted: (callback) => {
+    const listener = (_event: Electron.IpcRendererEvent, itemId: string): void =>
+      callback(itemId)
+    ipcRenderer.on(ipcChannels.itemDeleted, listener)
+    return () => ipcRenderer.removeListener(ipcChannels.itemDeleted, listener)
   }
 }
 

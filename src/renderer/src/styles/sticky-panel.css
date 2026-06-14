@@ -92,3 +92,4 @@
 .card-context-menu button:hover, .context-color:hover { background: #f1f3f6; }
 .context-color input { width: 28px; height: 22px; padding: 0; border: 0; background: transparent; }
 .danger-menu-item { color: #b3264c !important; }
+.detached-loading, .detached-error { height: 100%; display: grid; place-items: center; padding: 24px; color: #747d8a; background: #f4f6f9; }

@@ -5,12 +5,14 @@ export function TodoCard({
   item,
   onOpen,
   onToggle,
-  onContextMenu
+  onContextMenu,
+  onDetach
 }: {
   item: TodoItem
   onOpen(): void
   onToggle(taskId: string, completed: boolean): void
   onContextMenu(event: React.MouseEvent<HTMLElement>): void
+  onDetach(): void
 }): React.JSX.Element {
   const completedCount = item.tasks.filter((task) => task.completed).length
   const nextReminder = item.tasks
@@ -18,7 +20,12 @@ export function TodoCard({
     .sort((a, b) => String(a.remindAt).localeCompare(String(b.remindAt)))[0]
 
   return (
-    <StickyCard item={item} onOpen={onOpen} onContextMenu={onContextMenu}>
+    <StickyCard
+      item={item}
+      onOpen={onOpen}
+      onContextMenu={onContextMenu}
+      onDetach={onDetach}
+    >
       {item.tasks.slice(0, 3).map((task) => (
         <label className="todo-check" key={task.id}>
           <input
