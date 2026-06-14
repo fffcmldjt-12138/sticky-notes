@@ -13,7 +13,6 @@ interface Props {
 
 export function NoteEditor({ item, onSave, onBack, onDelete }: Props): React.JSX.Element {
   const [draft, setDraft] = useState(item)
-  const [preview, setPreview] = useState(false)
   const onSaveRef = useRef(onSave)
 
   useEffect(() => setDraft(item), [item])
@@ -53,14 +52,9 @@ export function NoteEditor({ item, onSave, onBack, onDelete }: Props): React.JSX
         <HeaderColorPicker value={draft.headerColor} onChange={(headerColor) => setDraft({ ...draft, headerColor })} />
         <BodyThemeToggle value={draft.bodyTheme} onChange={(bodyTheme) => setDraft({ ...draft, bodyTheme })} />
       </div>
-      <div className="segmented preview-toggle">
-        <button className={!preview ? 'active' : ''} onClick={() => setPreview(false)}>编辑</button>
-        <button className={preview ? 'active' : ''} onClick={() => setPreview(true)}>预览</button>
-      </div>
       <MarkdownEditor
         value={draft.contentMarkdown}
         onChange={(contentMarkdown) => setDraft({ ...draft, contentMarkdown })}
-        preview={preview}
       />
       <span className="save-status">自动保存</span>
     </section>

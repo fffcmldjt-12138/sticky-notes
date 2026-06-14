@@ -43,13 +43,20 @@
 .segmented button { flex: 1; padding: 7px 12px; border-radius: 7px; background: transparent; color: inherit; }
 .segmented button.active { background: white; color: #252a32; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
 .segmented.small button { padding: 5px 8px; font-size: 12px; }
-.preview-toggle { margin: 12px 12px 0; }
-.markdown-input, .markdown-preview { flex: 1; min-height: 0; margin: 12px; padding: 14px; border: 1px solid rgba(127,127,127,.22); border-radius: 12px; background: rgba(127,127,127,.08); color: inherit; overflow: auto; }
-.markdown-input { resize: none; outline: none; line-height: 1.6; }
-.markdown-preview { line-height: 1.55; }
-.markdown-preview > :first-child { margin-top: 0; }
-.markdown-preview > :last-child { margin-bottom: 0; }
-.markdown-preview pre { overflow: auto; padding: 10px; border-radius: 8px; background: rgba(0,0,0,.12); }
+.markdown-editor-shell { flex: 1; min-height: 0; margin: 12px; display: flex; flex-direction: column; border: 1px solid rgba(127,127,127,.22); border-radius: 12px; background: rgba(127,127,127,.08); overflow: hidden; }
+.markdown-toolbar { flex: 0 0 auto; padding: 7px; display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid rgba(127,127,127,.18); background: rgba(255,255,255,.62); }
+.markdown-toolbar button { min-width: 30px; padding: 5px 7px; border-radius: 6px; background: transparent; color: #343a45; font-size: 12px; white-space: nowrap; }
+.markdown-toolbar button:hover, .markdown-toolbar button.active { background: #e1e7f0; color: #225bb7; }
+.markdown-editor-shell .tiptap { height: 100%; min-height: 0; padding: 14px; outline: none; overflow-y: auto; line-height: 1.6; }
+.markdown-editor-shell .tiptap > :first-child { margin-top: 0; }
+.markdown-editor-shell .tiptap > :last-child { margin-bottom: 0; }
+.markdown-editor-shell .tiptap pre { overflow: auto; padding: 10px; border-radius: 8px; background: rgba(0,0,0,.12); }
+.markdown-editor-shell .tiptap blockquote { margin-left: 0; padding-left: 12px; border-left: 3px solid #8792a2; }
+.markdown-syntax-hint { flex: 0 0 auto; padding: 6px 10px; border-top: 1px solid rgba(127,127,127,.15); color: #858d99; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.markdown-editor-shell.compact { margin: 0; }
+.markdown-editor-shell.compact .markdown-toolbar { display: none; }
+.markdown-editor-shell.compact .tiptap { min-height: 44px; padding: 8px; }
+.markdown-editor-shell.compact .markdown-syntax-hint { display: none; }
 .save-status { padding: 0 14px 12px; font-size: 11px; color: #89909b; text-align: right; }
 .todo-controls { padding: 12px; display: grid; gap: 10px; border-bottom: 1px solid rgba(127,127,127,.18); }
 .todo-controls label { font-size: 13px; }

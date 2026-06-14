@@ -1,31 +1,55 @@
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import { useEffect } from 'react'
+import { Markdown } from '@tiptap/markdown'
+import { EditorContent, useEditor } from '@tiptap/react'
+import StarterKit from '@tiptap/starter-kit'
+import { MarkdownToolbar } from './MarkdownToolbar'
 
 export function MarkdownEditor({
   value,
   onChange,
-  preview
+  compact = false
 }: {
   value: string
   onChange(value: string): void
-  preview: boolean
-}): React.JSX.Element {
-  if (preview) {
-    return (
-      <div className="markdown-preview">
-        <ReactMarkdown remarkPlugins={[remarkGfm]}>{value || '*暂无内容*'}</ReactMarkdown>
-      </div>
-    )
-  }
+  compact?: boolean
+}): React.JSX.Element | null {
+  const editor = useEditor({
+    extensions: [
+      StarterKit.configure({
+        link: { openOnClick: false }
+      }),
+      Markdown
+    ],
+    content: value,
+    contentType: 'markdown',
+    immediatelyRender: false,
+    editorProps: {
+      attributes: {
+        class: compact ? 'markdown-prosemirror compact' : 'markdown-prosemirror',
+        role: 'textbox',
+        'aria-label': 'Markdown 编辑器'
+      }
+    },
+    onUpdate: ({ editor: currentEditor }) => {
+      onChange(currentEditor.getMarkdown())
+    }
+  })
+
+  useEffect(() => {
+    if (!editor) return
+    if (editor.getMarkdown() === value) return
+    editor.commands.setContent(editor.markdown!.parse(value), { emitUpdate: false })
+  }, [editor, value])
+
+  if (!editor) return null
 
   return (
-    <textarea
-      className="markdown-input"
-      value={value}
-      onChange={(event) => onChange(event.target.value)}
-      placeholder="支持 Markdown，例如：&#10;## 标题&#10;- 列表项"
-      autoFocus
-    />
+    <div className={`markdown-editor-shell ${compact ? 'compact' : ''}`}>
+      <MarkdownToolbar editor={editor} />
+      <EditorContent editor={editor} />
+      <div className="markdown-syntax-hint">
+        # 标题 · **粗体** · *斜体* · - 列表 · &gt; 引用 · `代码`
+      </div>
+    </div>
   )
 }
-
