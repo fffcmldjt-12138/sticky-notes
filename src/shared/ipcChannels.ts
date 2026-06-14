@@ -3,6 +3,10 @@ export const ipcChannels = {
   notesCreate: 'notes:create',
   notesUpdate: 'notes:update',
   notesDelete: 'notes:delete',
+  todoTaskAdd: 'todo-task:add',
+  todoTaskUpdate: 'todo-task:update',
+  todoTaskDelete: 'todo-task:delete',
+  todoTaskReorder: 'todo-task:reorder',
   configGet: 'config:get',
   configUpdate: 'config:update',
   windowExpand: 'window:expand',
@@ -12,4 +16,3 @@ export const ipcChannels = {
   windowSuspendAutoHide: 'window:suspend-auto-hide',
   openEditor: 'app:open-editor'
 } as const
-

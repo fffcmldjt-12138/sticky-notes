@@ -1,4 +1,4 @@
-import { mkdtemp, readFile } from 'node:fs/promises'
+import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -13,10 +13,10 @@ describe('NoteStore', () => {
     store = new NoteStore(directory)
   })
 
-  it('creates an empty versioned file on first load', async () => {
+  it('creates an empty version 2 file on first load', async () => {
     expect(await store.list()).toEqual([])
     expect(JSON.parse(await readFile(join(directory, 'notes.json'), 'utf8'))).toEqual({
-      version: 1,
+      version: 2,
       items: []
     })
   })
@@ -28,24 +28,28 @@ describe('NoteStore', () => {
     expect(note.type).toBe('note')
     expect(todo).toMatchObject({
       type: 'todo',
-      completed: false,
-      remindAt: null,
-      reminded: false
+      tasks: []
     })
   })
 
-  it('resets reminded when a Todo reminder changes', async () => {
+  it('manages independent Todo tasks and resets only the changed reminder', async () => {
     const todo = await store.create('todo')
-    await store.update(todo.id, {
+    const first = await store.addTodoTask(todo.id, 'First')
+    const second = await store.addTodoTask(todo.id, 'Second')
+    await store.updateTodoTask(todo.id, first!.id, {
       remindAt: '2026-06-14T20:00:00.000Z'
     })
-    const reminded = await store.update(todo.id, { reminded: true })
-    const changed = await store.update(todo.id, {
+    await store.updateTodoTask(todo.id, first!.id, { reminded: true })
+    await store.updateTodoTask(todo.id, second!.id, { reminded: true })
+    await store.updateTodoTask(todo.id, first!.id, {
       remindAt: '2026-06-15T20:00:00.000Z'
     })
 
-    expect(reminded?.type === 'todo' && reminded.reminded).toBe(true)
-    expect(changed?.type === 'todo' && changed.reminded).toBe(false)
+    const changed = (await store.list()).find((item) => item.id === todo.id)
+    expect(changed?.type).toBe('todo')
+    if (changed?.type !== 'todo') throw new Error('Expected Todo')
+    expect(changed.tasks.find((task) => task.id === first!.id)?.reminded).toBe(false)
+    expect(changed.tasks.find((task) => task.id === second!.id)?.reminded).toBe(true)
   })
 
   it('serializes concurrent updates without losing either change', async () => {
@@ -60,5 +64,35 @@ describe('NoteStore', () => {
     const items = await store.list()
     expect(items.find((item) => item.id === first.id)?.title).toBe('First changed')
     expect(items.find((item) => item.id === second.id)?.title).toBe('Second changed')
+  })
+
+  it('backs up and migrates a version 1 notes file on load', async () => {
+    await writeFile(
+      join(directory, 'notes.json'),
+      JSON.stringify({
+        version: 1,
+        items: [
+          {
+            id: 'note_legacy',
+            type: 'note',
+            title: 'Legacy',
+            contentMarkdown: 'content',
+            headerColor: 'green',
+            bodyTheme: 'light',
+            pinned: false,
+            syncedToSiyuan: false,
+            createdAt: '2026-06-14T09:00:00.000Z',
+            updatedAt: '2026-06-14T09:00:00.000Z'
+          }
+        ]
+      }),
+      'utf8'
+    )
+
+    const migrated = await store.list()
+    const files = await import('node:fs/promises').then(({ readdir }) => readdir(directory))
+
+    expect(migrated[0]).toMatchObject({ headerColor: '#55b985', detached: false })
+    expect(files.some((file) => file.startsWith('notes.json.backup-'))).toBe(true)
   })
 })

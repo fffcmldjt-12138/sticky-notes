@@ -1,8 +1,12 @@
-import type { StickyItem, StickyItemPatch } from '../../shared/models'
+import type { StickyItem, TodoItem, TodoTaskPatch } from '../../shared/models'
 
 interface ReminderStore {
   list(): Promise<StickyItem[]>
-  update(id: string, patch: StickyItemPatch): Promise<unknown>
+  updateTodoTask(
+    todoId: string,
+    taskId: string,
+    patch: TodoTaskPatch
+  ): Promise<TodoItem | null>
 }
 
 export class ReminderService {
@@ -17,18 +21,21 @@ export class ReminderService {
   async check(): Promise<void> {
     const now = this.now().getTime()
     const items = await this.store.list()
-    const due = items.filter(
-      (item) =>
-        item.type === 'todo' &&
-        !item.completed &&
-        !item.reminded &&
-        item.remindAt !== null &&
-        new Date(item.remindAt).getTime() <= now
-    )
 
-    for (const item of due) {
-      this.notify(item.title || '待办提醒', '待办提醒')
-      await this.store.update(item.id, { reminded: true })
+    for (const item of items) {
+      if (item.type !== 'todo') continue
+      for (const task of item.tasks) {
+        if (
+          task.completed ||
+          task.reminded ||
+          task.remindAt === null ||
+          new Date(task.remindAt).getTime() > now
+        ) {
+          continue
+        }
+        this.notify(task.contentMarkdown || item.title || '待办提醒', '待办提醒')
+        await this.store.updateTodoTask(item.id, task.id, { reminded: true })
+      }
     }
   }
 
@@ -42,4 +49,3 @@ export class ReminderService {
     this.timer = null
   }
 }
-

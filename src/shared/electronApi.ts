@@ -2,7 +2,10 @@ import type {
   AppConfig,
   NoteType,
   StickyItem,
-  StickyItemPatch
+  StickyItemPatch,
+  TodoItem,
+  TodoTask,
+  TodoTaskPatch
 } from './models'
 
 export interface StickyApi {
@@ -11,6 +14,14 @@ export interface StickyApi {
     create(type: NoteType): Promise<StickyItem>
     update(id: string, patch: StickyItemPatch): Promise<StickyItem | null>
     delete(id: string): Promise<boolean>
+    addTodoTask(todoId: string, contentMarkdown?: string): Promise<TodoTask | null>
+    updateTodoTask(
+      todoId: string,
+      taskId: string,
+      patch: TodoTaskPatch
+    ): Promise<TodoItem | null>
+    deleteTodoTask(todoId: string, taskId: string): Promise<TodoItem | null>
+    reorderTodoTasks(todoId: string, taskIds: string[]): Promise<TodoItem | null>
   }
   config: {
     get(): Promise<AppConfig>
@@ -25,4 +36,3 @@ export interface StickyApi {
   }
   onOpenEditor(callback: (type: NoteType) => void): () => void
 }
-

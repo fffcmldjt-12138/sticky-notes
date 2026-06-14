@@ -65,7 +65,40 @@ export default function App(): React.JSX.Element {
         <NoteEditor item={selected} onSave={(patch) => void save(selected.id, patch)} onBack={() => setSelectedId(null)} onDelete={() => void remove(selected)} />
       )}
       {selected?.type === 'todo' && (
-        <TodoEditor item={selected} onSave={(patch) => void save(selected.id, patch)} onBack={() => setSelectedId(null)} onDelete={() => void remove(selected)} />
+        <TodoEditor
+          item={selected}
+          onSave={(patch) => void save(selected.id, patch)}
+          onAddTask={async () => {
+            await window.stickyApi.notes.addTodoTask(selected.id)
+            await loadItems()
+          }}
+          onUpdateTask={async (taskId, patch) => {
+            const updated = await window.stickyApi.notes.updateTodoTask(
+              selected.id,
+              taskId,
+              patch
+            )
+            if (updated) {
+              setItems((current) =>
+                current.map((item) => item.id === updated.id ? updated : item)
+              )
+            }
+          }}
+          onDeleteTask={async (taskId) => {
+            if (!window.confirm('确定删除这条任务吗？')) return
+            const updated = await window.stickyApi.notes.deleteTodoTask(
+              selected.id,
+              taskId
+            )
+            if (updated) {
+              setItems((current) =>
+                current.map((item) => item.id === updated.id ? updated : item)
+              )
+            }
+          }}
+          onBack={() => setSelectedId(null)}
+          onDelete={() => void remove(selected)}
+        />
       )}
       {!selected && settingsOpen && config && (
         <SettingsPanel config={config} onChange={(patch) => void updateConfig(patch)} onBack={() => setSettingsOpen(false)} />
@@ -83,11 +116,22 @@ export default function App(): React.JSX.Element {
           <StickyPanel
             items={items}
             onOpen={(item) => setSelectedId(item.id)}
-            onToggleTodo={(item, completed) => void save(item.id, { completed })}
+            onToggleTodo={async (item, taskId, completed) => {
+              if (item.type !== 'todo') return
+              const updated = await window.stickyApi.notes.updateTodoTask(
+                item.id,
+                taskId,
+                { completed }
+              )
+              if (updated) {
+                setItems((current) =>
+                  current.map((entry) => entry.id === updated.id ? updated : entry)
+                )
+              }
+            }}
           />
         </>
       )}
     </div>
   )
 }
-

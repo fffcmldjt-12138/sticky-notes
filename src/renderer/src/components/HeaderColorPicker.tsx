@@ -1,6 +1,6 @@
 import type { HeaderColor } from '../../../shared/models'
 
-const colors: HeaderColor[] = ['yellow', 'blue', 'green', 'pink']
+const colors: HeaderColor[] = ['#f2c94c', '#5b8def', '#55b985', '#e783a8']
 
 export function HeaderColorPicker({
   value,
@@ -14,7 +14,8 @@ export function HeaderColorPicker({
       {colors.map((color) => (
         <button
           key={color}
-          className={`color-dot color-${color} ${value === color ? 'selected' : ''}`}
+          className={`color-dot ${value === color ? 'selected' : ''}`}
+          style={{ backgroundColor: color, color }}
           aria-label={color}
           onClick={() => onChange(color)}
         />
@@ -22,4 +23,3 @@ export function HeaderColorPicker({
     </div>
   )
 }
-

@@ -9,7 +9,7 @@ export function NoteCard({
 }): React.JSX.Element {
   return (
     <button className={`note-card body-${item.bodyTheme}`} onClick={onOpen}>
-      <header className={`header-${item.headerColor}`}>
+      <header style={{ backgroundColor: item.headerColor }}>
         <span className="type-badge">笔记</span>
         <span className="card-title">{item.title || '无标题笔记'}</span>
       </header>
@@ -20,4 +20,3 @@ export function NoteCard({
     </button>
   )
 }
-

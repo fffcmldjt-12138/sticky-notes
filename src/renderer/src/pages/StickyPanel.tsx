@@ -9,7 +9,7 @@ export function StickyPanel({
 }: {
   items: StickyItem[]
   onOpen(item: StickyItem): void
-  onToggleTodo(item: StickyItem, completed: boolean): void
+  onToggleTodo(item: StickyItem, taskId: string, completed: boolean): void
 }): React.JSX.Element {
   if (!items.length) {
     return (
@@ -27,10 +27,14 @@ export function StickyPanel({
         item.type === 'note' ? (
           <NoteCard key={item.id} item={item} onOpen={() => onOpen(item)} />
         ) : (
-          <TodoCard key={item.id} item={item} onOpen={() => onOpen(item)} onToggle={(completed) => onToggleTodo(item, completed)} />
+          <TodoCard
+            key={item.id}
+            item={item}
+            onOpen={() => onOpen(item)}
+            onToggle={(taskId, completed) => onToggleTodo(item, taskId, completed)}
+          />
         )
       )}
     </main>
   )
 }
-

@@ -8,7 +8,15 @@ const api: StickyApi = {
     list: () => ipcRenderer.invoke(ipcChannels.notesList),
     create: (type) => ipcRenderer.invoke(ipcChannels.notesCreate, type),
     update: (id, patch) => ipcRenderer.invoke(ipcChannels.notesUpdate, id, patch),
-    delete: (id) => ipcRenderer.invoke(ipcChannels.notesDelete, id)
+    delete: (id) => ipcRenderer.invoke(ipcChannels.notesDelete, id),
+    addTodoTask: (todoId, contentMarkdown) =>
+      ipcRenderer.invoke(ipcChannels.todoTaskAdd, todoId, contentMarkdown),
+    updateTodoTask: (todoId, taskId, patch) =>
+      ipcRenderer.invoke(ipcChannels.todoTaskUpdate, todoId, taskId, patch),
+    deleteTodoTask: (todoId, taskId) =>
+      ipcRenderer.invoke(ipcChannels.todoTaskDelete, todoId, taskId),
+    reorderTodoTasks: (todoId, taskIds) =>
+      ipcRenderer.invoke(ipcChannels.todoTaskReorder, todoId, taskIds)
   },
   config: {
     get: () => ipcRenderer.invoke(ipcChannels.configGet),
@@ -32,4 +40,3 @@ const api: StickyApi = {
 }
 
 contextBridge.exposeInMainWorld('stickyApi', api)
-

@@ -52,4 +52,8 @@ button.note-card:hover, .todo-card:hover { transform: translateY(-1px); box-shad
 .todo-controls label { font-size: 13px; }
 .reminder-field { display: grid; gap: 5px; }
 .reminder-field input { width: 100%; padding: 8px; border: 1px solid rgba(127,127,127,.25); border-radius: 8px; background: rgba(255,255,255,.8); }
-
+.todo-task-list { flex: 1; min-height: 0; overflow: auto; padding: 12px; display: grid; align-content: start; gap: 10px; }
+.todo-task-row { padding: 10px; display: grid; grid-template-columns: 24px 1fr 30px; gap: 8px; align-items: start; border: 1px solid rgba(127,127,127,.2); border-radius: 10px; }
+.todo-task-row textarea { grid-column: 2 / 4; min-height: 58px; resize: vertical; }
+.todo-task-row input[type="datetime-local"] { grid-column: 2 / 4; }
+.add-task-button { justify-self: stretch; }

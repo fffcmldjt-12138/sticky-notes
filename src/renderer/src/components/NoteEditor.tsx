@@ -44,7 +44,7 @@ export function NoteEditor({ item, onSave, onBack, onDelete }: Props): React.JSX
 
   return (
     <section className={`editor body-${draft.bodyTheme}`}>
-      <div className={`editor-header header-${draft.headerColor}`}>
+      <div className="editor-header" style={{ backgroundColor: draft.headerColor }}>
         <button className="icon-button" onClick={saveAndBack} aria-label="返回">‹</button>
         <input value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} />
         <button className="icon-button danger" onClick={onDelete} aria-label="删除">×</button>
