@@ -1,0 +1,82 @@
+.app-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(155deg, #f7f8fa 0%, #edf0f4 100%);
+  border-left: 1px solid #dfe3e9;
+  box-shadow: -12px 0 30px rgba(31, 38, 51, .12);
+}
+
+.panel-header {
+  height: 76px;
+  padding: 18px 16px 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  -webkit-app-region: drag;
+}
+.panel-header h1 { margin: 0; font-size: 22px; letter-spacing: -.5px; }
+.panel-header span { font-size: 12px; color: #7c8491; }
+.header-actions { display: flex; gap: 8px; -webkit-app-region: no-drag; }
+
+.card-list {
+  height: calc(100% - 76px);
+  overflow-y: auto;
+  padding: 6px 14px 24px;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+.card-list::-webkit-scrollbar { width: 6px; }
+.card-list::-webkit-scrollbar-thumb { background: #cdd2da; border-radius: 8px; }
+
+.empty-state {
+  height: calc(100% - 76px);
+  display: grid;
+  place-content: center;
+  text-align: center;
+  color: #7a828f;
+  padding: 30px;
+}
+.empty-state h2 { color: #303641; margin: 12px 0 4px; }
+.empty-state p { margin: 0; font-size: 14px; }
+.empty-mark { font-size: 34px; color: #5b8def; }
+
+.popover {
+  position: absolute;
+  z-index: 5;
+  top: 66px;
+  right: 14px;
+  width: 260px;
+  padding: 8px;
+  background: white;
+  border: 1px solid #e2e5ea;
+  border-radius: 14px;
+  box-shadow: 0 16px 44px rgba(28, 36, 50, .18);
+}
+.create-menu button {
+  width: 100%;
+  padding: 10px;
+  border-radius: 10px;
+  background: transparent;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  text-align: left;
+}
+.create-menu button:hover { background: #f3f5f8; }
+.create-menu strong, .create-menu small { display: block; }
+.create-menu small { color: #858c98; margin-top: 2px; }
+.menu-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; font-weight: 800; }
+.note-icon { background: #fff0b8; color: #725c00; }
+.todo-icon { background: #dce8ff; color: #245cb8; }
+.menu-cancel { justify-content: center !important; color: #737b88; }
+
+.settings-panel { height: 100%; }
+.settings-card { margin: 14px; background: white; border-radius: 14px; border: 1px solid #e3e6eb; overflow: hidden; }
+.settings-card label { padding: 16px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #edf0f3; }
+.settings-card label:last-child { border-bottom: 0; }
+.settings-card strong, .settings-card small { display: block; }
+.settings-card small { color: #818895; margin-top: 3px; }
+.settings-note { margin: 12px 20px; font-size: 12px; color: #858c98; }
+
