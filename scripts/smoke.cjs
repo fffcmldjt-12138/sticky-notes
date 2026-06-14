@@ -1,8 +1,11 @@
 const { spawn, spawnSync } = require('node:child_process')
 const path = require('node:path')
 
-const electron = path.resolve('node_modules/electron/dist/electron.exe')
-const child = spawn(electron, ['.'], {
+const executable = process.argv[2]
+  ? path.resolve(process.argv[2])
+  : path.resolve('node_modules/electron/dist/electron.exe')
+const args = process.argv[2] ? [] : ['.']
+const child = spawn(executable, args, {
   cwd: process.cwd(),
   windowsHide: true
 })
