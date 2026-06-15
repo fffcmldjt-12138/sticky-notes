@@ -76,7 +76,75 @@
 .menu-icon { display: grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; font-weight: 800; }
 .note-icon { background: #fff0b8; color: #725c00; }
 .todo-icon { background: #dce8ff; color: #245cb8; }
+.folder-icon { background: #e4e9f2; color: #46566e; }
 .menu-cancel { justify-content: center !important; color: #737b88; }
+
+.folder-card {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid #dfe4eb;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, .86);
+  box-shadow: 0 6px 18px rgba(35, 44, 58, .07);
+}
+.folder-title-bar {
+  min-height: 48px;
+  padding: 8px 12px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  cursor: grab;
+  user-select: none;
+  background: #f4f6f9;
+}
+.folder-title-bar:active { cursor: grabbing; }
+.folder-title-bar small { color: #828b98; }
+.folder-title {
+  overflow: hidden;
+  color: #303744;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.folder-toggle {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 7px;
+  background: #e6eaf0;
+  color: #5f6875;
+}
+.folder-contents {
+  padding: 8px;
+  display: grid;
+  gap: 7px;
+  border-top: 1px solid #e8ebef;
+}
+.folder-contents .folder-card { margin-left: 12px; }
+.folder-item-title {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  border-left: 5px solid;
+  border-radius: 8px;
+  background: #fff;
+  color: #303744;
+  text-align: left;
+}
+.folder-item-title span {
+  color: #858d99;
+  font-size: 10px;
+}
+.folder-item-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .settings-panel { height: 100%; }
 .settings-card { margin: 14px; background: white; border-radius: 14px; border: 1px solid #e3e6eb; overflow: hidden; }

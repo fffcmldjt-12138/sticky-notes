@@ -1,0 +1,58 @@
+// @vitest-environment jsdom
+
+import { render, screen } from '@testing-library/react'
+import { describe, expect, it, vi } from 'vitest'
+import type { FolderItem, NoteItem } from '../src/shared/models'
+import { StickyPanel } from '../src/renderer/src/pages/StickyPanel'
+
+const folder: FolderItem = {
+  id: 'folder_1',
+  title: '项目资料',
+  parentFolderId: null,
+  order: 0,
+  collapsed: false,
+  deletedAt: null,
+  createdAt: '2026-06-15T00:00:00.000Z',
+  updatedAt: '2026-06-15T00:00:00.000Z'
+}
+
+const note: NoteItem = {
+  id: 'note_1',
+  type: 'note',
+  title: '文件夹内笔记',
+  contentMarkdown: '这段正文不应在文件夹中显示',
+  headerColor: '#f2c94c',
+  bodyTheme: 'light',
+  pinned: false,
+  detached: false,
+  windowBounds: null,
+  parentFolderId: folder.id,
+  tags: [],
+  order: 0,
+  deletedAt: null,
+  syncedToSiyuan: false,
+  createdAt: '2026-06-15T00:00:00.000Z',
+  updatedAt: '2026-06-15T00:00:00.000Z'
+}
+
+describe('StickyPanel folders', () => {
+  it('renders folder children as title bars without their content', () => {
+    render(
+      <StickyPanel
+        items={[note]}
+        folders={[folder]}
+        onOpen={vi.fn()}
+        onToggleTodo={vi.fn()}
+        onContextMenu={vi.fn()}
+        onDetach={vi.fn()}
+        onToggleFolder={vi.fn()}
+        onMoveItem={vi.fn()}
+        onMoveFolder={vi.fn()}
+      />
+    )
+
+    expect(screen.getByText(/项目资料/)).toBeInTheDocument()
+    expect(screen.getByText('文件夹内笔记')).toBeInTheDocument()
+    expect(screen.queryByText('这段正文不应在文件夹中显示')).not.toBeInTheDocument()
+  })
+})

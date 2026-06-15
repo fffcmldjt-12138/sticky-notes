@@ -47,6 +47,12 @@ describe('App creation flow', () => {
         selectImage: vi.fn().mockResolvedValue(null),
         importImageData: vi.fn()
       },
+      folders: {
+        list: vi.fn().mockResolvedValue([]),
+        create: vi.fn(),
+        update: vi.fn(),
+        moveItem: vi.fn()
+      },
       window: {
         expand: vi.fn(),
         scheduleCollapse: vi.fn(),

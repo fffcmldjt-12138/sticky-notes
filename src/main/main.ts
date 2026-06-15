@@ -11,6 +11,7 @@ import {
 import { electronApp, is } from '@electron-toolkit/utils'
 import { registerConfigIpc } from './ipc/configIpc'
 import { registerAssetIpc } from './ipc/assetIpc'
+import { registerFolderIpc } from './ipc/folderIpc'
 import { registerNoteIpc } from './ipc/noteIpc'
 import { registerWindowIpc } from './ipc/windowIpc'
 import { AutoLaunchService } from './services/AutoLaunchService'
@@ -112,6 +113,7 @@ if (!hasLock) {
       }
     })
     registerAssetIpc(assets)
+    registerFolderIpc(notes)
     registerWindowIpc(windows, detachedWindows, notes)
     registerConfigIpc(config, autoLaunch, windows, tray)
     reminder.start()

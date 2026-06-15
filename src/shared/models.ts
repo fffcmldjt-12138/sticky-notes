@@ -73,6 +73,10 @@ export interface FolderItem {
   updatedAt: string
 }
 
+export type FolderPatch = Partial<
+  Pick<FolderItem, 'title' | 'parentFolderId' | 'order' | 'collapsed' | 'deletedAt'>
+>
+
 export interface NotesFile {
   version: 3
   items: StickyItem[]

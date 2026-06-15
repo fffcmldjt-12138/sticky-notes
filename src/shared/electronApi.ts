@@ -1,6 +1,8 @@
 import type {
   AppConfig,
   AssetReference,
+  FolderItem,
+  FolderPatch,
   NoteType,
   StickyItem,
   StickyItemPatch,
@@ -31,6 +33,12 @@ export interface StickyApi {
   assets: {
     selectImage(): Promise<AssetReference | null>
     importImageData(bytes: Uint8Array, mimeType: string): Promise<AssetReference>
+  }
+  folders: {
+    list(): Promise<FolderItem[]>
+    create(title: string, parentFolderId?: string | null): Promise<FolderItem>
+    update(id: string, patch: FolderPatch): Promise<FolderItem | null>
+    moveItem(itemId: string, parentFolderId: string | null): Promise<StickyItem | null>
   }
   window: {
     expand(): void

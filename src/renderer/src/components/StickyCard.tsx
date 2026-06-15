@@ -19,6 +19,10 @@ export function StickyCard({
     <article
       className={`sticky-card body-${item.bodyTheme}`}
       draggable
+      onDragStart={(event) => {
+        event.dataTransfer.setData('text/sticky-item', item.id)
+        event.dataTransfer.effectAllowed = 'move'
+      }}
       onContextMenu={(event) => {
         event.preventDefault()
         onContextMenu?.(event)

@@ -2,6 +2,8 @@ import { copyFile, readFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import type {
+  FolderItem,
+  FolderPatch,
   NoteItem,
   NotesFile,
   NoteType,
@@ -33,6 +35,88 @@ export class NoteStore {
     await this.ensureInitialized()
     await this.mutationQueue
     return (await this.file.read()).items
+  }
+
+  async listFolders(): Promise<FolderItem[]> {
+    await this.ensureInitialized()
+    await this.mutationQueue
+    return (await this.file.read()).folders.filter((folder) => !folder.deletedAt)
+  }
+
+  async createFolder(
+    title: string,
+    parentFolderId: string | null = null
+  ): Promise<FolderItem> {
+    await this.ensureInitialized()
+    return this.mutate(async () => {
+      const data = await this.file.read()
+      assertFolderDepth(data.folders, parentFolderId)
+      const now = new Date().toISOString()
+      const folder: FolderItem = {
+        id: `folder_${randomUUID()}`,
+        title: title.trim() || '新建文件夹',
+        parentFolderId,
+        order: data.folders.length,
+        collapsed: false,
+        deletedAt: null,
+        createdAt: now,
+        updatedAt: now
+      }
+      data.folders.push(folder)
+      await this.file.write(data)
+      return folder
+    })
+  }
+
+  async updateFolder(
+    id: string,
+    patch: FolderPatch
+  ): Promise<FolderItem | null> {
+    await this.ensureInitialized()
+    return this.mutate(async () => {
+      const data = await this.file.read()
+      const index = data.folders.findIndex((folder) => folder.id === id)
+      if (index < 0) return null
+      if (Object.hasOwn(patch, 'parentFolderId')) {
+        assertFolderMove(data.folders, id, patch.parentFolderId ?? null)
+      }
+      const updated = {
+        ...data.folders[index],
+        ...patch,
+        updatedAt: new Date().toISOString()
+      }
+      data.folders[index] = updated
+      await this.file.write(data)
+      return updated
+    })
+  }
+
+  async moveItem(
+    itemId: string,
+    parentFolderId: string | null
+  ): Promise<StickyItem | null> {
+    await this.ensureInitialized()
+    return this.mutate(async () => {
+      const data = await this.file.read()
+      if (
+        parentFolderId &&
+        !data.folders.some(
+          (folder) => folder.id === parentFolderId && !folder.deletedAt
+        )
+      ) {
+        throw new Error('目标文件夹不存在')
+      }
+      const index = data.items.findIndex((item) => item.id === itemId)
+      if (index < 0) return null
+      const updated = {
+        ...data.items[index],
+        parentFolderId,
+        updatedAt: new Date().toISOString()
+      } as StickyItem
+      data.items[index] = updated
+      await this.file.write(data)
+      return updated
+    })
   }
 
   async create(type: NoteType, title?: string): Promise<StickyItem> {
@@ -234,4 +318,72 @@ function reminderSelection(
     .map(({ id, offsetMinutes }) => `${id}:${offsetMinutes}`)
     .sort()
     .join('|')
+}
+
+function assertFolderDepth(
+  folders: FolderItem[],
+  parentFolderId: string | null
+): void {
+  let depth = 1
+  let current = parentFolderId
+  const visited = new Set<string>()
+  while (current) {
+    if (visited.has(current)) throw new Error('文件夹层级循环')
+    visited.add(current)
+    const parent = folders.find(
+      (folder) => folder.id === current && !folder.deletedAt
+    )
+    if (!parent) throw new Error('目标文件夹不存在')
+    depth += 1
+    current = parent.parentFolderId
+  }
+  if (depth > 3) throw new Error('文件夹最多嵌套 3 层')
+}
+
+function assertFolderMove(
+  folders: FolderItem[],
+  folderId: string,
+  parentFolderId: string | null
+): void {
+  if (folderId === parentFolderId) throw new Error('文件夹不能移动到自身')
+  let current = parentFolderId
+  while (current) {
+    if (current === folderId) throw new Error('文件夹不能移动到子文件夹')
+    current = folders.find((folder) => folder.id === current)?.parentFolderId ?? null
+  }
+  assertFolderDepth(folders, parentFolderId)
+  const targetDepth = parentFolderId
+    ? getFolderDepth(folders, parentFolderId) + 1
+    : 1
+  if (targetDepth + getSubtreeHeight(folders, folderId) - 1 > 3) {
+    throw new Error('文件夹最多嵌套 3 层')
+  }
+}
+
+function getFolderDepth(folders: FolderItem[], folderId: string): number {
+  let depth = 0
+  let current: string | null = folderId
+  const visited = new Set<string>()
+  while (current) {
+    if (visited.has(current)) throw new Error('文件夹层级循环')
+    visited.add(current)
+    const folder = folders.find(
+      (candidate) => candidate.id === current && !candidate.deletedAt
+    )
+    if (!folder) throw new Error('目标文件夹不存在')
+    depth += 1
+    current = folder.parentFolderId
+  }
+  return depth
+}
+
+function getSubtreeHeight(folders: FolderItem[], folderId: string): number {
+  const children = folders.filter(
+    (folder) => folder.parentFolderId === folderId && !folder.deletedAt
+  )
+  if (!children.length) return 1
+  return (
+    1 +
+    Math.max(...children.map((folder) => getSubtreeHeight(folders, folder.id)))
+  )
 }

@@ -33,6 +33,15 @@ const api: StickyApi = {
     importImageData: (bytes, mimeType) =>
       ipcRenderer.invoke(ipcChannels.assetImportData, bytes, mimeType)
   },
+  folders: {
+    list: () => ipcRenderer.invoke(ipcChannels.foldersList),
+    create: (title, parentFolderId) =>
+      ipcRenderer.invoke(ipcChannels.foldersCreate, title, parentFolderId),
+    update: (id, patch) =>
+      ipcRenderer.invoke(ipcChannels.foldersUpdate, id, patch),
+    moveItem: (itemId, parentFolderId) =>
+      ipcRenderer.invoke(ipcChannels.foldersMoveItem, itemId, parentFolderId)
+  },
   window: {
     expand: () => ipcRenderer.send(ipcChannels.windowExpand),
     scheduleCollapse: () => ipcRenderer.send(ipcChannels.windowScheduleCollapse),

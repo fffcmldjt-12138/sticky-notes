@@ -1,5 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
-import type { AppConfig, NoteType, StickyItem, StickyItemPatch } from '../../shared/models'
+import type {
+  AppConfig,
+  FolderItem,
+  NoteType,
+  StickyItem,
+  StickyItemPatch
+} from '../../shared/models'
 import { CreateMenu } from './components/CreateMenu'
 import { CardContextMenu, type CardAction } from './components/CardContextMenu'
 import { NoteEditor } from './components/NoteEditor'
@@ -10,6 +16,7 @@ import { StickyPanel } from './pages/StickyPanel'
 import { DetachedEditor } from './pages/DetachedEditor'
 import { upsertItem } from './lib/itemList'
 import { getItemTags, mergeTags } from '../../shared/tags'
+import type { FolderTreeNode } from './lib/folderTree'
 
 export default function App(): React.JSX.Element {
   const params = new URLSearchParams(window.location.search)
@@ -19,6 +26,7 @@ export default function App(): React.JSX.Element {
 
 function PanelApp(): React.JSX.Element {
   const [items, setItems] = useState<StickyItem[]>([])
+  const [folders, setFolders] = useState<FolderItem[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -32,11 +40,16 @@ function PanelApp(): React.JSX.Element {
   } | null>(null)
 
   const loadItems = useCallback(async () => setItems(await window.stickyApi.notes.list()), [])
+  const loadFolders = useCallback(
+    async () => setFolders(await window.stickyApi.folders.list()),
+    []
+  )
 
   useEffect(() => {
     void loadItems()
+    void loadFolders()
     void window.stickyApi.config.get().then(setConfig)
-  }, [loadItems])
+  }, [loadFolders, loadItems])
 
   useEffect(() => {
     const removeChanged = window.stickyApi.onItemChanged((changed) => {
@@ -56,6 +69,14 @@ function PanelApp(): React.JSX.Element {
     const item = await window.stickyApi.notes.create(type, title)
     setItems((current) => upsertItem(current, item))
     setSelectedId(item.id)
+    setCreateOpen(false)
+  }, [])
+
+  const createFolder = useCallback(async () => {
+    const title = window.prompt('文件夹名称', '新建文件夹')
+    if (title === null) return
+    const folder = await window.stickyApi.folders.create(title)
+    setFolders((current) => [...current, folder])
     setCreateOpen(false)
   }, [])
 
@@ -205,11 +226,13 @@ function PanelApp(): React.JSX.Element {
               onCreate={(type) => {
                 void createItem(type)
               }}
+              onCreateFolder={() => void createFolder()}
               onClose={() => setCreateOpen(false)}
             />
           )}
           <StickyPanel
             items={visibleItems}
+            folders={folders}
             onOpen={(item) => setSelectedId(item.id)}
             onToggleTodo={async (item, taskId, completed) => {
               if (item.type !== 'todo') return
@@ -228,6 +251,42 @@ function PanelApp(): React.JSX.Element {
               setContextMenu({ item, x: event.clientX, y: event.clientY })
             }
             onDetach={(item) => void window.stickyApi.window.detach(item.id)}
+            onToggleFolder={(folder: FolderTreeNode) => {
+              void window.stickyApi.folders
+                .update(folder.id, { collapsed: !folder.collapsed })
+                .then((updated) => {
+                  if (!updated) return
+                  setFolders((current) =>
+                    current.map((entry) => entry.id === updated.id ? updated : entry)
+                  )
+                })
+            }}
+            onMoveItem={(itemId, folderId) => {
+              void window.stickyApi.folders
+                .moveItem(itemId, folderId)
+                .then((updated) => {
+                  if (!updated) return
+                  setItems((current) =>
+                    current.map((entry) => entry.id === updated.id ? updated : entry)
+                  )
+                })
+                .catch((error: unknown) =>
+                  window.alert(error instanceof Error ? error.message : '移动便签失败')
+                )
+            }}
+            onMoveFolder={(folderId, parentFolderId) => {
+              void window.stickyApi.folders
+                .update(folderId, { parentFolderId })
+                .then((updated) => {
+                  if (!updated) return
+                  setFolders((current) =>
+                    current.map((entry) => entry.id === updated.id ? updated : entry)
+                  )
+                })
+                .catch((error: unknown) =>
+                  window.alert(error instanceof Error ? error.message : '移动文件夹失败')
+                )
+            }}
           />
         </>
       )}
