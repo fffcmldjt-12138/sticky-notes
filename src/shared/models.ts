@@ -9,6 +9,12 @@ export interface WindowBounds {
   height: number
 }
 
+export interface AssetReference {
+  fileName: string
+  mimeType: string
+  url: string
+}
+
 export interface BaseItem {
   id: string
   type: NoteType
@@ -18,6 +24,10 @@ export interface BaseItem {
   pinned: boolean
   detached: boolean
   windowBounds: WindowBounds | null
+  parentFolderId: string | null
+  tags: string[]
+  order: number
+  deletedAt: string | null
   createdAt: string
   updatedAt: string
 }
@@ -43,9 +53,21 @@ export interface TodoItem extends BaseItem {
 
 export type StickyItem = NoteItem | TodoItem
 
+export interface FolderItem {
+  id: string
+  title: string
+  parentFolderId: string | null
+  order: number
+  collapsed: boolean
+  deletedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
+
 export interface NotesFile {
-  version: 2
+  version: 3
   items: StickyItem[]
+  folders: FolderItem[]
 }
 
 export interface AppConfig {
@@ -65,6 +87,10 @@ export type StickyItemPatch = Partial<
     | 'pinned'
     | 'detached'
     | 'windowBounds'
+    | 'parentFolderId'
+    | 'tags'
+    | 'order'
+    | 'deletedAt'
     | 'updatedAt'
   >
 > & {
@@ -74,4 +100,3 @@ export type StickyItemPatch = Partial<
 export type TodoTaskPatch = Partial<
   Pick<TodoTask, 'contentMarkdown' | 'completed' | 'remindAt' | 'reminded'>
 >
-

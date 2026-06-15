@@ -28,6 +28,11 @@ const api: StickyApi = {
     update: (patch: Partial<Omit<AppConfig, 'version'>>) =>
       ipcRenderer.invoke(ipcChannels.configUpdate, patch)
   },
+  assets: {
+    selectImage: () => ipcRenderer.invoke(ipcChannels.assetSelect),
+    importImageData: (bytes, mimeType) =>
+      ipcRenderer.invoke(ipcChannels.assetImportData, bytes, mimeType)
+  },
   window: {
     expand: () => ipcRenderer.send(ipcChannels.windowExpand),
     scheduleCollapse: () => ipcRenderer.send(ipcChannels.windowScheduleCollapse),
@@ -36,7 +41,8 @@ const api: StickyApi = {
     suspendAutoHide: (value) =>
       ipcRenderer.send(ipcChannels.windowSuspendAutoHide, value),
     detach: (itemId) => ipcRenderer.invoke(ipcChannels.windowDetach, itemId),
-    attach: (itemId) => ipcRenderer.invoke(ipcChannels.windowAttach, itemId)
+    attach: (itemId) => ipcRenderer.invoke(ipcChannels.windowAttach, itemId),
+    openExternal: (url) => ipcRenderer.invoke(ipcChannels.windowOpenExternal, url)
   },
   onOpenEditor: (callback: (type: NoteType) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, type: NoteType): void =>

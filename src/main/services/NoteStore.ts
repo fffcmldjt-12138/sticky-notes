@@ -23,8 +23,9 @@ export class NoteStore {
   constructor(userDataPath: string) {
     this.filePath = join(userDataPath, 'notes.json')
     this.file = new JsonFileStore(this.filePath, () => ({
-      version: 2,
-      items: []
+      version: 3,
+      items: [],
+      folders: []
     }))
   }
 
@@ -49,6 +50,10 @@ export class NoteStore {
         pinned: false,
         detached: false,
         windowBounds: null,
+        parentFolderId: null,
+        tags: [],
+        order: data.items.length,
+        deletedAt: null,
         createdAt: now,
         updatedAt: now
       }
@@ -179,10 +184,10 @@ export class NoteStore {
       const raw = JSON.parse(await readFile(this.filePath, 'utf8')) as {
         version?: number
       }
-      if (raw.version === 1) {
+      if (raw.version === 1 || raw.version === 2) {
         await copyFile(this.filePath, `${this.filePath}.backup-${Date.now()}`)
         await this.file.write(migrateNotesFile(raw))
-      } else if (raw.version === 2) {
+      } else if (raw.version === 3) {
         const normalized = migrateNotesFile(raw)
         await this.file.write(normalized)
       } else {
@@ -191,7 +196,7 @@ export class NoteStore {
     } catch (error) {
       const nodeError = error as NodeJS.ErrnoException
       if (nodeError.code !== 'ENOENT') throw error
-      await this.file.write({ version: 2, items: [] })
+      await this.file.write({ version: 3, items: [], folders: [] })
     }
   }
 

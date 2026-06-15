@@ -1,10 +1,20 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, Notification, screen } from 'electron'
+import { pathToFileURL } from 'node:url'
+import {
+  app,
+  BrowserWindow,
+  net,
+  Notification,
+  protocol,
+  screen
+} from 'electron'
 import { electronApp, is } from '@electron-toolkit/utils'
 import { registerConfigIpc } from './ipc/configIpc'
+import { registerAssetIpc } from './ipc/assetIpc'
 import { registerNoteIpc } from './ipc/noteIpc'
 import { registerWindowIpc } from './ipc/windowIpc'
 import { AutoLaunchService } from './services/AutoLaunchService'
+import { AssetService } from './services/AssetService'
 import { ConfigStore } from './services/ConfigStore'
 import {
   DetachedWindowService,
@@ -16,6 +26,15 @@ import { TrayService } from './services/TrayService'
 import { WindowService } from './services/WindowService'
 
 const hasLock = app.requestSingleInstanceLock()
+protocol.registerSchemesAsPrivileged([{
+  scheme: 'asset',
+  privileges: {
+    standard: true,
+    secure: true,
+    supportFetchAPI: true,
+    stream: true
+  }
+}])
 if (!hasLock) {
   app.quit()
 } else {
@@ -24,6 +43,7 @@ if (!hasLock) {
 
     const userData = app.getPath('userData')
     const notes = new NoteStore(userData)
+    const assets = new AssetService(userData)
     const config = new ConfigStore(userData)
     const autoLaunch = new AutoLaunchService()
     const windows = new WindowService()
@@ -73,6 +93,12 @@ if (!hasLock) {
     })
 
     const currentConfig = await config.get()
+    protocol.handle('asset', (request) => {
+      const filePath = assets.resolveUrl(request.url)
+      return filePath
+        ? net.fetch(pathToFileURL(filePath).toString())
+        : new Response('Asset not found', { status: 404 })
+    })
     autoLaunch.setEnabled(currentConfig.autoLaunch)
     windows.create()
     windows.setAlwaysOnTop(currentConfig.alwaysOnTop)
@@ -85,6 +111,7 @@ if (!hasLock) {
         broadcast('notes:item-deleted', itemId)
       }
     })
+    registerAssetIpc(assets)
     registerWindowIpc(windows, detachedWindows, notes)
     registerConfigIpc(config, autoLaunch, windows, tray)
     reminder.start()

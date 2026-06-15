@@ -1,8 +1,17 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { Markdown } from '@tiptap/markdown'
-import { EditorContent, useEditor } from '@tiptap/react'
+import Image from '@tiptap/extension-image'
+import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { MarkdownToolbar } from './MarkdownToolbar'
+
+export function shouldApplyExternalMarkdown(
+  currentValue: string,
+  lastEmittedValue: string,
+  incomingValue: string
+): boolean {
+  return incomingValue !== currentValue && incomingValue !== lastEmittedValue
+}
 
 export function MarkdownEditor({
   value,
@@ -13,10 +22,35 @@ export function MarkdownEditor({
   onChange(value: string): void
   compact?: boolean
 }): React.JSX.Element | null {
+  const lastEmittedValue = useRef(value)
+  const editorRef = useRef<Editor | null>(null)
+
+  async function importImage(file: File): Promise<void> {
+    if (!file.type.startsWith('image/')) return
+    const asset = await window.stickyApi.assets.importImageData(
+      new Uint8Array(await file.arrayBuffer()),
+      file.type
+    )
+    editorRef.current
+      ?.chain()
+      .focus()
+      .setImage({ src: asset.url, alt: file.name || '本地图片' })
+      .run()
+  }
+
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        link: { openOnClick: false }
+        link: {
+          openOnClick: false,
+          autolink: true,
+          linkOnPaste: true,
+          defaultProtocol: 'https'
+        }
+      }),
+      Image.configure({
+        allowBase64: false,
+        inline: false
       }),
       Markdown
     ],
@@ -28,24 +62,78 @@ export function MarkdownEditor({
         class: compact ? 'markdown-prosemirror compact' : 'markdown-prosemirror',
         role: 'textbox',
         'aria-label': 'Markdown 编辑器'
+      },
+      handleClick: (_view, _position, event) => {
+        if (!event.ctrlKey && !event.metaKey) return false
+        const target = event.target
+        if (!(target instanceof Element)) return false
+        const href = target.closest('a')?.getAttribute('href')
+        if (!href) return false
+        void window.stickyApi.window.openExternal(href)
+        return true
+      },
+      handlePaste: (_view, event) => {
+        const file = [...(event.clipboardData?.files ?? [])]
+          .find((candidate) => candidate.type.startsWith('image/'))
+        if (!file) return false
+        event.preventDefault()
+        void importImage(file)
+        return true
+      },
+      handleDrop: (_view, event) => {
+        const file = [...(event.dataTransfer?.files ?? [])]
+          .find((candidate) => candidate.type.startsWith('image/'))
+        if (!file) return false
+        event.preventDefault()
+        void importImage(file)
+        return true
       }
     },
     onUpdate: ({ editor: currentEditor }) => {
-      onChange(currentEditor.getMarkdown())
+      const markdown = currentEditor.getMarkdown()
+      lastEmittedValue.current = markdown
+      onChange(markdown)
     }
   })
 
   useEffect(() => {
+    editorRef.current = editor
+    return () => {
+      editorRef.current = null
+    }
+  }, [editor])
+
+  useEffect(() => {
     if (!editor) return
-    if (editor.getMarkdown() === value) return
+    if (
+      !shouldApplyExternalMarkdown(
+        editor.getMarkdown(),
+        lastEmittedValue.current,
+        value
+      )
+    ) {
+      return
+    }
     editor.commands.setContent(editor.markdown!.parse(value), { emitUpdate: false })
+    lastEmittedValue.current = value
   }, [editor, value])
 
   if (!editor) return null
 
   return (
     <div className={`markdown-editor-shell ${compact ? 'compact' : ''}`}>
-      <MarkdownToolbar editor={editor} />
+      <MarkdownToolbar
+        editor={editor}
+        onInsertImage={() => {
+          void window.stickyApi.assets.selectImage().then((asset) => {
+            if (!asset) return
+            editor.chain().focus().setImage({
+              src: asset.url,
+              alt: asset.fileName
+            }).run()
+          })
+        }}
+      />
       <EditorContent editor={editor} />
       <div className="markdown-syntax-hint">
         # 标题 · **粗体** · *斜体* · - 列表 · &gt; 引用 · `代码`

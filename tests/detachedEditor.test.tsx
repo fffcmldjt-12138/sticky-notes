@@ -49,6 +49,9 @@ describe('detached editor controls', () => {
     )
 
     expect(container.querySelector('.editor-header')).toHaveClass('detached-header')
+    expect(container.querySelector('.editor-header input')).not.toBeInTheDocument()
+    expect(container.querySelector('.editor-header')).toHaveTextContent('Note')
+    expect(screen.getByLabelText('标题')).toHaveValue('Note')
     expect(screen.queryByRole('button', { name: '返回' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '删除' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '关闭' }))

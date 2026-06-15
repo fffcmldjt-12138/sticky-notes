@@ -11,6 +11,10 @@ const dueTodo: TodoItem = {
   pinned: false,
   detached: false,
   windowBounds: null,
+  parentFolderId: null,
+  tags: [],
+  order: 0,
+  deletedAt: null,
   tasks: [
     {
       id: 'task_1',

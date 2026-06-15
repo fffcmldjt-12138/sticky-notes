@@ -21,15 +21,31 @@
 .sticky-card-body { padding: 12px; }
 .sticky-card-body p, .todo-check span { margin: 0; font-size: 13px; line-height: 1.55; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
 .sticky-card-body time { display: block; margin-top: 10px; color: #8a919c; font-size: 11px; }
+.card-tags, .tag-chip-list { display: flex; gap: 5px; flex-wrap: wrap; }
+.card-tags { margin-top: 8px; }
+.card-tags span, .tag-chip { padding: 2px 6px; border-radius: 999px; background: rgba(91,141,239,.12); color: #3565ad; font-size: 10px; }
+.tag-editor { padding: 8px 12px; display: grid; grid-template-columns: minmax(0,1fr) 100px; gap: 8px; align-items: center; border-bottom: 1px solid rgba(127,127,127,.14); }
+.tag-editor input { min-width: 0; padding: 6px 8px; border: 1px solid rgba(127,127,127,.22); border-radius: 8px; background: rgba(255,255,255,.72); color: inherit; }
+.tag-chip { border: 0; }
+.tag-chip.content { cursor: default; opacity: .78; }
 .body-dark .sticky-card-body time { color: #aab1bc; }
 .todo-check { display: flex; align-items: flex-start; gap: 8px; }
 .todo-check input { margin-top: 3px; accent-color: #5b8def; }
 .todo-card.completed .card-title, .todo-card.completed .todo-check span { text-decoration: line-through; opacity: .65; }
 
-.editor { height: 100%; display: flex; flex-direction: column; }
+.editor { height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .editor-header { height: 62px; padding: 12px; display: grid; grid-template-columns: 34px 1fr 34px; gap: 8px; align-items: center; }
-.editor-header input { min-width: 0; border: 0; outline: 0; background: transparent; color: inherit; text-align: center; font-weight: 750; }
+.editor-header-title { min-width: 0; overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; font-weight: 750; user-select: none; }
 .editor-toolbar { padding: 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(127,127,127,.18); }
+.editor-identity-toolbar { position: relative; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 8px; }
+.editor-title-input { min-width: 0; width: 100%; padding: 8px 10px; border: 1px solid rgba(127,127,127,.25); border-radius: 9px; background: rgba(255,255,255,.72); color: inherit; outline: none; }
+.editor-title-input:focus { border-color: #5b8def; box-shadow: 0 0 0 2px rgba(91,141,239,.14); }
+.body-dark .editor-title-input { background: rgba(255,255,255,.08); }
+.compact-color-picker { position: relative; width: 34px; }
+.compact-color-picker summary { width: 34px; height: 34px; border: 3px solid rgba(255,255,255,.8); border-radius: 10px; box-shadow: 0 0 0 1px rgba(0,0,0,.12); cursor: pointer; list-style: none; }
+.compact-color-picker summary::-webkit-details-marker { display: none; }
+.compact-color-popover { position: absolute; z-index: 15; top: 42px; left: 0; width: 190px; padding: 9px; border: 1px solid #dfe3e9; border-radius: 12px; background: white; box-shadow: 0 14px 36px rgba(24,31,43,.2); }
+.compact-color-popover .color-picker { flex-wrap: wrap; }
 .color-picker { display: flex; gap: 7px; }
 .color-dot { width: 22px; height: 22px; border-radius: 50%; border: 3px solid transparent; }
 .color-dot.selected { border-color: currentColor; box-shadow: inset 0 0 0 2px white; }
@@ -47,11 +63,13 @@
 .markdown-toolbar { flex: 0 0 auto; padding: 7px; display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid rgba(127,127,127,.18); background: rgba(255,255,255,.62); }
 .markdown-toolbar button { min-width: 30px; padding: 5px 7px; border-radius: 6px; background: transparent; color: #343a45; font-size: 12px; white-space: nowrap; }
 .markdown-toolbar button:hover, .markdown-toolbar button.active { background: #e1e7f0; color: #225bb7; }
-.markdown-editor-shell .tiptap { height: 100%; min-height: 0; padding: 14px; outline: none; overflow-y: auto; line-height: 1.6; }
+.markdown-editor-shell > div:has(.tiptap) { flex: 1; min-height: 0; overflow: hidden; }
+.markdown-editor-shell .tiptap { height: 100%; min-height: 0; padding: 14px; outline: none; overflow-y: auto; overscroll-behavior: contain; line-height: 1.6; }
 .markdown-editor-shell .tiptap > :first-child { margin-top: 0; }
 .markdown-editor-shell .tiptap > :last-child { margin-bottom: 0; }
 .markdown-editor-shell .tiptap pre { overflow: auto; padding: 10px; border-radius: 8px; background: rgba(0,0,0,.12); }
 .markdown-editor-shell .tiptap blockquote { margin-left: 0; padding-left: 12px; border-left: 3px solid #8792a2; }
+.markdown-editor-shell .tiptap img { display: block; max-width: 100%; max-height: 420px; margin: 10px auto; border-radius: 9px; object-fit: contain; }
 .markdown-syntax-hint { flex: 0 0 auto; padding: 6px 10px; border-top: 1px solid rgba(127,127,127,.15); color: #858d99; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .markdown-editor-shell.compact { margin: 0; }
 .markdown-editor-shell.compact .markdown-toolbar { display: none; }

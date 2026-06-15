@@ -9,6 +9,8 @@ export const ipcChannels = {
   todoTaskReorder: 'todo-task:reorder',
   configGet: 'config:get',
   configUpdate: 'config:update',
+  assetSelect: 'asset:select',
+  assetImportData: 'asset:import-data',
   windowExpand: 'window:expand',
   windowScheduleCollapse: 'window:schedule-collapse',
   windowCancelCollapse: 'window:cancel-collapse',
@@ -16,6 +18,7 @@ export const ipcChannels = {
   windowSuspendAutoHide: 'window:suspend-auto-hide',
   windowDetach: 'window:detach',
   windowAttach: 'window:attach',
+  windowOpenExternal: 'window:open-external',
   openEditor: 'app:open-editor',
   itemChanged: 'notes:item-changed',
   itemDeleted: 'notes:item-deleted'

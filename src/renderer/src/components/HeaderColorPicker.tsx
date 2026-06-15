@@ -17,12 +17,14 @@ const colors: HeaderColor[] = [
 
 export function HeaderColorPicker({
   value,
-  onChange
+  onChange,
+  compact = false
 }: {
   value: HeaderColor
   onChange(value: HeaderColor): void
+  compact?: boolean
 }): React.JSX.Element {
-  return (
+  const picker = (
     <div className="color-picker" aria-label="头部颜色">
       {colors.map((color) => (
         <button
@@ -42,5 +44,18 @@ export function HeaderColorPicker({
         />
       </label>
     </div>
+  )
+
+  if (compact) {
+    return (
+      <details className="compact-color-picker">
+        <summary aria-label="选择头部颜色" style={{ backgroundColor: value }} />
+        <div className="compact-color-popover">{picker}</div>
+      </details>
+    )
+  }
+
+  return (
+    picker
   )
 }

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { migrateNotesFile } from '../src/main/services/noteMigration'
 
 describe('migrateNotesFile', () => {
-  it('migrates version 1 notes and todos to version 2 without data loss', () => {
+  it('migrates version 1 notes and todos to version 3 without data loss', () => {
     const result = migrateNotesFile({
       version: 1,
       items: [
@@ -36,19 +36,28 @@ describe('migrateNotesFile', () => {
     })
 
     expect(result).toMatchObject({
-      version: 2,
+      version: 3,
+      folders: [],
       items: [
         {
           id: 'note_1',
           headerColor: '#f2c94c',
           detached: false,
-          windowBounds: null
+          windowBounds: null,
+          parentFolderId: null,
+          tags: [],
+          order: 0,
+          deletedAt: null
         },
         {
           id: 'todo_1',
           headerColor: '#5b8def',
           detached: false,
           windowBounds: null,
+          parentFolderId: null,
+          tags: [],
+          order: 1,
+          deletedAt: null,
           tasks: [
             {
               contentMarkdown: '- [ ] legacy task',
@@ -58,6 +67,43 @@ describe('migrateNotesFile', () => {
             }
           ]
         }
+      ]
+    })
+  })
+
+  it('migrates version 2 items to version 3 organization fields', () => {
+    const result = migrateNotesFile({
+      version: 2,
+      items: [
+        {
+          id: 'note_2',
+          type: 'note',
+          title: 'Current note',
+          contentMarkdown: 'Text',
+          headerColor: '#5b8def',
+          bodyTheme: 'dark',
+          pinned: true,
+          detached: true,
+          windowBounds: { x: 1, y: 2, width: 300, height: 400 },
+          syncedToSiyuan: false,
+          createdAt: '2026-06-14T09:00:00.000Z',
+          updatedAt: '2026-06-14T10:00:00.000Z'
+        }
+      ]
+    })
+
+    expect(result).toEqual({
+      version: 3,
+      folders: [],
+      items: [
+        expect.objectContaining({
+          id: 'note_2',
+          contentMarkdown: 'Text',
+          parentFolderId: null,
+          tags: [],
+          order: 0,
+          deletedAt: null
+        })
       ]
     })
   })

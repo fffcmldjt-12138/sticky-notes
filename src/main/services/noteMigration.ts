@@ -26,17 +26,28 @@ function normalizeBodyTheme(value: unknown): BodyTheme {
 
 export function migrateNotesFile(value: unknown): NotesFile {
   if (!value || typeof value !== 'object') throw new Error('Invalid notes file')
-  const source = value as { version?: number; items?: unknown[] }
-  if (source.version === 2) return normalizeVersion2(source)
+  const source = value as { version?: number; items?: unknown[]; folders?: unknown[] }
+  if (source.version === 3) return normalizeVersion3(source)
+  if (source.version === 2) return migrateVersion2(source)
   if (source.version !== 1) throw new Error(`Unsupported notes version: ${source.version}`)
 
   return {
-    version: 2,
+    version: 3,
+    folders: [],
     items: (source.items ?? []).map(migrateVersion1Item)
   }
 }
 
-function migrateVersion1Item(value: unknown): StickyItem {
+function organizationFields(index: number) {
+  return {
+    parentFolderId: null,
+    tags: [],
+    order: index,
+    deletedAt: null
+  }
+}
+
+function migrateVersion1Item(value: unknown, index: number): StickyItem {
   const item = value as Record<string, unknown>
   const base = {
     id: String(item.id),
@@ -46,6 +57,7 @@ function migrateVersion1Item(value: unknown): StickyItem {
     pinned: Boolean(item.pinned),
     detached: false,
     windowBounds: null,
+    ...organizationFields(index),
     createdAt: String(item.createdAt),
     updatedAt: String(item.updatedAt)
   }
@@ -75,19 +87,43 @@ function migrateVersion1Item(value: unknown): StickyItem {
   }
 }
 
-function normalizeVersion2(source: { items?: unknown[] }): NotesFile {
+function migrateVersion2(source: { items?: unknown[] }): NotesFile {
   return {
-    version: 2,
-    items: (source.items ?? []).map((value) => {
+    version: 3,
+    folders: [],
+    items: (source.items ?? []).map((value, index) => {
       const item = value as StickyItem
       return {
         ...item,
         headerColor: normalizeColor(item.headerColor),
         bodyTheme: normalizeBodyTheme(item.bodyTheme),
         detached: Boolean(item.detached),
-        windowBounds: item.windowBounds ?? null
+        windowBounds: item.windowBounds ?? null,
+        ...organizationFields(index)
       }
     })
   }
 }
 
+function normalizeVersion3(
+  source: { items?: unknown[]; folders?: unknown[] }
+): NotesFile {
+  return {
+    version: 3,
+    folders: (source.folders ?? []) as NotesFile['folders'],
+    items: (source.items ?? []).map((value, index) => {
+      const item = value as StickyItem
+      return {
+        ...item,
+        headerColor: normalizeColor(item.headerColor),
+        bodyTheme: normalizeBodyTheme(item.bodyTheme),
+        detached: Boolean(item.detached),
+        windowBounds: item.windowBounds ?? null,
+        parentFolderId: item.parentFolderId ?? null,
+        tags: Array.isArray(item.tags) ? item.tags : [],
+        order: Number.isFinite(item.order) ? item.order : index,
+        deletedAt: item.deletedAt ?? null
+      }
+    })
+  }
+}

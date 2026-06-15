@@ -1,5 +1,6 @@
 import type {
   AppConfig,
+  AssetReference,
   NoteType,
   StickyItem,
   StickyItemPatch,
@@ -27,6 +28,10 @@ export interface StickyApi {
     get(): Promise<AppConfig>
     update(patch: Partial<Omit<AppConfig, 'version'>>): Promise<AppConfig>
   }
+  assets: {
+    selectImage(): Promise<AssetReference | null>
+    importImageData(bytes: Uint8Array, mimeType: string): Promise<AssetReference>
+  }
   window: {
     expand(): void
     scheduleCollapse(): void
@@ -35,6 +40,7 @@ export interface StickyApi {
     suspendAutoHide(suspended: boolean): void
     detach(itemId: string): Promise<void>
     attach(itemId: string): Promise<void>
+    openExternal(url: string): Promise<boolean>
   }
   onOpenEditor(callback: (type: NoteType) => void): () => void
   onItemChanged(callback: (item: StickyItem) => void): () => void

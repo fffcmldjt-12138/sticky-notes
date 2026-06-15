@@ -1,5 +1,6 @@
 import type { TodoItem } from '../../../shared/models'
 import { StickyCard } from './StickyCard'
+import { getItemTags } from '../../../shared/tags'
 
 export function TodoCard({
   item,
@@ -36,6 +37,9 @@ export function TodoCard({
           <span>{task.contentMarkdown || '空任务'}</span>
         </label>
       ))}
+      <div className="card-tags">
+        {getItemTags(item).map((tag) => <span key={tag}>#{tag}</span>)}
+      </div>
       {!item.tasks.length && <p>点击编辑并添加任务...</p>}
       <time>
         {completedCount}/{item.tasks.length} 已完成

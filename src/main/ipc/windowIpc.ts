@@ -1,5 +1,6 @@
-import { ipcMain } from 'electron'
+import { ipcMain, shell } from 'electron'
 import { ipcChannels } from '../../shared/ipcChannels'
+import { normalizeExternalUrl } from '../../shared/externalUrl'
 import type { WindowService } from '../services/WindowService'
 import type { DetachedWindowService } from '../services/DetachedWindowService'
 import type { NoteStore } from '../services/NoteStore'
@@ -23,4 +24,10 @@ export function registerWindowIpc(
   ipcMain.handle(ipcChannels.windowAttach, (_event, itemId: string) =>
     detachedWindows.attach(itemId)
   )
+  ipcMain.handle(ipcChannels.windowOpenExternal, async (_event, value: string) => {
+    const url = normalizeExternalUrl(value)
+    if (!url) return false
+    await shell.openExternal(url)
+    return true
+  })
 }

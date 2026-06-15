@@ -13,11 +13,12 @@ describe('NoteStore', () => {
     store = new NoteStore(directory)
   })
 
-  it('creates an empty version 2 file on first load', async () => {
+  it('creates an empty version 3 file on first load', async () => {
     expect(await store.list()).toEqual([])
     expect(JSON.parse(await readFile(join(directory, 'notes.json'), 'utf8'))).toEqual({
-      version: 2,
-      items: []
+      version: 3,
+      items: [],
+      folders: []
     })
   })
 
@@ -26,9 +27,19 @@ describe('NoteStore', () => {
     const todo = await store.create('todo')
 
     expect(note.type).toBe('note')
+    expect(note).toMatchObject({
+      parentFolderId: null,
+      tags: [],
+      order: 0,
+      deletedAt: null
+    })
     expect(todo).toMatchObject({
       type: 'todo',
-      tasks: []
+      tasks: [],
+      parentFolderId: null,
+      tags: [],
+      order: 1,
+      deletedAt: null
     })
   })
 

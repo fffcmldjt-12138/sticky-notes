@@ -9,6 +9,7 @@ import { SettingsPanel } from './pages/SettingsPanel'
 import { StickyPanel } from './pages/StickyPanel'
 import { DetachedEditor } from './pages/DetachedEditor'
 import { upsertItem } from './lib/itemList'
+import { getItemTags, mergeTags } from '../../shared/tags'
 
 export default function App(): React.JSX.Element {
   const params = new URLSearchParams(window.location.search)
@@ -23,6 +24,7 @@ function PanelApp(): React.JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [config, setConfig] = useState<AppConfig | null>(null)
   const [pendingRename, setPendingRename] = useState<StickyItem | null>(null)
+  const [activeTag, setActiveTag] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<{
     item: StickyItem
     x: number
@@ -63,6 +65,10 @@ function PanelApp(): React.JSX.Element {
   )
 
   const selected = items.find((item) => item.id === selectedId) ?? null
+  const allTags = mergeTags(...items.map(getItemTags))
+  const visibleItems = activeTag
+    ? items.filter((item) => getItemTags(item).includes(activeTag))
+    : items
   const suspendAutoHide = Boolean(
     selected ||
     createOpen ||
@@ -174,7 +180,21 @@ function PanelApp(): React.JSX.Element {
       {!selected && !settingsOpen && (
         <>
           <header className="panel-header">
-            <div><h1>便签</h1><span>{items.length} 条记录</span></div>
+            <div>
+              <h1>便签</h1>
+              <span>{items.length} 条记录</span>
+              <div className="panel-tag-filters">
+                {allTags.map((tag) => (
+                  <button
+                    key={tag}
+                    className={activeTag === tag ? 'active' : ''}
+                    onClick={() => setActiveTag(activeTag === tag ? null : tag)}
+                  >
+                    #{tag}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="header-actions">
               <button className="icon-button" onClick={() => setSettingsOpen(true)} aria-label="设置">⚙</button>
               <button className="primary-button" onClick={() => setCreateOpen((open) => !open)}>＋ 新建</button>
@@ -189,7 +209,7 @@ function PanelApp(): React.JSX.Element {
             />
           )}
           <StickyPanel
-            items={items}
+            items={visibleItems}
             onOpen={(item) => setSelectedId(item.id)}
             onToggleTodo={async (item, taskId, completed) => {
               if (item.type !== 'todo') return

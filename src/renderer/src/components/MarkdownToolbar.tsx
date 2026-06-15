@@ -1,9 +1,11 @@
 import type { Editor } from '@tiptap/react'
 
 export function MarkdownToolbar({
-  editor
+  editor,
+  onInsertImage
 }: {
   editor: Editor
+  onInsertImage(): void
 }): React.JSX.Element {
   const button = (
     label: string,
@@ -50,6 +52,11 @@ export function MarkdownToolbar({
       {button('1.', '有序列表：1. ', editor.isActive('orderedList'), () =>
         editor.chain().focus().toggleOrderedList().run()
       )}
+      {button('1.1', '多级编号列表', false, () => {
+        const chain = editor.chain().focus()
+        if (!editor.isActive('orderedList')) chain.toggleOrderedList()
+        chain.sinkListItem('listItem').run()
+      })}
       {button('❯', '引用：> ', editor.isActive('blockquote'), () =>
         editor.chain().focus().toggleBlockquote().run()
       )}
@@ -72,6 +79,7 @@ export function MarkdownToolbar({
       {button('取消链接', '移除链接', false, () =>
         editor.chain().focus().extendMarkRange('link').unsetLink().run()
       )}
+      {button('图片', '插入本地图片', false, onInsertImage)}
       {button('↶', '撤销', false, () => editor.chain().focus().undo().run())}
       {button('↷', '重做', false, () => editor.chain().focus().redo().run())}
     </div>

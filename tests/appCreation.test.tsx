@@ -43,6 +43,10 @@ describe('App creation flow', () => {
         }),
         update: vi.fn()
       },
+      assets: {
+        selectImage: vi.fn().mockResolvedValue(null),
+        importImageData: vi.fn()
+      },
       window: {
         expand: vi.fn(),
         scheduleCollapse: vi.fn(),
@@ -50,7 +54,8 @@ describe('App creation flow', () => {
         hide: vi.fn(),
         suspendAutoHide: vi.fn(),
         detach: vi.fn(),
-        attach: vi.fn()
+        attach: vi.fn(),
+        openExternal: vi.fn()
       },
       onOpenEditor: vi.fn().mockReturnValue(() => undefined),
       onItemChanged: vi.fn().mockReturnValue(() => undefined),

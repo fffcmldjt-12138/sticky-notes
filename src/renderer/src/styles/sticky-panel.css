@@ -17,8 +17,11 @@
 }
 .panel-header h1 { margin: 0; font-size: 22px; letter-spacing: -.5px; }
 .panel-header span { font-size: 12px; color: #7c8491; }
+.panel-tag-filters { max-width: 210px; display: flex; gap: 4px; overflow-x: auto; margin-top: 4px; }
+.panel-tag-filters button { padding: 2px 6px; border-radius: 999px; background: #e8ecf2; color: #657080; font-size: 9px; white-space: nowrap; }
+.panel-tag-filters button.active { background: #5b8def; color: white; }
 .header-actions { display: flex; gap: 8px; -webkit-app-region: no-drag; }
-.panel-header button, .editor-header button, .editor-header input { -webkit-app-region: no-drag; }
+.panel-header button, .editor-header button { -webkit-app-region: no-drag; }
 .editor-header.detached-header { -webkit-app-region: drag; }
 .editor-header-spacer { width: 34px; height: 34px; }
 

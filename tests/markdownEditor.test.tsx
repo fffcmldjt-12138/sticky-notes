@@ -2,13 +2,26 @@
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
-import { MarkdownEditor } from '../src/renderer/src/components/MarkdownEditor'
+import {
+  MarkdownEditor,
+  shouldApplyExternalMarkdown
+} from '../src/renderer/src/components/MarkdownEditor'
 
 describe('MarkdownEditor', () => {
+  it('does not reapply a value that was just emitted by the local editor', () => {
+    expect(
+      shouldApplyExternalMarkdown('## Local', '## Local', '## Local')
+    ).toBe(false)
+    expect(
+      shouldApplyExternalMarkdown('## Local', '## Local', '## Remote')
+    ).toBe(true)
+  })
+
   it('keeps a formatting toolbar visible and renders Markdown immediately', async () => {
     render(<MarkdownEditor value="## Heading" onChange={vi.fn()} />)
 
     expect(screen.getByRole('toolbar')).toBeVisible()
+    expect(screen.getByRole('button', { name: '1.1' })).toBeVisible()
     await waitFor(() => {
       expect(screen.getByRole('heading', { level: 2 })).toHaveTextContent('Heading')
     })

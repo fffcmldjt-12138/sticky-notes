@@ -12,6 +12,10 @@ const note: NoteItem = {
   pinned: false,
   detached: false,
   windowBounds: null,
+  parentFolderId: null,
+  tags: [],
+  order: 0,
+  deletedAt: null,
   syncedToSiyuan: false,
   createdAt: '2026-06-15T00:00:00.000Z',
   updatedAt: '2026-06-15T00:00:00.000Z'

@@ -22,6 +22,8 @@ import type {
 import { BodyThemeToggle } from './BodyThemeToggle'
 import { HeaderColorPicker } from './HeaderColorPicker'
 import { TodoTaskRow } from './TodoTaskRow'
+import { TagEditor } from './TagEditor'
+import { extractTags } from '../../../shared/tags'
 
 interface Props {
   item: TodoItem
@@ -48,22 +50,39 @@ export function TodoEditor({
 }: Props): React.JSX.Element {
   const [draft, setDraft] = useState(item)
   const onSaveRef = useRef(onSave)
+  const lastSubmittedRef = useRef<StickyItemPatch | null>(null)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
-  useEffect(() => setDraft(item), [item])
+  useEffect(() => {
+    const submitted = lastSubmittedRef.current
+    if (
+      submitted &&
+      submitted.title === item.title &&
+      submitted.headerColor === item.headerColor &&
+      submitted.bodyTheme === item.bodyTheme
+      && JSON.stringify(submitted.tags) === JSON.stringify(item.tags)
+    ) {
+      setDraft((current) => ({ ...current, tasks: item.tasks }))
+      return
+    }
+    setDraft(item)
+  }, [item])
   useEffect(() => {
     onSaveRef.current = onSave
   }, [onSave])
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      onSaveRef.current({
+      const patch = {
         title: draft.title,
         headerColor: draft.headerColor,
         bodyTheme: draft.bodyTheme
-      })
+        , tags: draft.tags
+      } satisfies StickyItemPatch
+      lastSubmittedRef.current = patch
+      onSaveRef.current(patch)
     }, 500)
     return () => window.clearTimeout(timer)
   }, [draft])
@@ -78,11 +97,14 @@ export function TodoEditor({
   }
 
   function saveAndBack(): void {
-    onSaveRef.current({
+    const patch = {
       title: draft.title,
       headerColor: draft.headerColor,
       bodyTheme: draft.bodyTheme
-    })
+      , tags: draft.tags
+    } satisfies StickyItemPatch
+    lastSubmittedRef.current = patch
+    onSaveRef.current(patch)
     onBack()
   }
 
@@ -95,25 +117,33 @@ export function TodoEditor({
         {detached
           ? <span className="editor-header-spacer" />
           : <button className="icon-button" onClick={saveAndBack} aria-label="返回">‹</button>}
-        <input
-          aria-label="标题"
-          value={draft.title}
-          onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-        />
+        <span className="editor-header-title">{draft.title || '无标题'}</span>
         {detached
           ? <button className="icon-button" onClick={saveAndBack} aria-label="关闭">×</button>
           : <button className="icon-button danger" onClick={onDelete} aria-label="删除">×</button>}
       </div>
-      <div className="editor-toolbar">
+      <div className="editor-toolbar editor-identity-toolbar">
         <HeaderColorPicker
+          compact
           value={draft.headerColor}
           onChange={(headerColor) => setDraft({ ...draft, headerColor })}
+        />
+        <input
+          className="editor-title-input"
+          aria-label="标题"
+          value={draft.title}
+          onChange={(event) => setDraft({ ...draft, title: event.target.value })}
         />
         <BodyThemeToggle
           value={draft.bodyTheme}
           onChange={(bodyTheme) => setDraft({ ...draft, bodyTheme })}
         />
       </div>
+      <TagEditor
+        value={draft.tags}
+        contentTags={draft.tasks.flatMap((task) => extractTags(task.contentMarkdown))}
+        onChange={(tags) => setDraft({ ...draft, tags })}
+      />
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
