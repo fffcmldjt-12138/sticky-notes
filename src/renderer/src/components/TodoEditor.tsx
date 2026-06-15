@@ -158,6 +158,7 @@ export function TodoEditor({
               <TodoTaskRow
                 key={task.id}
                 task={task}
+                bodyTheme={draft.bodyTheme}
                 onUpdate={(patch) => onUpdateTask(task.id, patch)}
                 onDelete={() => onDeleteTask(task.id)}
               />

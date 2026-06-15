@@ -14,6 +14,10 @@ const todo: TodoItem = {
   pinned: false,
   detached: false,
   windowBounds: null,
+  parentFolderId: null,
+  tags: [],
+  order: 0,
+  deletedAt: null,
   tasks: [
     {
       id: 'task_1',
@@ -24,125 +28,137 @@ const todo: TodoItem = {
       tags: [],
       deadlineAt: null,
       deadlineReminders: []
-    },
-    {
-      id: 'task_2',
-      contentMarkdown: 'Second',
-      completed: false,
-      remindAt: null,
-      reminded: true,
-      tags: [],
-      deadlineAt: '2026-06-20T12:00:00.000Z',
-      deadlineReminders: []
     }
   ],
   createdAt: '2026-06-14T09:00:00.000Z',
   updatedAt: '2026-06-14T09:00:00.000Z'
 }
 
-describe('TodoEditor', () => {
-  it('updates only the selected task reminder and resets its reminded flag', () => {
-    const onUpdateTask = vi.fn()
-    render(
-      <TodoEditor
-        item={todo}
-        onSave={vi.fn()}
-        onAddTask={vi.fn()}
-        onUpdateTask={onUpdateTask}
-        onDeleteTask={vi.fn()}
-        onReorderTasks={vi.fn()}
-        onBack={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    )
+function renderEditor(onUpdateTask = vi.fn()): ReturnType<typeof render> {
+  return render(
+    <TodoEditor
+      item={todo}
+      onSave={vi.fn()}
+      onAddTask={vi.fn()}
+      onUpdateTask={onUpdateTask}
+      onDeleteTask={vi.fn()}
+      onReorderTasks={vi.fn()}
+      onBack={vi.fn()}
+      onDelete={vi.fn()}
+    />
+  )
+}
 
-    const reminderInputs = screen.getAllByLabelText('提醒时间')
-    fireEvent.change(reminderInputs[1], {
+describe('TodoEditor', () => {
+  it('shows a compact row with a large checkbox and only two setting buttons', () => {
+    renderEditor()
+
+    expect(screen.getByLabelText('完成状态')).toHaveClass('task-complete-checkbox')
+    expect(screen.getByLabelText('任务内容')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '设置提醒' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '设置 DDL' })).toBeInTheDocument()
+    expect(screen.queryByLabelText('提醒时间')).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('DDL 时间')).not.toBeInTheDocument()
+  })
+
+  it('opens reminder settings near the reminder button and saves once', () => {
+    const onUpdateTask = vi.fn()
+    renderEditor(onUpdateTask)
+
+    fireEvent.click(screen.getByRole('button', { name: '设置提醒' }))
+    fireEvent.change(screen.getByLabelText('提醒时间'), {
       target: { value: '2026-06-16T09:30' }
     })
 
+    expect(onUpdateTask).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '保存提醒' }))
+
     expect(onUpdateTask).toHaveBeenCalledOnce()
-    expect(onUpdateTask).toHaveBeenCalledWith('task_2', {
+    expect(onUpdateTask).toHaveBeenCalledWith('task_1', {
       remindAt: new Date('2026-06-16T09:30').toISOString(),
+      reminded: false
+    })
+    expect(screen.queryByLabelText('提醒时间')).not.toBeInTheDocument()
+  })
+
+  it('clears an existing reminder from the popover', () => {
+    const onUpdateTask = vi.fn()
+    renderEditor(onUpdateTask)
+
+    fireEvent.click(screen.getByRole('button', { name: '设置提醒' }))
+    fireEvent.click(screen.getByRole('button', { name: '清除提醒' }))
+
+    expect(onUpdateTask).toHaveBeenCalledWith('task_1', {
+      remindAt: null,
       reminded: false
     })
   })
 
-  it('renders one drag handle and one plain text input per task', () => {
-    render(
-      <TodoEditor
-        item={todo}
-        onSave={vi.fn()}
-        onAddTask={vi.fn()}
-        onUpdateTask={vi.fn()}
-        onDeleteTask={vi.fn()}
-        onReorderTasks={vi.fn()}
-        onBack={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    )
-
-    expect(screen.getAllByLabelText('拖动排序')).toHaveLength(2)
-    expect(screen.getAllByLabelText('任务内容')).toHaveLength(2)
-    expect(screen.queryByLabelText('Markdown 编辑器')).not.toBeInTheDocument()
-  })
-
-  it('updates task content from the plain text input', () => {
+  it('opens DDL settings and saves the deadline with selected reminders once', () => {
     const onUpdateTask = vi.fn()
-    render(
-      <TodoEditor
-        item={todo}
-        onSave={vi.fn()}
-        onAddTask={vi.fn()}
-        onUpdateTask={onUpdateTask}
-        onDeleteTask={vi.fn()}
-        onReorderTasks={vi.fn()}
-        onBack={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    )
+    renderEditor(onUpdateTask)
 
-    fireEvent.change(screen.getAllByLabelText('任务内容')[0], {
-      target: { value: 'Updated task' }
+    fireEvent.click(screen.getByRole('button', { name: '设置 DDL' }))
+    fireEvent.change(screen.getByLabelText('DDL 时间'), {
+      target: { value: '2026-06-20T18:00' }
     })
+    fireEvent.click(screen.getByRole('button', { name: '提前 3 天' }))
+    fireEvent.click(screen.getByRole('button', { name: '提前 6 小时' }))
 
+    expect(onUpdateTask).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: '保存 DDL' }))
+
+    expect(onUpdateTask).toHaveBeenCalledOnce()
     expect(onUpdateTask).toHaveBeenCalledWith('task_1', {
-      contentMarkdown: 'Updated task'
+      deadlineAt: new Date('2026-06-20T18:00').toISOString(),
+      deadlineReminders: [
+        {
+          id: 'preset-4320',
+          offsetMinutes: 4320,
+          remindedAt: null
+        },
+        {
+          id: 'preset-360',
+          offsetMinutes: 360,
+          remindedAt: null
+        }
+      ]
     })
   })
 
-  it('shows a deadline and supports multiple advance reminder presets', () => {
+  it('switches from reminder to DDL and clears the deadline', () => {
     const onUpdateTask = vi.fn()
-    render(
-      <TodoEditor
-        item={todo}
-        onSave={vi.fn()}
-        onAddTask={vi.fn()}
-        onUpdateTask={onUpdateTask}
-        onDeleteTask={vi.fn()}
-        onReorderTasks={vi.fn()}
-        onBack={vi.fn()}
-        onDelete={vi.fn()}
-      />
-    )
+    renderEditor(onUpdateTask)
 
-    expect(screen.getAllByLabelText('DDL')).toHaveLength(2)
-    fireEvent.click(screen.getAllByRole('button', { name: '提前 3 天' })[0])
-    fireEvent.click(screen.getAllByRole('button', { name: '提前 1 天' })[0])
+    fireEvent.click(screen.getByRole('button', { name: '设置提醒' }))
+    expect(screen.getByRole('dialog', { name: '提醒设置' })).toBeInTheDocument()
 
+    fireEvent.click(screen.getByRole('button', { name: '设置 DDL' }))
+    expect(screen.queryByRole('dialog', { name: '提醒设置' })).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog', { name: 'DDL 设置' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '清除 DDL' }))
     expect(onUpdateTask).toHaveBeenCalledWith('task_1', {
-      deadlineReminders: [{
-        id: 'preset-4320',
-        offsetMinutes: 4320,
-        remindedAt: null
-      }]
+      deadlineAt: null,
+      deadlineReminders: []
     })
-    expect(onUpdateTask).toHaveBeenCalledWith('task_1', {
-      deadlineReminders: [{
-        id: 'preset-1440',
-        offsetMinutes: 1440,
-        remindedAt: null
-      }]
+  })
+
+  it('closes reminder settings without saving on cancel or Escape', () => {
+    const onUpdateTask = vi.fn()
+    renderEditor(onUpdateTask)
+
+    fireEvent.click(screen.getByRole('button', { name: '设置提醒' }))
+    fireEvent.change(screen.getByLabelText('提醒时间'), {
+      target: { value: '2026-06-16T09:30' }
     })
+    fireEvent.click(screen.getByRole('button', { name: '取消' }))
+    expect(onUpdateTask).not.toHaveBeenCalled()
+    expect(screen.queryByRole('dialog', { name: '提醒设置' })).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '设置提醒' }))
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: '提醒设置' })).not.toBeInTheDocument()
+    expect(onUpdateTask).not.toHaveBeenCalled()
   })
 })

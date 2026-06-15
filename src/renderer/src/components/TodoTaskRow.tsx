@@ -1,25 +1,31 @@
+import { useRef, useState } from 'react'
 import { CSS } from '@dnd-kit/utilities'
 import { useSortable } from '@dnd-kit/sortable'
-import type { TodoTask, TodoTaskPatch } from '../../../shared/models'
+import type {
+  BodyTheme,
+  TodoTask,
+  TodoTaskPatch
+} from '../../../shared/models'
 import { extractTags } from '../../../shared/tags'
-import { DeadlineReminderPicker } from './DeadlineReminderPicker'
+import { DeadlinePopover } from './DeadlinePopover'
+import { ReminderPopover } from './ReminderPopover'
 
-function toLocalInput(iso: string | null): string {
-  if (!iso) return ''
-  const date = new Date(iso)
-  const offset = date.getTimezoneOffset() * 60_000
-  return new Date(date.getTime() - offset).toISOString().slice(0, 16)
-}
+type ActivePopover = 'reminder' | 'deadline' | null
 
 export function TodoTaskRow({
   task,
+  bodyTheme,
   onUpdate,
   onDelete
 }: {
   task: TodoTask
+  bodyTheme: BodyTheme
   onUpdate(patch: TodoTaskPatch): void
   onDelete(): void
 }): React.JSX.Element {
+  const [activePopover, setActivePopover] = useState<ActivePopover>(null)
+  const reminderButtonRef = useRef<HTMLButtonElement>(null)
+  const deadlineButtonRef = useRef<HTMLButtonElement>(null)
   const {
     attributes,
     listeners,
@@ -45,14 +51,12 @@ export function TodoTaskRow({
         ⋮⋮
       </button>
       <input
+        className="task-complete-checkbox"
         aria-label="完成状态"
         type="checkbox"
         checked={task.completed}
         onChange={(event) => onUpdate({ completed: event.target.checked })}
       />
-      <button className="task-delete-button" onClick={onDelete} aria-label="删除任务">
-        ×
-      </button>
       <input
         className="task-content-input"
         aria-label="任务内容"
@@ -60,53 +64,82 @@ export function TodoTaskRow({
         value={task.contentMarkdown}
         onChange={(event) => onUpdate({ contentMarkdown: event.target.value })}
       />
-      <div className="task-time-grid">
-        <label>
-          提醒
-          <input
-            aria-label="提醒时间"
-            type="datetime-local"
-            value={toLocalInput(task.remindAt)}
-            onChange={(event) =>
-              onUpdate({
-                remindAt: event.target.value
-                  ? new Date(event.target.value).toISOString()
-                  : null,
-                reminded: false
-              })
+      <button
+        className="task-delete-button"
+        onClick={onDelete}
+        aria-label="删除任务"
+      >
+        ×
+      </button>
+      <div className="task-setting-buttons">
+        <div className="task-setting-anchor">
+          <button
+            ref={reminderButtonRef}
+            type="button"
+            className={`task-setting-button ${task.remindAt ? 'active' : ''}`}
+            aria-label="设置提醒"
+            onClick={() =>
+              setActivePopover((current) =>
+                current === 'reminder' ? null : 'reminder'
+              )
             }
-          />
-        </label>
-        <label>
-          DDL
-          <input
-            aria-label="DDL"
-            type="datetime-local"
-            value={toLocalInput(task.deadlineAt)}
-            onChange={(event) =>
-              onUpdate({
-                deadlineAt: event.target.value
-                  ? new Date(event.target.value).toISOString()
-                  : null
-              })
+          >
+            提醒{task.remindAt ? ` · ${formatShortDate(task.remindAt)}` : ''}
+          </button>
+          {activePopover === 'reminder' && (
+            <ReminderPopover
+              value={task.remindAt}
+              anchor={reminderButtonRef.current}
+              bodyTheme={bodyTheme}
+              onSave={onUpdate}
+              onClose={() => setActivePopover(null)}
+            />
+          )}
+        </div>
+        <div className="task-setting-anchor">
+          <button
+            ref={deadlineButtonRef}
+            type="button"
+            className={`task-setting-button ${task.deadlineAt ? 'active' : ''}`}
+            aria-label="设置 DDL"
+            onClick={() =>
+              setActivePopover((current) =>
+                current === 'deadline' ? null : 'deadline'
+              )
             }
-          />
-        </label>
+          >
+            DDL{task.deadlineAt ? ` · ${formatShortDate(task.deadlineAt)}` : ''}
+          </button>
+          {activePopover === 'deadline' && (
+            <DeadlinePopover
+              deadlineAt={task.deadlineAt}
+              reminders={task.deadlineReminders ?? []}
+              anchor={deadlineButtonRef.current}
+              bodyTheme={bodyTheme}
+              onSave={onUpdate}
+              onClose={() => setActivePopover(null)}
+            />
+          )}
+        </div>
       </div>
-      <div className="task-deadline-options">
-        <span>DDL 提前提醒</span>
-        <DeadlineReminderPicker
-          value={task.deadlineReminders ?? []}
-          onChange={(deadlineReminders) => onUpdate({ deadlineReminders })}
-        />
-      </div>
-      <div className="task-inline-tags">
-        {extractTags(task.contentMarkdown).map((tag) => (
-          <span key={tag}>#{tag}</span>
-        ))}
-      </div>
+      {extractTags(task.contentMarkdown).length > 0 && (
+        <div className="task-inline-tags">
+          {extractTags(task.contentMarkdown).map((tag) => (
+            <span key={tag}>#{tag}</span>
+          ))}
+        </div>
+      )}
     </div>
   )
+}
+
+function formatShortDate(iso: string): string {
+  return new Intl.DateTimeFormat('zh-CN', {
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(new Date(iso))
 }
 
 export function getDeadlineStatus(
