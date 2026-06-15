@@ -7,6 +7,7 @@ import type {
   StickyItemPatch
 } from '../../shared/models'
 import { CreateMenu } from './components/CreateMenu'
+import { FolderDialog } from './components/FolderDialog'
 import { CardContextMenu, type CardAction } from './components/CardContextMenu'
 import { NoteEditor } from './components/NoteEditor'
 import { TitleDialog } from './components/TitleDialog'
@@ -29,6 +30,7 @@ function PanelApp(): React.JSX.Element {
   const [folders, setFolders] = useState<FolderItem[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [config, setConfig] = useState<AppConfig | null>(null)
   const [pendingRename, setPendingRename] = useState<StickyItem | null>(null)
@@ -72,11 +74,10 @@ function PanelApp(): React.JSX.Element {
     setCreateOpen(false)
   }, [])
 
-  const createFolder = useCallback(async () => {
-    const title = window.prompt('文件夹名称', '新建文件夹')
-    if (title === null) return
+  const createFolder = useCallback(async (title: string) => {
     const folder = await window.stickyApi.folders.create(title)
     setFolders((current) => [...current, folder])
+    setFolderDialogOpen(false)
     setCreateOpen(false)
   }, [])
 
@@ -93,6 +94,7 @@ function PanelApp(): React.JSX.Element {
   const suspendAutoHide = Boolean(
     selected ||
     createOpen ||
+    folderDialogOpen ||
     settingsOpen ||
     pendingRename ||
     contextMenu
@@ -234,7 +236,10 @@ function PanelApp(): React.JSX.Element {
               onCreate={(type) => {
                 void createItem(type)
               }}
-              onCreateFolder={() => void createFolder()}
+              onCreateFolder={() => {
+                setCreateOpen(false)
+                setFolderDialogOpen(true)
+              }}
               onClose={() => setCreateOpen(false)}
             />
           )}
@@ -315,6 +320,12 @@ function PanelApp(): React.JSX.Element {
             setPendingRename(null)
           }}
           onCancel={() => setPendingRename(null)}
+        />
+      )}
+      {folderDialogOpen && (
+        <FolderDialog
+          onConfirm={createFolder}
+          onCancel={() => setFolderDialogOpen(false)}
         />
       )}
     </div>

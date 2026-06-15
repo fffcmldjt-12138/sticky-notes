@@ -3,7 +3,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StickyApi } from '../src/shared/electronApi'
-import type { NoteItem } from '../src/shared/models'
+import type { FolderItem, NoteItem } from '../src/shared/models'
 import App from '../src/renderer/src/App'
 
 const createdNote: NoteItem = {
@@ -16,7 +16,22 @@ const createdNote: NoteItem = {
   pinned: false,
   detached: false,
   windowBounds: null,
+  parentFolderId: null,
+  tags: [],
+  order: 0,
+  deletedAt: null,
   syncedToSiyuan: false,
+  createdAt: '2026-06-15T00:00:00.000Z',
+  updatedAt: '2026-06-15T00:00:00.000Z'
+}
+
+const createdFolder: FolderItem = {
+  id: 'folder_1',
+  title: '项目资料',
+  parentFolderId: null,
+  order: 0,
+  collapsed: false,
+  deletedAt: null,
   createdAt: '2026-06-15T00:00:00.000Z',
   updatedAt: '2026-06-15T00:00:00.000Z'
 }
@@ -49,7 +64,7 @@ describe('App creation flow', () => {
       },
       folders: {
         list: vi.fn().mockResolvedValue([]),
-        create: vi.fn(),
+        create: vi.fn().mockResolvedValue(createdFolder),
         update: vi.fn(),
         moveItem: vi.fn()
       },
@@ -92,5 +107,24 @@ describe('App creation flow', () => {
     expect(window.stickyApi.notes.create).toHaveBeenCalledWith('note', undefined)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(await screen.findByLabelText('标题')).toHaveValue('新建笔记')
+  })
+
+  it('creates one folder through an in-app name dialog', async () => {
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: /新建/ }))
+    fireEvent.click(screen.getByRole('button', { name: /新建文件夹/ }))
+
+    const input = await screen.findByRole('textbox', { name: '文件夹名称' })
+    fireEvent.change(input, { target: { value: '项目资料' } })
+    const confirm = screen.getByRole('button', { name: '确认' })
+    fireEvent.click(confirm)
+    fireEvent.click(confirm)
+
+    await waitFor(() => {
+      expect(window.stickyApi.folders.create).toHaveBeenCalledOnce()
+    })
+    expect(window.stickyApi.folders.create).toHaveBeenCalledWith('项目资料')
+    expect(screen.getByText(/项目资料/)).toBeInTheDocument()
   })
 })
