@@ -274,6 +274,9 @@ function PanelApp(): React.JSX.Element {
                 )
               }
             }}
+            onToggleTodoExpanded={(item, panelExpanded) => {
+              void save(item.id, { panelExpanded })
+            }}
             onContextMenu={(item, event) =>
               setContextMenu({ item, x: event.clientX, y: event.clientY })
             }
