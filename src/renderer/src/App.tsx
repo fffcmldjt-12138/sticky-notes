@@ -16,14 +16,18 @@ import { TodoEditor } from './components/TodoEditor'
 import { SettingsPanel } from './pages/SettingsPanel'
 import { StickyPanel } from './pages/StickyPanel'
 import { DetachedEditor } from './pages/DetachedEditor'
+import { DetachedFolder } from './pages/DetachedFolder'
 import { upsertItem } from './lib/itemList'
 import { getItemTags, mergeTags } from '../../shared/tags'
 import type { FolderTreeNode } from './lib/folderTree'
 
 export default function App(): React.JSX.Element {
   const params = new URLSearchParams(window.location.search)
-  const detachedId = params.get('mode') === 'detached' ? params.get('id') : null
-  return detachedId ? <DetachedEditor itemId={detachedId} /> : <PanelApp />
+  const mode = params.get('mode')
+  const id = params.get('id')
+  if (mode === 'folder' && id) return <DetachedFolder folderId={id} />
+  if (mode === 'detached' && id) return <DetachedEditor itemId={id} />
+  return <PanelApp />
 }
 
 function PanelApp(): React.JSX.Element {

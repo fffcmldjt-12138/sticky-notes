@@ -207,3 +207,30 @@
 .context-color input { width: 28px; height: 22px; padding: 0; border: 0; background: transparent; }
 .danger-menu-item { color: #b3264c !important; }
 .detached-loading, .detached-error { height: 100%; display: grid; place-items: center; padding: 24px; color: #747d8a; background: #f4f6f9; }
+.detached-folder-shell {
+  height: 100%;
+  display: grid;
+  grid-template-rows: 58px minmax(0, 1fr);
+  background: linear-gradient(155deg, #f7f8fa 0%, #edf0f4 100%);
+}
+.detached-folder-header {
+  padding: 10px 12px 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: #e9edf3;
+  border-bottom: 1px solid #d9dfe7;
+  -webkit-app-region: drag;
+}
+.detached-folder-header strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.detached-folder-header button { -webkit-app-region: no-drag; }
+.detached-folder-tree {
+  min-height: 0;
+  padding: 12px;
+  overflow-y: auto;
+}
