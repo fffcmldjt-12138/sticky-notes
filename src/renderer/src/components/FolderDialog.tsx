@@ -1,13 +1,15 @@
 import { useRef, useState } from 'react'
 
 export function FolderDialog({
+  initialTitle = '',
   onConfirm,
   onCancel
 }: {
+  initialTitle?: string
   onConfirm(title: string): Promise<void>
   onCancel(): void
 }): React.JSX.Element {
-  const [title, setTitle] = useState('')
+  const [title, setTitle] = useState(initialTitle)
   const [submitting, setSubmitting] = useState(false)
   const submittingRef = useRef(false)
   const trimmed = title.trim()
@@ -32,7 +34,9 @@ export function FolderDialog({
           }
         }}
       >
-        <h2 id="folder-dialog-heading">新建文件夹</h2>
+        <h2 id="folder-dialog-heading">
+          {initialTitle ? '重命名文件夹' : '新建文件夹'}
+        </h2>
         <label>
           文件夹名称
           <input
@@ -44,13 +48,15 @@ export function FolderDialog({
           />
         </label>
         <div className="dialog-actions">
-          <button type="button" onClick={onCancel} disabled={submitting}>取消</button>
+          <button type="button" onClick={onCancel} disabled={submitting}>
+            取消
+          </button>
           <button
             className="primary-button"
             type="submit"
             disabled={!trimmed || submitting}
           >
-            {submitting ? '创建中…' : '确认'}
+            {submitting ? '保存中…' : '确认'}
           </button>
         </div>
       </form>

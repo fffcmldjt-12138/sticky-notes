@@ -43,4 +43,18 @@ describe('buildFolderTree', () => {
     expect(tree.folders[0].descendantItemCount).toBe(1)
     expect(tree.rootItems).toEqual([])
   })
+
+  it('exposes items and folders in one mixed order', () => {
+    const rootNote = { ...note, id: 'root-note', parentFolderId: null, order: 0 }
+    const rootFolder = { ...folders[0], order: 1 }
+    const laterNote = { ...note, id: 'later-note', parentFolderId: null, order: 2 }
+
+    const tree = buildFolderTree([rootFolder], [laterNote, rootNote])
+
+    expect(tree.entries.map((entry) => `${entry.kind}:${entry.id}`)).toEqual([
+      'item:root-note',
+      'folder:f1',
+      'item:later-note'
+    ])
+  })
 })

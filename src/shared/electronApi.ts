@@ -4,6 +4,7 @@ import type {
   FolderItem,
   FolderPatch,
   NoteType,
+  OrderedNodeRef,
   RecycleContents,
   StickyItem,
   StickyItemPatch,
@@ -39,7 +40,12 @@ export interface StickyApi {
     list(): Promise<FolderItem[]>
     create(title: string, parentFolderId?: string | null): Promise<FolderItem>
     update(id: string, patch: FolderPatch): Promise<FolderItem | null>
+    delete(id: string): Promise<boolean>
     moveItem(itemId: string, parentFolderId: string | null): Promise<StickyItem | null>
+    reorderChildren(
+      parentFolderId: string | null,
+      orderedNodes: OrderedNodeRef[]
+    ): Promise<void>
   }
   recycle: {
     list(): Promise<RecycleContents>

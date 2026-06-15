@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { Markdown } from '@tiptap/markdown'
+import type { JSONContent } from '@tiptap/core'
 import Image from '@tiptap/extension-image'
 import { EditorContent, useEditor, type Editor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -11,6 +12,43 @@ export function shouldApplyExternalMarkdown(
   incomingValue: string
 ): boolean {
   return incomingValue !== currentValue && incomingValue !== lastEmittedValue
+}
+
+interface MarkdownCopyEditor {
+  state: {
+    selection: {
+      empty: boolean
+      content(): {
+        content: {
+          toJSON(): JSONContent[]
+        }
+      }
+    }
+  }
+  markdown?: {
+    serialize(content: JSONContent): string
+  }
+}
+
+interface MarkdownClipboardEvent {
+  clipboardData: {
+    setData(type: string, value: string): void
+  } | null
+  preventDefault(): void
+}
+
+export function writeMarkdownSelection(
+  editor: MarkdownCopyEditor,
+  event: MarkdownClipboardEvent
+): boolean {
+  if (editor.state.selection.empty || !editor.markdown || !event.clipboardData) {
+    return false
+  }
+  const content = editor.state.selection.content().content.toJSON()
+  const markdown = editor.markdown.serialize({ type: 'doc', content })
+  event.clipboardData.setData('text/plain', markdown)
+  event.preventDefault()
+  return true
 }
 
 export function MarkdownEditor({
@@ -71,6 +109,14 @@ export function MarkdownEditor({
         if (!href) return false
         void window.stickyApi.window.openExternal(href)
         return true
+      },
+      handleDOMEvents: {
+        copy: (_view, event) => {
+          const currentEditor = editorRef.current
+          return currentEditor
+            ? writeMarkdownSelection(currentEditor, event)
+            : false
+        }
       },
       handlePaste: (_view, event) => {
         const file = [...(event.clipboardData?.files ?? [])]

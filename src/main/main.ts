@@ -124,6 +124,10 @@ if (!hasLock) {
     reminder.start()
     await detachedWindows.restore(await notes.list())
 
+    if (process.env.STICKY_NOTES_SMOKE_QUIT === '1') {
+      setTimeout(() => app.quit(), 500)
+    }
+
     app.on('second-instance', () => windows.show())
     app.on('before-quit', () => {
       reminder.stop()

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { BodyTheme, TodoTaskPatch } from '../../../shared/models'
 import { AnchoredPopover } from './AnchoredPopover'
+import { DateTimePicker } from './DateTimePicker'
 
 function toLocalInput(iso: string | null): string {
   if (!iso) return ''
@@ -32,12 +33,7 @@ export function ReminderPopover({
       onClose={onClose}
     >
       <strong>提醒时间</strong>
-      <input
-        aria-label="提醒时间"
-        type="datetime-local"
-        value={draft}
-        onChange={(event) => setDraft(event.target.value)}
-      />
+      <DateTimePicker label="提醒时间" value={draft} onChange={setDraft} />
       <div className="task-popover-actions">
         <button
           type="button"

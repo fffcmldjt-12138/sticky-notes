@@ -49,6 +49,28 @@ function renderEditor(onUpdateTask = vi.fn()): ReturnType<typeof render> {
   )
 }
 
+function chooseDateTime(
+  prefix: '提醒' | 'DDL ',
+  date: string,
+  hour: string,
+  minute: string
+): void {
+  fireEvent.change(screen.getByLabelText(`${prefix}日期`), {
+    target: { value: date }
+  })
+  fireEvent.change(screen.getByLabelText(`${prefix}小时`), {
+    target: { value: hour }
+  })
+  fireEvent.change(screen.getByLabelText(`${prefix}分钟`), {
+    target: { value: minute }
+  })
+  fireEvent.click(
+    screen.getByRole('button', {
+      name: prefix === '提醒' ? '确认提醒时间' : '确认DDL时间'
+    })
+  )
+}
+
 describe('TodoEditor', () => {
   it('shows a compact row with a large checkbox and only two setting buttons', () => {
     renderEditor()
@@ -66,9 +88,7 @@ describe('TodoEditor', () => {
     renderEditor(onUpdateTask)
 
     fireEvent.click(screen.getByRole('button', { name: '设置提醒' }))
-    fireEvent.change(screen.getByLabelText('提醒时间'), {
-      target: { value: '2026-06-16T09:30' }
-    })
+    chooseDateTime('提醒', '2026-06-16', '09', '30')
 
     expect(onUpdateTask).not.toHaveBeenCalled()
     fireEvent.click(screen.getByRole('button', { name: '保存提醒' }))
@@ -99,9 +119,7 @@ describe('TodoEditor', () => {
     renderEditor(onUpdateTask)
 
     fireEvent.click(screen.getByRole('button', { name: '设置 DDL' }))
-    fireEvent.change(screen.getByLabelText('DDL 时间'), {
-      target: { value: '2026-06-20T18:00' }
-    })
+    chooseDateTime('DDL ', '2026-06-20', '18', '00')
     fireEvent.click(screen.getByRole('button', { name: '提前 3 天' }))
     fireEvent.click(screen.getByRole('button', { name: '提前 6 小时' }))
 
@@ -149,9 +167,7 @@ describe('TodoEditor', () => {
     renderEditor(onUpdateTask)
 
     fireEvent.click(screen.getByRole('button', { name: '设置提醒' }))
-    fireEvent.change(screen.getByLabelText('提醒时间'), {
-      target: { value: '2026-06-16T09:30' }
-    })
+    chooseDateTime('提醒', '2026-06-16', '09', '30')
     fireEvent.click(screen.getByRole('button', { name: '取消' }))
     expect(onUpdateTask).not.toHaveBeenCalled()
     expect(screen.queryByRole('dialog', { name: '提醒设置' })).not.toBeInTheDocument()

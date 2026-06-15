@@ -115,6 +115,21 @@
   background: #e6eaf0;
   color: #5f6875;
 }
+.folder-toggle {
+  background: transparent;
+  transition: transform .15s ease;
+}
+.folder-toggle.expanded { transform: rotate(90deg); }
+.mixed-drop-marker {
+  height: 6px;
+  margin: -3px 0;
+  border-radius: 999px;
+  transition: background .12s ease, height .12s ease;
+}
+.mixed-drop-marker:hover {
+  height: 10px;
+  background: rgba(91, 141, 239, .3);
+}
 .folder-contents {
   padding: 8px;
   display: grid;

@@ -8,6 +8,7 @@ import type {
 } from '../../shared/models'
 import { CreateMenu } from './components/CreateMenu'
 import { FolderDialog } from './components/FolderDialog'
+import { FolderContextMenu } from './components/FolderContextMenu'
 import { CardContextMenu, type CardAction } from './components/CardContextMenu'
 import { NoteEditor } from './components/NoteEditor'
 import { TitleDialog } from './components/TitleDialog'
@@ -34,9 +35,16 @@ function PanelApp(): React.JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [config, setConfig] = useState<AppConfig | null>(null)
   const [pendingRename, setPendingRename] = useState<StickyItem | null>(null)
+  const [pendingFolderRename, setPendingFolderRename] =
+    useState<FolderItem | null>(null)
   const [activeTag, setActiveTag] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<{
     item: StickyItem
+    x: number
+    y: number
+  } | null>(null)
+  const [folderContextMenu, setFolderContextMenu] = useState<{
+    folder: FolderItem
     x: number
     y: number
   } | null>(null)
@@ -97,7 +105,9 @@ function PanelApp(): React.JSX.Element {
     folderDialogOpen ||
     settingsOpen ||
     pendingRename ||
-    contextMenu
+    pendingFolderRename ||
+    contextMenu ||
+    folderContextMenu
   )
   useEffect(() => {
     window.stickyApi.window.suspendAutoHide(suspendAutoHide)
@@ -274,30 +284,22 @@ function PanelApp(): React.JSX.Element {
                   )
                 })
             }}
-            onMoveItem={(itemId, folderId) => {
+            onFolderContextMenu={(folder, event) =>
+              setFolderContextMenu({
+                folder,
+                x: event.clientX,
+                y: event.clientY
+              })
+            }
+            onReorder={(parentFolderId, orderedNodes) => {
               void window.stickyApi.folders
-                .moveItem(itemId, folderId)
-                .then((updated) => {
-                  if (!updated) return
-                  setItems((current) =>
-                    current.map((entry) => entry.id === updated.id ? updated : entry)
-                  )
+                .reorderChildren(parentFolderId, orderedNodes)
+                .then(() => {
+                  void loadItems()
+                  void loadFolders()
                 })
                 .catch((error: unknown) =>
-                  window.alert(error instanceof Error ? error.message : '移动便签失败')
-                )
-            }}
-            onMoveFolder={(folderId, parentFolderId) => {
-              void window.stickyApi.folders
-                .update(folderId, { parentFolderId })
-                .then((updated) => {
-                  if (!updated) return
-                  setFolders((current) =>
-                    current.map((entry) => entry.id === updated.id ? updated : entry)
-                  )
-                })
-                .catch((error: unknown) =>
-                  window.alert(error instanceof Error ? error.message : '移动文件夹失败')
+                  window.alert(error instanceof Error ? error.message : '移动失败')
                 )
             }}
           />
@@ -309,6 +311,27 @@ function PanelApp(): React.JSX.Element {
           position={{ x: contextMenu.x, y: contextMenu.y }}
           onAction={(action) => void handleCardAction(contextMenu.item, action)}
           onClose={() => setContextMenu(null)}
+        />
+      )}
+      {folderContextMenu && (
+        <FolderContextMenu
+          position={{ x: folderContextMenu.x, y: folderContextMenu.y }}
+          onRename={() => {
+            setPendingFolderRename(folderContextMenu.folder)
+            setFolderContextMenu(null)
+          }}
+          onDelete={() => {
+            const folder = folderContextMenu.folder
+            setFolderContextMenu(null)
+            if (!window.confirm(`确定删除“${folder.title}”吗？其中内容会移到上一级。`)) {
+              return
+            }
+            void window.stickyApi.folders.delete(folder.id).then(() => {
+              void loadItems()
+              void loadFolders()
+            })
+          }}
+          onClose={() => setFolderContextMenu(null)}
         />
       )}
       {pendingRename && (
@@ -326,6 +349,19 @@ function PanelApp(): React.JSX.Element {
         <FolderDialog
           onConfirm={createFolder}
           onCancel={() => setFolderDialogOpen(false)}
+        />
+      )}
+      {pendingFolderRename && (
+        <FolderDialog
+          initialTitle={pendingFolderRename.title}
+          onConfirm={async (title) => {
+            await window.stickyApi.folders.update(pendingFolderRename.id, {
+              title
+            })
+            setPendingFolderRename(null)
+            await loadFolders()
+          }}
+          onCancel={() => setPendingFolderRename(null)}
         />
       )}
     </div>

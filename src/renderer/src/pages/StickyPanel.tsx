@@ -1,5 +1,5 @@
-import type { FolderItem, StickyItem } from '../../../shared/models'
-import { FolderCard } from '../components/FolderCard'
+import type { FolderItem, OrderedNodeRef, StickyItem } from '../../../shared/models'
+import { DropMarker, FolderCard } from '../components/FolderCard'
 import { NoteCard } from '../components/NoteCard'
 import { TodoCard } from '../components/TodoCard'
 import { buildFolderTree, type FolderTreeNode } from '../lib/folderTree'
@@ -12,8 +12,8 @@ export function StickyPanel({
   onContextMenu,
   onDetach,
   onToggleFolder,
-  onMoveItem,
-  onMoveFolder
+  onFolderContextMenu,
+  onReorder
 }: {
   items: StickyItem[]
   folders: FolderItem[]
@@ -22,8 +22,11 @@ export function StickyPanel({
   onContextMenu(item: StickyItem, event: React.MouseEvent<HTMLElement>): void
   onDetach(item: StickyItem): void
   onToggleFolder(folder: FolderTreeNode): void
-  onMoveItem(itemId: string, folderId: string | null): void
-  onMoveFolder(folderId: string, parentFolderId: string | null): void
+  onFolderContextMenu(
+    folder: FolderTreeNode,
+    event: React.MouseEvent<HTMLElement>
+  ): void
+  onReorder(parentFolderId: string | null, orderedNodes: OrderedNodeRef[]): void
 }): React.JSX.Element {
   const tree = buildFolderTree(folders, items)
 
@@ -37,53 +40,48 @@ export function StickyPanel({
     )
   }
 
+  const reorderAt = (dragged: OrderedNodeRef, index: number): void => {
+    const ordered = tree.entries
+      .map(({ kind, id }) => ({ kind, id }))
+      .filter((node) => node.kind !== dragged.kind || node.id !== dragged.id)
+    ordered.splice(Math.min(index, ordered.length), 0, dragged)
+    onReorder(null, ordered)
+  }
+
   return (
-    <main
-      className="card-list"
-      onDragOver={(event) => {
-        event.preventDefault()
-        event.dataTransfer.dropEffect = 'move'
-      }}
-      onDrop={(event) => {
-        event.preventDefault()
-        const itemId = event.dataTransfer.getData('text/sticky-item')
-        const folderId = event.dataTransfer.getData('text/sticky-folder')
-        if (itemId) onMoveItem(itemId, null)
-        if (folderId) onMoveFolder(folderId, null)
-      }}
-    >
-      {tree.rootItems.map((item) =>
-        item.type === 'note' ? (
-          <NoteCard
-            key={item.id}
-            item={item}
-            onOpen={() => onOpen(item)}
-            onContextMenu={(event) => onContextMenu(item, event)}
-            onDetach={() => onDetach(item)}
-          />
-        ) : (
-          <TodoCard
-            key={item.id}
-            item={item}
-            onOpen={() => onOpen(item)}
-            onToggle={(taskId, completed) => onToggleTodo(item, taskId, completed)}
-            onContextMenu={(event) => onContextMenu(item, event)}
-            onDetach={() => onDetach(item)}
-          />
-        )
-      )}
-      {tree.folders.map((folder) => (
-        <FolderCard
-          key={folder.id}
-          node={folder}
-          onOpenItem={onOpen}
-          onToggle={onToggleFolder}
-          onMoveItem={(itemId, folderId) => onMoveItem(itemId, folderId)}
-          onMoveFolder={(folderId, parentFolderId) =>
-            onMoveFolder(folderId, parentFolderId)
-          }
-        />
+    <main className="card-list">
+      {tree.entries.map((entry, index) => (
+        <div key={`${entry.kind}:${entry.id}`}>
+          <DropMarker onDrop={(dragged) => reorderAt(dragged, index)} />
+          {entry.kind === 'item' && entry.item.type === 'note' ? (
+            <NoteCard
+              item={entry.item}
+              onOpen={() => onOpen(entry.item)}
+              onContextMenu={(event) => onContextMenu(entry.item, event)}
+              onDetach={() => onDetach(entry.item)}
+            />
+          ) : entry.kind === 'item' && entry.item.type === 'todo' ? (
+            <TodoCard
+              item={entry.item}
+              onOpen={() => onOpen(entry.item)}
+              onToggle={(taskId, completed) =>
+                onToggleTodo(entry.item, taskId, completed)
+              }
+              onContextMenu={(event) => onContextMenu(entry.item, event)}
+              onDetach={() => onDetach(entry.item)}
+            />
+          ) : entry.kind === 'folder' ? (
+            <FolderCard
+              node={entry.folder}
+              onOpenItem={onOpen}
+              onToggle={onToggleFolder}
+              onContextMenu={onFolderContextMenu}
+              onReorder={onReorder}
+            />
+          ) : null}
+        </div>
       ))}
+      <DropMarker onDrop={(dragged) => reorderAt(dragged, tree.entries.length)} />
     </main>
   )
 }

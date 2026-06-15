@@ -47,13 +47,9 @@ export class TrayService {
         { type: 'separator' },
         {
           label: '退出',
-          click: () => {
-            this.windows.quit()
-            app.quit()
-          }
+          click: () => app.quit()
         }
       ])
     )
   }
 }
-

@@ -6,6 +6,7 @@ import type {
 } from '../../../shared/models'
 import { DeadlineReminderPicker } from './DeadlineReminderPicker'
 import { AnchoredPopover } from './AnchoredPopover'
+import { DateTimePicker } from './DateTimePicker'
 
 function toLocalInput(iso: string | null): string {
   if (!iso) return ''
@@ -40,11 +41,10 @@ export function DeadlinePopover({
       onClose={onClose}
     >
       <strong>截止时间</strong>
-      <input
-        aria-label="DDL 时间"
-        type="datetime-local"
+      <DateTimePicker
+        label="DDL 时间"
         value={deadlineDraft}
-        onChange={(event) => setDeadlineDraft(event.target.value)}
+        onChange={setDeadlineDraft}
       />
       <span className="task-popover-label">提前提醒</span>
       <DeadlineReminderPicker

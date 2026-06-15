@@ -7,6 +7,7 @@ import type {
   NoteItem,
   NotesFile,
   NoteType,
+  OrderedNodeRef,
   RecycleContents,
   StickyItem,
   StickyItemPatch,
@@ -57,7 +58,7 @@ export class NoteStore {
         id: `folder_${randomUUID()}`,
         title: title.trim() || '新建文件夹',
         parentFolderId,
-        order: data.folders.length,
+        order: nextSiblingOrder(data, parentFolderId),
         collapsed: false,
         deletedAt: null,
         createdAt: now,
@@ -92,6 +93,55 @@ export class NoteStore {
     })
   }
 
+  async deleteFolder(id: string): Promise<boolean> {
+    await this.ensureInitialized()
+    return this.mutate(async () => {
+      const data = await this.file.read()
+      const folder = data.folders.find(
+        (candidate) => candidate.id === id && !candidate.deletedAt
+      )
+      if (!folder) return false
+
+      const parentFolderId = folder.parentFolderId
+      const insertionIndex = siblingReferences(data, parentFolderId).findIndex(
+        (reference) => reference.kind === 'folder' && reference.id === id
+      )
+      const promoted = siblingReferences(data, id)
+      const now = new Date().toISOString()
+      for (const reference of promoted) {
+        if (reference.kind === 'item') {
+          const item = data.items.find((candidate) => candidate.id === reference.id)
+          if (item) {
+            item.parentFolderId = parentFolderId
+            item.updatedAt = now
+          }
+        } else {
+          const child = data.folders.find(
+            (candidate) => candidate.id === reference.id
+          )
+          if (child) {
+            child.parentFolderId = parentFolderId
+            child.updatedAt = now
+          }
+        }
+      }
+      folder.deletedAt = now
+      folder.updatedAt = now
+
+      const promotedKeys = new Set(
+        promoted.map((reference) => `${reference.kind}:${reference.id}`)
+      )
+      const siblings = siblingReferences(data, parentFolderId).filter(
+        (reference) =>
+          !promotedKeys.has(`${reference.kind}:${reference.id}`)
+      )
+      siblings.splice(Math.max(0, insertionIndex), 0, ...promoted)
+      assignSiblingOrder(data, siblings)
+      await this.file.write(data)
+      return true
+    })
+  }
+
   async moveItem(
     itemId: string,
     parentFolderId: string | null
@@ -120,6 +170,62 @@ export class NoteStore {
     })
   }
 
+  async reorderChildren(
+    parentFolderId: string | null,
+    orderedNodes: OrderedNodeRef[]
+  ): Promise<void> {
+    await this.ensureInitialized()
+    return this.mutate(async () => {
+      const data = await this.file.read()
+      if (
+        parentFolderId &&
+        !data.folders.some(
+          (folder) => folder.id === parentFolderId && !folder.deletedAt
+        )
+      ) {
+        throw new Error('Target folder does not exist')
+      }
+
+      const seen = new Set<string>()
+      const sourceParents = new Set<string | null>()
+      for (const reference of orderedNodes) {
+        const key = `${reference.kind}:${reference.id}`
+        if (seen.has(key)) throw new Error('Duplicate ordered node')
+        seen.add(key)
+
+        if (reference.kind === 'item') {
+          const item = data.items.find(
+            (candidate) => candidate.id === reference.id && !candidate.deletedAt
+          )
+          if (!item) throw new Error('Sticky item does not exist')
+          sourceParents.add(item.parentFolderId)
+          item.parentFolderId = parentFolderId
+          item.updatedAt = new Date().toISOString()
+        } else {
+          const folder = data.folders.find(
+            (candidate) => candidate.id === reference.id && !candidate.deletedAt
+          )
+          if (!folder) throw new Error('Folder does not exist')
+          assertFolderMove(data.folders, folder.id, parentFolderId)
+          sourceParents.add(folder.parentFolderId)
+          folder.parentFolderId = parentFolderId
+          folder.updatedAt = new Date().toISOString()
+        }
+      }
+
+      const remaining = siblingReferences(data, parentFolderId).filter(
+        (reference) => !seen.has(`${reference.kind}:${reference.id}`)
+      )
+      assignSiblingOrder(data, [...orderedNodes, ...remaining])
+      for (const sourceParent of sourceParents) {
+        if (sourceParent !== parentFolderId) {
+          assignSiblingOrder(data, siblingReferences(data, sourceParent))
+        }
+      }
+      await this.file.write(data)
+    })
+  }
+
   async create(type: NoteType, title?: string): Promise<StickyItem> {
     await this.ensureInitialized()
     return this.mutate(async () => {
@@ -137,7 +243,7 @@ export class NoteStore {
         windowBounds: null,
         parentFolderId: null,
         tags: [],
-        order: data.items.length,
+        order: nextSiblingOrder(data, null),
         deletedAt: null,
         createdAt: now,
         updatedAt: now
@@ -477,4 +583,48 @@ function getSubtreeHeight(folders: FolderItem[], folderId: string): number {
     1 +
     Math.max(...children.map((folder) => getSubtreeHeight(folders, folder.id)))
   )
+}
+
+function siblingReferences(
+  data: NotesFile,
+  parentFolderId: string | null
+): OrderedNodeRef[] {
+  return [
+    ...data.items
+      .filter(
+        (item) => !item.deletedAt && item.parentFolderId === parentFolderId
+      )
+      .map((item) => ({ kind: 'item' as const, id: item.id, order: item.order })),
+    ...data.folders
+      .filter(
+        (folder) =>
+          !folder.deletedAt && folder.parentFolderId === parentFolderId
+      )
+      .map((folder) => ({
+        kind: 'folder' as const,
+        id: folder.id,
+        order: folder.order
+      }))
+  ]
+    .sort((a, b) => a.order - b.order)
+    .map(({ kind, id }) => ({ kind, id }))
+}
+
+function assignSiblingOrder(
+  data: NotesFile,
+  orderedNodes: OrderedNodeRef[]
+): void {
+  orderedNodes.forEach((reference, order) => {
+    const collection =
+      reference.kind === 'item' ? data.items : data.folders
+    const node = collection.find((candidate) => candidate.id === reference.id)
+    if (node) node.order = order
+  })
+}
+
+function nextSiblingOrder(
+  data: NotesFile,
+  parentFolderId: string | null
+): number {
+  return siblingReferences(data, parentFolderId).length
 }

@@ -39,8 +39,15 @@ const api: StickyApi = {
       ipcRenderer.invoke(ipcChannels.foldersCreate, title, parentFolderId),
     update: (id, patch) =>
       ipcRenderer.invoke(ipcChannels.foldersUpdate, id, patch),
+    delete: (id) => ipcRenderer.invoke(ipcChannels.foldersDelete, id),
     moveItem: (itemId, parentFolderId) =>
-      ipcRenderer.invoke(ipcChannels.foldersMoveItem, itemId, parentFolderId)
+      ipcRenderer.invoke(ipcChannels.foldersMoveItem, itemId, parentFolderId),
+    reorderChildren: (parentFolderId, orderedNodes) =>
+      ipcRenderer.invoke(
+        ipcChannels.foldersReorderChildren,
+        parentFolderId,
+        orderedNodes
+      )
   },
   recycle: {
     list: () => ipcRenderer.invoke(ipcChannels.recycleList),

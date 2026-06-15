@@ -1,18 +1,18 @@
-import type { StickyItem } from '../../../shared/models'
-import type { FolderTreeNode } from '../lib/folderTree'
+import type { OrderedNodeRef, StickyItem } from '../../../shared/models'
+import type { FolderTreeEntry, FolderTreeNode } from '../lib/folderTree'
 
 export function FolderCard({
   node,
   onOpenItem,
   onToggle,
-  onMoveItem,
-  onMoveFolder
+  onContextMenu,
+  onReorder
 }: {
   node: FolderTreeNode
   onOpenItem(item: StickyItem): void
   onToggle(node: FolderTreeNode): void
-  onMoveItem(itemId: string, folderId: string): void
-  onMoveFolder(folderId: string, parentFolderId: string): void
+  onContextMenu(node: FolderTreeNode, event: React.MouseEvent<HTMLElement>): void
+  onReorder(parentFolderId: string | null, orderedNodes: OrderedNodeRef[]): void
 }): React.JSX.Element {
   return (
     <section
@@ -24,14 +24,18 @@ export function FolderCard({
       onDrop={(event) => {
         event.preventDefault()
         event.stopPropagation()
-        const itemId = event.dataTransfer.getData('text/sticky-item')
-        const folderId = event.dataTransfer.getData('text/sticky-folder')
-        if (itemId) onMoveItem(itemId, node.id)
-        if (folderId && folderId !== node.id) onMoveFolder(folderId, node.id)
+        const dragged = readDraggedNode(event.dataTransfer)
+        if (dragged && dragged.id !== node.id) {
+          onReorder(node.id, appendDragged(node.entries, dragged))
+        }
       }}
     >
       <div
         className="folder-title-bar"
+        onContextMenu={(event) => {
+          event.preventDefault()
+          onContextMenu(node, event)
+        }}
         draggable
         onDragStart={(event) => {
           event.stopPropagation()
@@ -40,45 +44,116 @@ export function FolderCard({
         }}
       >
         <button
-          className="folder-toggle"
+          className={`folder-toggle ${node.collapsed ? '' : 'expanded'}`}
           onClick={() => onToggle(node)}
           aria-label={node.collapsed ? '展开文件夹' : '收起文件夹'}
         >
-          {node.collapsed ? '›' : '⌄'}
+          ›
         </button>
         <span className="folder-title">文件夹 {node.title}</span>
         <small>{node.descendantItemCount}</small>
       </div>
       {!node.collapsed && (
         <div className="folder-contents">
-          {node.items.map((item) => (
-            <button
-              key={item.id}
-              className="folder-item-title"
-              style={{ borderLeftColor: item.headerColor }}
-              onClick={() => onOpenItem(item)}
-              draggable
-              onDragStart={(event) => {
-                event.dataTransfer.setData('text/sticky-item', item.id)
-                event.dataTransfer.effectAllowed = 'move'
-              }}
-            >
-              <span>{item.type === 'note' ? '笔记' : '待办'}</span>
-              <strong>{item.title || '无标题'}</strong>
-            </button>
+          {node.entries.map((entry, index) => (
+            <div key={`${entry.kind}:${entry.id}`}>
+              <DropMarker
+                onDrop={(dragged) =>
+                  onReorder(node.id, insertDragged(node.entries, dragged, index))
+                }
+              />
+              {entry.kind === 'item' ? (
+                <FolderItemTitle item={entry.item} onOpen={onOpenItem} />
+              ) : (
+                <FolderCard
+                  node={entry.folder}
+                  onOpenItem={onOpenItem}
+                  onToggle={onToggle}
+                  onContextMenu={onContextMenu}
+                  onReorder={onReorder}
+                />
+              )}
+            </div>
           ))}
-          {node.children.map((child) => (
-            <FolderCard
-              key={child.id}
-              node={child}
-              onOpenItem={onOpenItem}
-              onToggle={onToggle}
-              onMoveItem={onMoveItem}
-              onMoveFolder={onMoveFolder}
-            />
-          ))}
+          <DropMarker
+            onDrop={(dragged) =>
+              onReorder(node.id, appendDragged(node.entries, dragged))
+            }
+          />
         </div>
       )}
     </section>
   )
+}
+
+function FolderItemTitle({
+  item,
+  onOpen
+}: {
+  item: StickyItem
+  onOpen(item: StickyItem): void
+}): React.JSX.Element {
+  return (
+    <button
+      className="folder-item-title"
+      style={{ borderLeftColor: item.headerColor }}
+      onClick={() => onOpen(item)}
+      draggable
+      onDragStart={(event) => {
+        event.dataTransfer.setData('text/sticky-item', item.id)
+        event.dataTransfer.effectAllowed = 'move'
+      }}
+    >
+      <span>{item.type === 'note' ? '笔记' : '待办'}</span>
+      <strong>{item.title || '无标题'}</strong>
+    </button>
+  )
+}
+
+export function DropMarker({
+  onDrop
+}: {
+  onDrop(node: OrderedNodeRef): void
+}): React.JSX.Element {
+  return (
+    <div
+      className="mixed-drop-marker"
+      onDragOver={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+      }}
+      onDrop={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        const dragged = readDraggedNode(event.dataTransfer)
+        if (dragged) onDrop(dragged)
+      }}
+    />
+  )
+}
+
+function readDraggedNode(dataTransfer: DataTransfer): OrderedNodeRef | null {
+  const itemId = dataTransfer.getData('text/sticky-item')
+  if (itemId) return { kind: 'item', id: itemId }
+  const folderId = dataTransfer.getData('text/sticky-folder')
+  return folderId ? { kind: 'folder', id: folderId } : null
+}
+
+function insertDragged(
+  entries: FolderTreeEntry[],
+  dragged: OrderedNodeRef,
+  index: number
+): OrderedNodeRef[] {
+  const ordered = entries
+    .map(({ kind, id }) => ({ kind, id }))
+    .filter((entry) => entry.kind !== dragged.kind || entry.id !== dragged.id)
+  ordered.splice(Math.min(index, ordered.length), 0, dragged)
+  return ordered
+}
+
+function appendDragged(
+  entries: FolderTreeEntry[],
+  dragged: OrderedNodeRef
+): OrderedNodeRef[] {
+  return insertDragged(entries, dragged, entries.length)
 }

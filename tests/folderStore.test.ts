@@ -46,4 +46,72 @@ describe('folder storage', () => {
       store.updateFolder(moving.id, { parentFolderId: destinationChild.id })
     ).rejects.toThrow('文件夹最多嵌套 3 层')
   })
+
+  it('stores notes, todos, and folders in one shared sibling order', async () => {
+    const note = await store.create('note')
+    const folder = await store.createFolder('Mixed')
+    const todo = await store.create('todo')
+
+    await store.reorderChildren(null, [
+      { kind: 'item', id: note.id },
+      { kind: 'item', id: todo.id },
+      { kind: 'folder', id: folder.id }
+    ])
+
+    const items = await store.list()
+    const folders = await store.listFolders()
+    expect(items.find((item) => item.id === note.id)).toMatchObject({
+      parentFolderId: null,
+      order: 0
+    })
+    expect(items.find((item) => item.id === todo.id)).toMatchObject({
+      parentFolderId: null,
+      order: 1
+    })
+    expect(folders.find((entry) => entry.id === folder.id)).toMatchObject({
+      parentFolderId: null,
+      order: 2
+    })
+  })
+
+  it('moves an item to a parent and normalizes both sibling lists', async () => {
+    const folder = await store.createFolder('Destination')
+    const first = await store.create('note')
+    const moved = await store.create('todo')
+
+    await store.reorderChildren(folder.id, [{ kind: 'item', id: moved.id }])
+
+    expect(await store.list()).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: first.id, parentFolderId: null, order: 1 }),
+        expect.objectContaining({ id: moved.id, parentFolderId: folder.id, order: 0 })
+      ])
+    )
+  })
+
+  it('promotes direct children when deleting a folder', async () => {
+    const before = await store.create('note')
+    const folder = await store.createFolder('Delete me')
+    const childNote = await store.create('note')
+    const childFolder = await store.createFolder('Child', folder.id)
+    await store.reorderChildren(folder.id, [
+      { kind: 'item', id: childNote.id },
+      { kind: 'folder', id: childFolder.id }
+    ])
+
+    expect(await store.deleteFolder(folder.id)).toBe(true)
+
+    const items = await store.list()
+    const folders = await store.listFolders()
+    expect(items.find((item) => item.id === before.id)?.order).toBe(0)
+    expect(items.find((item) => item.id === childNote.id)).toMatchObject({
+      parentFolderId: null,
+      order: 1
+    })
+    expect(folders.find((entry) => entry.id === childFolder.id)).toMatchObject({
+      parentFolderId: null,
+      order: 2
+    })
+    expect(folders.some((entry) => entry.id === folder.id)).toBe(false)
+  })
 })

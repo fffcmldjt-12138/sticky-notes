@@ -46,8 +46,8 @@ describe('StickyPanel folders', () => {
         onContextMenu={vi.fn()}
         onDetach={vi.fn()}
         onToggleFolder={vi.fn()}
-        onMoveItem={vi.fn()}
-        onMoveFolder={vi.fn()}
+        onFolderContextMenu={vi.fn()}
+        onReorder={vi.fn()}
       />
     )
 

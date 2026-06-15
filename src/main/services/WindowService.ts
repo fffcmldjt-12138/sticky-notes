@@ -2,6 +2,7 @@ import { join } from 'node:path'
 import { BrowserWindow, screen } from 'electron'
 import { is } from '@electron-toolkit/utils'
 import { getCollapsedBounds, getExpandedBounds } from './windowGeometry'
+import { WindowLifecycle } from './WindowLifecycle'
 
 const PANEL_WIDTH = 360
 const HOT_EDGE_WIDTH = 8
@@ -11,7 +12,7 @@ export class WindowService {
   private window: BrowserWindow | null = null
   private collapseTimer: NodeJS.Timeout | null = null
   private autoHideSuspended = false
-  private quitting = false
+  private readonly lifecycle = new WindowLifecycle()
 
   create(): BrowserWindow {
     const workArea = screen.getPrimaryDisplay().workArea
@@ -35,7 +36,7 @@ export class WindowService {
     })
 
     this.window.on('close', (event) => {
-      if (!this.quitting) {
+      if (this.lifecycle.shouldHideOnClose()) {
         event.preventDefault()
         this.window?.hide()
       }
@@ -103,7 +104,7 @@ export class WindowService {
   }
 
   quit(): void {
-    this.quitting = true
-    this.window?.destroy()
+    if (!this.lifecycle.beginShutdown()) return
+    this.cancelCollapse()
   }
 }

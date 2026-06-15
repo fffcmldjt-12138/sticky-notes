@@ -62,6 +62,11 @@ export interface TodoItem extends BaseItem {
 
 export type StickyItem = NoteItem | TodoItem
 
+export interface OrderedNodeRef {
+  kind: 'item' | 'folder'
+  id: string
+}
+
 export interface FolderItem {
   id: string
   title: string
