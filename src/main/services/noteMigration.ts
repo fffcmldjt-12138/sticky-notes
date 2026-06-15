@@ -73,7 +73,10 @@ function migrateVersion1Item(value: unknown, index: number): StickyItem {
             contentMarkdown,
             completed: Boolean(item.completed),
             remindAt: typeof item.remindAt === 'string' ? item.remindAt : null,
-            reminded: Boolean(item.reminded)
+            reminded: Boolean(item.reminded),
+            tags: [],
+            deadlineAt: null,
+            deadlineReminders: []
           }]
         : []
     }
@@ -93,7 +96,7 @@ function migrateVersion2(source: { items?: unknown[] }): NotesFile {
     folders: [],
     items: (source.items ?? []).map((value, index) => {
       const item = value as StickyItem
-      return {
+      const normalized = {
         ...item,
         headerColor: normalizeColor(item.headerColor),
         bodyTheme: normalizeBodyTheme(item.bodyTheme),
@@ -101,6 +104,7 @@ function migrateVersion2(source: { items?: unknown[] }): NotesFile {
         windowBounds: item.windowBounds ?? null,
         ...organizationFields(index)
       }
+      return normalizeTodoTasks(normalized)
     })
   }
 }
@@ -113,7 +117,7 @@ function normalizeVersion3(
     folders: (source.folders ?? []) as NotesFile['folders'],
     items: (source.items ?? []).map((value, index) => {
       const item = value as StickyItem
-      return {
+      const normalized = {
         ...item,
         headerColor: normalizeColor(item.headerColor),
         bodyTheme: normalizeBodyTheme(item.bodyTheme),
@@ -124,6 +128,22 @@ function normalizeVersion3(
         order: Number.isFinite(item.order) ? item.order : index,
         deletedAt: item.deletedAt ?? null
       }
+      return normalizeTodoTasks(normalized)
     })
+  }
+}
+
+function normalizeTodoTasks(item: StickyItem): StickyItem {
+  if (item.type !== 'todo') return item
+  return {
+    ...item,
+    tasks: item.tasks.map((task) => ({
+      ...task,
+      tags: Array.isArray(task.tags) ? task.tags : [],
+      deadlineAt: task.deadlineAt ?? null,
+      deadlineReminders: Array.isArray(task.deadlineReminders)
+        ? task.deadlineReminders
+        : []
+    }))
   }
 }

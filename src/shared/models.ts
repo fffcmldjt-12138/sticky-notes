@@ -44,6 +44,15 @@ export interface TodoTask {
   completed: boolean
   remindAt: string | null
   reminded: boolean
+  tags: string[]
+  deadlineAt: string | null
+  deadlineReminders: DeadlineReminder[]
+}
+
+export interface DeadlineReminder {
+  id: string
+  offsetMinutes: number
+  remindedAt: string | null
 }
 
 export interface TodoItem extends BaseItem {
@@ -98,5 +107,14 @@ export type StickyItemPatch = Partial<
 }
 
 export type TodoTaskPatch = Partial<
-  Pick<TodoTask, 'contentMarkdown' | 'completed' | 'remindAt' | 'reminded'>
+  Pick<
+    TodoTask,
+    | 'contentMarkdown'
+    | 'completed'
+    | 'remindAt'
+    | 'reminded'
+    | 'tags'
+    | 'deadlineAt'
+    | 'deadlineReminders'
+  >
 >

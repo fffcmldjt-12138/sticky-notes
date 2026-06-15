@@ -19,6 +19,9 @@ export function TodoCard({
   const nextReminder = item.tasks
     .filter((task) => !task.completed && task.remindAt)
     .sort((a, b) => String(a.remindAt).localeCompare(String(b.remindAt)))[0]
+  const nextDeadline = item.tasks
+    .filter((task) => !task.completed && task.deadlineAt)
+    .sort((a, b) => String(a.deadlineAt).localeCompare(String(b.deadlineAt)))[0]
 
   return (
     <StickyCard
@@ -45,6 +48,9 @@ export function TodoCard({
         {completedCount}/{item.tasks.length} 已完成
         {nextReminder?.remindAt
           ? ` · 最近提醒 ${new Date(nextReminder.remindAt).toLocaleString('zh-CN')}`
+          : ''}
+        {nextDeadline?.deadlineAt
+          ? ` · DDL ${new Date(nextDeadline.deadlineAt).toLocaleString('zh-CN')}`
           : ''}
       </time>
     </StickyCard>

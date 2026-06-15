@@ -20,14 +20,20 @@ const todo: TodoItem = {
       contentMarkdown: 'First',
       completed: false,
       remindAt: null,
-      reminded: false
+      reminded: false,
+      tags: [],
+      deadlineAt: null,
+      deadlineReminders: []
     },
     {
       id: 'task_2',
       contentMarkdown: 'Second',
       completed: false,
       remindAt: null,
-      reminded: true
+      reminded: true,
+      tags: [],
+      deadlineAt: '2026-06-20T12:00:00.000Z',
+      deadlineReminders: []
     }
   ],
   createdAt: '2026-06-14T09:00:00.000Z',
@@ -102,6 +108,41 @@ describe('TodoEditor', () => {
 
     expect(onUpdateTask).toHaveBeenCalledWith('task_1', {
       contentMarkdown: 'Updated task'
+    })
+  })
+
+  it('shows a deadline and supports multiple advance reminder presets', () => {
+    const onUpdateTask = vi.fn()
+    render(
+      <TodoEditor
+        item={todo}
+        onSave={vi.fn()}
+        onAddTask={vi.fn()}
+        onUpdateTask={onUpdateTask}
+        onDeleteTask={vi.fn()}
+        onReorderTasks={vi.fn()}
+        onBack={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+
+    expect(screen.getAllByLabelText('DDL')).toHaveLength(2)
+    fireEvent.click(screen.getAllByRole('button', { name: '提前 3 天' })[0])
+    fireEvent.click(screen.getAllByRole('button', { name: '提前 1 天' })[0])
+
+    expect(onUpdateTask).toHaveBeenCalledWith('task_1', {
+      deadlineReminders: [{
+        id: 'preset-4320',
+        offsetMinutes: 4320,
+        remindedAt: null
+      }]
+    })
+    expect(onUpdateTask).toHaveBeenCalledWith('task_1', {
+      deadlineReminders: [{
+        id: 'preset-1440',
+        offsetMinutes: 1440,
+        remindedAt: null
+      }]
     })
   })
 })

@@ -63,6 +63,26 @@ describe('NoteStore', () => {
     expect(changed.tasks.find((task) => task.id === second!.id)?.reminded).toBe(true)
   })
 
+  it('resets deadline delivery state when the deadline changes', async () => {
+    const todo = await store.create('todo')
+    const task = await store.addTodoTask(todo.id, 'Deadline task')
+    await store.updateTodoTask(todo.id, task!.id, {
+      deadlineAt: '2026-06-20T12:00:00.000Z',
+      deadlineReminders: [{
+        id: 'one-day',
+        offsetMinutes: 1440,
+        remindedAt: '2026-06-19T12:00:00.000Z'
+      }]
+    })
+    await store.updateTodoTask(todo.id, task!.id, {
+      deadlineAt: '2026-06-21T12:00:00.000Z'
+    })
+
+    const changed = (await store.list()).find((item) => item.id === todo.id)
+    if (changed?.type !== 'todo') throw new Error('Expected Todo')
+    expect(changed.tasks[0].deadlineReminders[0].remindedAt).toBeNull()
+  })
+
   it('serializes concurrent updates without losing either change', async () => {
     const first = await store.create('note')
     const second = await store.create('note')

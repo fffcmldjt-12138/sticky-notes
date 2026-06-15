@@ -103,7 +103,10 @@ export class NoteStore {
       contentMarkdown,
       completed: false,
       remindAt: null,
-      reminded: false
+      reminded: false,
+      tags: [],
+      deadlineAt: null,
+      deadlineReminders: []
     }
     const updated = await this.changeTodo(todoId, (todo) => ({
       ...todo,
@@ -128,7 +131,21 @@ export class NoteStore {
         ) {
           nextPatch.reminded = false
         }
-        return { ...task, ...nextPatch }
+        const deadlineChanged =
+          Object.hasOwn(nextPatch, 'deadlineAt') &&
+          nextPatch.deadlineAt !== task.deadlineAt
+        const selectionChanged =
+          Object.hasOwn(nextPatch, 'deadlineReminders') &&
+          reminderSelection(task.deadlineReminders) !==
+            reminderSelection(nextPatch.deadlineReminders ?? [])
+        const updated = { ...task, ...nextPatch }
+        if (deadlineChanged || selectionChanged) {
+          updated.deadlineReminders = updated.deadlineReminders.map((reminder) => ({
+            ...reminder,
+            remindedAt: null
+          }))
+        }
+        return updated
       })
     }))
   }
@@ -208,4 +225,13 @@ export class NoteStore {
     )
     return result
   }
+}
+
+function reminderSelection(
+  reminders: TodoTask['deadlineReminders']
+): string {
+  return reminders
+    .map(({ id, offsetMinutes }) => `${id}:${offsetMinutes}`)
+    .sort()
+    .join('|')
 }

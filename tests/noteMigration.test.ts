@@ -63,7 +63,10 @@ describe('migrateNotesFile', () => {
               contentMarkdown: '- [ ] legacy task',
               completed: false,
               remindAt: '2026-06-14T20:00:00.000Z',
-              reminded: false
+              reminded: false,
+              tags: [],
+              deadlineAt: null,
+              deadlineReminders: []
             }
           ]
         }
@@ -105,6 +108,45 @@ describe('migrateNotesFile', () => {
           deletedAt: null
         })
       ]
+    })
+  })
+
+  it('normalizes existing version 3 todo tasks with deadline fields', () => {
+    const result = migrateNotesFile({
+      version: 3,
+      folders: [],
+      items: [{
+        id: 'todo_3',
+        type: 'todo',
+        title: 'Todo',
+        headerColor: '#5b8def',
+        bodyTheme: 'light',
+        pinned: false,
+        detached: false,
+        windowBounds: null,
+        parentFolderId: null,
+        tags: [],
+        order: 0,
+        deletedAt: null,
+        tasks: [{
+          id: 'task_1',
+          contentMarkdown: 'Submit',
+          completed: false,
+          remindAt: null,
+          reminded: false
+        }],
+        createdAt: '2026-06-14T09:00:00.000Z',
+        updatedAt: '2026-06-14T09:00:00.000Z'
+      }]
+    })
+
+    expect(result.items[0]).toMatchObject({
+      type: 'todo',
+      tasks: [{
+        tags: [],
+        deadlineAt: null,
+        deadlineReminders: []
+      }]
     })
   })
 
