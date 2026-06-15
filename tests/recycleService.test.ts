@@ -74,4 +74,26 @@ describe('RecycleService', () => {
       [activeAsset.fileName, recycledAsset.fileName].sort()
     )
   })
+
+  it('moves orphaned images to asset trash when the recycle bin is emptied', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'sticky-empty-assets-'))
+    store = new NoteStore(directory)
+    const assets = new AssetService(directory)
+    recycle = new RecycleService(
+      store,
+      () => new Date('2026-06-15T12:00:00.000Z'),
+      assets
+    )
+    const asset = await assets.importBuffer(Buffer.from('image'), 'image/png')
+    const note = await store.create('note')
+    await store.update(note.id, { contentMarkdown: `![](${asset.url})` })
+    await store.delete(note.id)
+
+    await recycle.empty()
+
+    expect(await readdir(join(directory, 'assets'))).toEqual([])
+    expect(await readdir(join(directory, 'assets-trash'))).toEqual([
+      `${new Date('2026-06-15T12:00:00.000Z').getTime()}--${asset.fileName}`
+    ])
+  })
 })

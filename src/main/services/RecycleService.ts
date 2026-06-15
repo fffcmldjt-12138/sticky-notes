@@ -32,12 +32,17 @@ export class RecycleService {
   async purgeExpired(): Promise<number> {
     const cutoff = new Date(this.now().getTime() - RETENTION_MS)
     const purged = await this.store.purgeDeletedBefore(cutoff)
-    if (this.assets) await this.assets.purgeTrashBefore(cutoff)
+    if (this.assets) {
+      await this.cleanUnusedImages()
+      await this.assets.purgeTrashBefore(cutoff)
+    }
     return purged
   }
 
-  empty(): Promise<number> {
-    return this.store.emptyDeleted()
+  async empty(): Promise<number> {
+    const emptied = await this.store.emptyDeleted()
+    if (this.assets) await this.cleanUnusedImages()
+    return emptied
   }
 
   async cleanUnusedImages(): Promise<number> {
