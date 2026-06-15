@@ -29,6 +29,8 @@ export const ipcChannels = {
   windowSuspendAutoHide: 'window:suspend-auto-hide',
   windowDetach: 'window:detach',
   windowAttach: 'window:attach',
+  windowDetachFolder: 'window:detach-folder',
+  windowAttachFolder: 'window:attach-folder',
   windowOpenExternal: 'window:open-external',
   openEditor: 'app:open-editor',
   itemChanged: 'notes:item-changed',

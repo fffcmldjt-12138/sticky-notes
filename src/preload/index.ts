@@ -68,6 +68,10 @@ const api: StickyApi = {
       ipcRenderer.send(ipcChannels.windowSuspendAutoHide, value),
     detach: (itemId) => ipcRenderer.invoke(ipcChannels.windowDetach, itemId),
     attach: (itemId) => ipcRenderer.invoke(ipcChannels.windowAttach, itemId),
+    detachFolder: (folderId) =>
+      ipcRenderer.invoke(ipcChannels.windowDetachFolder, folderId),
+    attachFolder: (folderId) =>
+      ipcRenderer.invoke(ipcChannels.windowAttachFolder, folderId),
     openExternal: (url) => ipcRenderer.invoke(ipcChannels.windowOpenExternal, url)
   },
   onOpenEditor: (callback: (type: NoteType) => void) => {

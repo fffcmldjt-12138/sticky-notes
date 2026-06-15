@@ -22,6 +22,10 @@ import {
   DetachedWindowService,
   type DetachedWindowHandle
 } from './services/DetachedWindowService'
+import {
+  FolderWindowService,
+  type FolderWindowHandle
+} from './services/FolderWindowService'
 import { NoteStore } from './services/NoteStore'
 import { ReminderService } from './services/ReminderService'
 import { RecycleService } from './services/RecycleService'
@@ -90,6 +94,40 @@ if (!hasLock) {
       () => screen.getAllDisplays().map((display) => display.workArea),
       (item) => broadcast('notes:item-changed', item)
     )
+    const folderWindows = new FolderWindowService(
+      notes,
+      {
+        create: (folder, bounds): FolderWindowHandle => {
+          const window = new BrowserWindow({
+            ...bounds,
+            minWidth: 320,
+            minHeight: 360,
+            frame: false,
+            resizable: true,
+            show: false,
+            alwaysOnTop: true,
+            backgroundColor: '#f3f5f8',
+            webPreferences: {
+              preload: join(__dirname, '../preload/index.mjs'),
+              contextIsolation: true,
+              nodeIntegration: false,
+              sandbox: false
+            }
+          })
+          const query = `mode=folder&id=${encodeURIComponent(folder.id)}`
+          if (is.dev && process.env.ELECTRON_RENDERER_URL) {
+            void window.loadURL(`${process.env.ELECTRON_RENDERER_URL}?${query}`)
+          } else {
+            void window.loadFile(join(__dirname, '../renderer/index.html'), {
+              query: { mode: 'folder', id: folder.id }
+            })
+          }
+          window.once('ready-to-show', () => window.show())
+          return window
+        }
+      },
+      () => screen.getAllDisplays().map((display) => display.workArea)
+    )
     const tray = new TrayService(windows, config, autoLaunch)
     const reminder = new ReminderService(notes, (title, body) => {
       new Notification({ title, body }).show()
@@ -117,12 +155,15 @@ if (!hasLock) {
       }
     })
     registerAssetIpc(assets)
-    registerFolderIpc(notes)
+    registerFolderIpc(notes, {
+      beforeDelete: (folderId) => folderWindows.closeForDelete(folderId)
+    })
     registerRecycleIpc(recycle)
-    registerWindowIpc(windows, detachedWindows, notes)
+    registerWindowIpc(windows, detachedWindows, folderWindows, notes)
     registerConfigIpc(config, autoLaunch, windows, tray)
     reminder.start()
     await detachedWindows.restore(await notes.list())
+    await folderWindows.restore(await notes.listFolders())
 
     if (process.env.STICKY_NOTES_SMOKE_QUIT === '1') {
       setTimeout(() => app.quit(), 500)
@@ -132,6 +173,7 @@ if (!hasLock) {
     app.on('before-quit', () => {
       reminder.stop()
       detachedWindows.beginShutdown()
+      folderWindows.beginShutdown()
       windows.quit()
     })
   })

@@ -62,6 +62,8 @@ export interface StickyApi {
     suspendAutoHide(suspended: boolean): void
     detach(itemId: string): Promise<void>
     attach(itemId: string): Promise<void>
+    detachFolder(folderId: string): Promise<void>
+    attachFolder(folderId: string): Promise<void>
     openExternal(url: string): Promise<boolean>
   }
   onOpenEditor(callback: (type: NoteType) => void): () => void
