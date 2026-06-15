@@ -1,17 +1,22 @@
 import type { OrderedNodeRef, StickyItem } from '../../../shared/models'
 import type { FolderTreeEntry, FolderTreeNode } from '../lib/folderTree'
+import { endedOutsidePanel } from '../lib/dragBoundary'
 
 export function FolderCard({
   node,
   onOpenItem,
   onToggle,
   onContextMenu,
+  onDetachItem,
+  onDetachFolder,
   onReorder
 }: {
   node: FolderTreeNode
   onOpenItem(item: StickyItem): void
   onToggle(node: FolderTreeNode): void
   onContextMenu(node: FolderTreeNode, event: React.MouseEvent<HTMLElement>): void
+  onDetachItem(item: StickyItem): void
+  onDetachFolder(node: FolderTreeNode): void
   onReorder(parentFolderId: string | null, orderedNodes: OrderedNodeRef[]): void
 }): React.JSX.Element {
   return (
@@ -42,6 +47,18 @@ export function FolderCard({
           event.dataTransfer.setData('text/sticky-folder', node.id)
           event.dataTransfer.effectAllowed = 'move'
         }}
+        onDragEnd={(event) => {
+          if (
+            endedOutsidePanel(
+              event.clientX,
+              event.clientY,
+              window.innerWidth,
+              window.innerHeight
+            )
+          ) {
+            onDetachFolder(node)
+          }
+        }}
       >
         <button
           className={`folder-toggle ${node.collapsed ? '' : 'expanded'}`}
@@ -63,13 +80,19 @@ export function FolderCard({
                 }
               />
               {entry.kind === 'item' ? (
-                <FolderItemTitle item={entry.item} onOpen={onOpenItem} />
+                <FolderItemTitle
+                  item={entry.item}
+                  onOpen={onOpenItem}
+                  onDetach={onDetachItem}
+                />
               ) : (
                 <FolderCard
                   node={entry.folder}
                   onOpenItem={onOpenItem}
                   onToggle={onToggle}
                   onContextMenu={onContextMenu}
+                  onDetachItem={onDetachItem}
+                  onDetachFolder={onDetachFolder}
                   onReorder={onReorder}
                 />
               )}
@@ -88,10 +111,12 @@ export function FolderCard({
 
 function FolderItemTitle({
   item,
-  onOpen
+  onOpen,
+  onDetach
 }: {
   item: StickyItem
   onOpen(item: StickyItem): void
+  onDetach(item: StickyItem): void
 }): React.JSX.Element {
   return (
     <button
@@ -102,6 +127,18 @@ function FolderItemTitle({
       onDragStart={(event) => {
         event.dataTransfer.setData('text/sticky-item', item.id)
         event.dataTransfer.effectAllowed = 'move'
+      }}
+      onDragEnd={(event) => {
+        if (
+          endedOutsidePanel(
+            event.clientX,
+            event.clientY,
+            window.innerWidth,
+            window.innerHeight
+          )
+        ) {
+          onDetach(item)
+        }
       }}
     >
       <span>{item.type === 'note' ? '笔记' : '待办'}</span>

@@ -13,6 +13,7 @@ export function StickyPanel({
   onDetach,
   onToggleFolder,
   onFolderContextMenu,
+  onDetachFolder,
   onReorder
 }: {
   items: StickyItem[]
@@ -26,6 +27,7 @@ export function StickyPanel({
     folder: FolderTreeNode,
     event: React.MouseEvent<HTMLElement>
   ): void
+  onDetachFolder(folder: FolderTreeNode): void
   onReorder(parentFolderId: string | null, orderedNodes: OrderedNodeRef[]): void
 }): React.JSX.Element {
   const tree = buildFolderTree(folders, items)
@@ -76,6 +78,8 @@ export function StickyPanel({
               onOpenItem={onOpen}
               onToggle={onToggleFolder}
               onContextMenu={onFolderContextMenu}
+              onDetachItem={onDetach}
+              onDetachFolder={onDetachFolder}
               onReorder={onReorder}
             />
           ) : null}

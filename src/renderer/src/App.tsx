@@ -291,6 +291,7 @@ function PanelApp(): React.JSX.Element {
                 y: event.clientY
               })
             }
+            onDetachFolder={() => undefined}
             onReorder={(parentFolderId, orderedNodes) => {
               void window.stickyApi.folders
                 .reorderChildren(parentFolderId, orderedNodes)

@@ -1,5 +1,6 @@
 import type { PropsWithChildren } from 'react'
 import type { StickyItem } from '../../../shared/models'
+import { endedOutsidePanel } from '../lib/dragBoundary'
 
 interface Props extends PropsWithChildren {
   item: StickyItem
@@ -28,11 +29,12 @@ export function StickyCard({
         onContextMenu?.(event)
       }}
       onDragEnd={(event) => {
-        const outside =
-          event.clientX <= 0 ||
-          event.clientY <= 0 ||
-          event.clientX >= window.innerWidth ||
-          event.clientY >= window.innerHeight
+        const outside = endedOutsidePanel(
+          event.clientX,
+          event.clientY,
+          window.innerWidth,
+          window.innerHeight
+        )
         if (outside) onDetach?.()
       }}
     >
