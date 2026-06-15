@@ -42,6 +42,16 @@ const api: StickyApi = {
     moveItem: (itemId, parentFolderId) =>
       ipcRenderer.invoke(ipcChannels.foldersMoveItem, itemId, parentFolderId)
   },
+  recycle: {
+    list: () => ipcRenderer.invoke(ipcChannels.recycleList),
+    restoreItem: (id) =>
+      ipcRenderer.invoke(ipcChannels.recycleRestoreItem, id),
+    restoreFolder: (id) =>
+      ipcRenderer.invoke(ipcChannels.recycleRestoreFolder, id),
+    empty: () => ipcRenderer.invoke(ipcChannels.recycleEmpty),
+    cleanUnusedImages: () =>
+      ipcRenderer.invoke(ipcChannels.recycleCleanUnusedImages)
+  },
   window: {
     expand: () => ipcRenderer.send(ipcChannels.windowExpand),
     scheduleCollapse: () => ipcRenderer.send(ipcChannels.windowScheduleCollapse),

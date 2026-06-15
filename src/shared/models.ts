@@ -83,6 +83,11 @@ export interface NotesFile {
   folders: FolderItem[]
 }
 
+export interface RecycleContents {
+  items: StickyItem[]
+  folders: FolderItem[]
+}
+
 export interface AppConfig {
   version: 1
   autoLaunch: boolean

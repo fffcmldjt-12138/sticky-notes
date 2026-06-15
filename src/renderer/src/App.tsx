@@ -196,7 +196,15 @@ function PanelApp(): React.JSX.Element {
         />
       )}
       {!selected && settingsOpen && config && (
-        <SettingsPanel config={config} onChange={(patch) => void updateConfig(patch)} onBack={() => setSettingsOpen(false)} />
+        <SettingsPanel
+          config={config}
+          onChange={(patch) => void updateConfig(patch)}
+          onBack={() => setSettingsOpen(false)}
+          onDataChanged={() => {
+            void loadItems()
+            void loadFolders()
+          }}
+        />
       )}
       {!selected && !settingsOpen && (
         <>

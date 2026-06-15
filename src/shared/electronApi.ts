@@ -4,6 +4,7 @@ import type {
   FolderItem,
   FolderPatch,
   NoteType,
+  RecycleContents,
   StickyItem,
   StickyItemPatch,
   TodoItem,
@@ -39,6 +40,13 @@ export interface StickyApi {
     create(title: string, parentFolderId?: string | null): Promise<FolderItem>
     update(id: string, patch: FolderPatch): Promise<FolderItem | null>
     moveItem(itemId: string, parentFolderId: string | null): Promise<StickyItem | null>
+  }
+  recycle: {
+    list(): Promise<RecycleContents>
+    restoreItem(id: string): Promise<boolean>
+    restoreFolder(id: string): Promise<boolean>
+    empty(): Promise<number>
+    cleanUnusedImages(): Promise<number>
   }
   window: {
     expand(): void

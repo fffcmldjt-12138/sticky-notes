@@ -53,6 +53,13 @@ describe('App creation flow', () => {
         update: vi.fn(),
         moveItem: vi.fn()
       },
+      recycle: {
+        list: vi.fn().mockResolvedValue({ items: [], folders: [] }),
+        restoreItem: vi.fn(),
+        restoreFolder: vi.fn(),
+        empty: vi.fn(),
+        cleanUnusedImages: vi.fn()
+      },
       window: {
         expand: vi.fn(),
         scheduleCollapse: vi.fn(),

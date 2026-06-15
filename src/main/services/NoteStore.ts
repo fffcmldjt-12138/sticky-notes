@@ -7,6 +7,7 @@ import type {
   NoteItem,
   NotesFile,
   NoteType,
+  RecycleContents,
   StickyItem,
   StickyItemPatch,
   TodoItem,
@@ -34,7 +35,7 @@ export class NoteStore {
   async list(): Promise<StickyItem[]> {
     await this.ensureInitialized()
     await this.mutationQueue
-    return (await this.file.read()).items
+    return (await this.file.read()).items.filter((item) => !item.deletedAt)
   }
 
   async listFolders(): Promise<FolderItem[]> {
@@ -173,11 +174,101 @@ export class NoteStore {
     await this.ensureInitialized()
     return this.mutate(async () => {
       const data = await this.file.read()
-      const remaining = data.items.filter((item) => item.id !== id)
-      if (remaining.length === data.items.length) return false
-      data.items = remaining
+      const index = data.items.findIndex((item) => item.id === id)
+      if (index < 0) return false
+      data.items[index] = {
+        ...data.items[index],
+        deletedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      } as StickyItem
       await this.file.write(data)
       return true
+    })
+  }
+
+  async listDeleted(): Promise<RecycleContents> {
+    await this.ensureInitialized()
+    await this.mutationQueue
+    const data = await this.file.read()
+    return {
+      items: data.items.filter((item) => item.deletedAt),
+      folders: data.folders.filter((folder) => folder.deletedAt)
+    }
+  }
+
+  async restoreItem(id: string): Promise<boolean> {
+    await this.ensureInitialized()
+    return this.mutate(async () => {
+      const data = await this.file.read()
+      const index = data.items.findIndex((item) => item.id === id && item.deletedAt)
+      if (index < 0) return false
+      const parentFolderId = data.folders.some(
+        (folder) =>
+          folder.id === data.items[index].parentFolderId && !folder.deletedAt
+      )
+        ? data.items[index].parentFolderId
+        : null
+      data.items[index] = {
+        ...data.items[index],
+        parentFolderId,
+        deletedAt: null,
+        updatedAt: new Date().toISOString()
+      } as StickyItem
+      await this.file.write(data)
+      return true
+    })
+  }
+
+  async restoreFolder(id: string): Promise<boolean> {
+    await this.ensureInitialized()
+    return this.mutate(async () => {
+      const data = await this.file.read()
+      const index = data.folders.findIndex(
+        (folder) => folder.id === id && folder.deletedAt
+      )
+      if (index < 0) return false
+      const parentFolderId = data.folders.some(
+        (folder) =>
+          folder.id === data.folders[index].parentFolderId && !folder.deletedAt
+      )
+        ? data.folders[index].parentFolderId
+        : null
+      data.folders[index] = {
+        ...data.folders[index],
+        parentFolderId,
+        deletedAt: null,
+        updatedAt: new Date().toISOString()
+      }
+      await this.file.write(data)
+      return true
+    })
+  }
+
+  async purgeDeletedBefore(cutoff: Date): Promise<number> {
+    await this.ensureInitialized()
+    return this.mutate(async () => {
+      const data = await this.file.read()
+      const shouldPurge = (deletedAt: string | null): boolean =>
+        Boolean(deletedAt && new Date(deletedAt).getTime() <= cutoff.getTime())
+      const itemCount = data.items.length
+      const folderCount = data.folders.length
+      data.items = data.items.filter((item) => !shouldPurge(item.deletedAt))
+      data.folders = data.folders.filter((folder) => !shouldPurge(folder.deletedAt))
+      await this.file.write(data)
+      return itemCount + folderCount - data.items.length - data.folders.length
+    })
+  }
+
+  async emptyDeleted(): Promise<number> {
+    await this.ensureInitialized()
+    return this.mutate(async () => {
+      const data = await this.file.read()
+      const itemCount = data.items.length
+      const folderCount = data.folders.length
+      data.items = data.items.filter((item) => !item.deletedAt)
+      data.folders = data.folders.filter((folder) => !folder.deletedAt)
+      await this.file.write(data)
+      return itemCount + folderCount - data.items.length - data.folders.length
     })
   }
 

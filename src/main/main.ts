@@ -13,6 +13,7 @@ import { registerConfigIpc } from './ipc/configIpc'
 import { registerAssetIpc } from './ipc/assetIpc'
 import { registerFolderIpc } from './ipc/folderIpc'
 import { registerNoteIpc } from './ipc/noteIpc'
+import { registerRecycleIpc } from './ipc/recycleIpc'
 import { registerWindowIpc } from './ipc/windowIpc'
 import { AutoLaunchService } from './services/AutoLaunchService'
 import { AssetService } from './services/AssetService'
@@ -23,6 +24,7 @@ import {
 } from './services/DetachedWindowService'
 import { NoteStore } from './services/NoteStore'
 import { ReminderService } from './services/ReminderService'
+import { RecycleService } from './services/RecycleService'
 import { TrayService } from './services/TrayService'
 import { WindowService } from './services/WindowService'
 
@@ -92,8 +94,10 @@ if (!hasLock) {
     const reminder = new ReminderService(notes, (title, body) => {
       new Notification({ title, body }).show()
     })
+    const recycle = new RecycleService(notes, () => new Date(), assets)
 
     const currentConfig = await config.get()
+    await recycle.purgeExpired()
     protocol.handle('asset', (request) => {
       const filePath = assets.resolveUrl(request.url)
       return filePath
@@ -114,6 +118,7 @@ if (!hasLock) {
     })
     registerAssetIpc(assets)
     registerFolderIpc(notes)
+    registerRecycleIpc(recycle)
     registerWindowIpc(windows, detachedWindows, notes)
     registerConfigIpc(config, autoLaunch, windows, tray)
     reminder.start()
