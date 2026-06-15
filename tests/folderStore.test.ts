@@ -114,4 +114,19 @@ describe('folder storage', () => {
     })
     expect(folders.some((entry) => entry.id === folder.id)).toBe(false)
   })
+
+  it('persists detached folder bounds', async () => {
+    const folder = await store.createFolder('Window')
+    const bounds = { x: 120, y: 80, width: 380, height: 520 }
+
+    const updated = await store.updateFolder(folder.id, {
+      detached: true,
+      windowBounds: bounds
+    })
+
+    expect(updated).toMatchObject({ detached: true, windowBounds: bounds })
+    expect(await store.listFolders()).toContainEqual(
+      expect.objectContaining({ id: folder.id, detached: true, windowBounds: bounds })
+    )
+  })
 })

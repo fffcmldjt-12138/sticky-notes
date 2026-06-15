@@ -60,6 +60,8 @@ export class NoteStore {
         parentFolderId,
         order: nextSiblingOrder(data, parentFolderId),
         collapsed: false,
+        detached: false,
+        windowBounds: null,
         deletedAt: null,
         createdAt: now,
         updatedAt: now
@@ -251,7 +253,7 @@ export class NoteStore {
       const item: NoteItem | TodoItem =
         type === 'note'
           ? { ...base, type, contentMarkdown: '', syncedToSiyuan: false }
-          : { ...base, type, tasks: [] }
+          : { ...base, type, tasks: [], panelExpanded: false }
 
       data.items.unshift(item)
       await this.file.write(data)

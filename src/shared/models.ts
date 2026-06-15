@@ -58,6 +58,7 @@ export interface DeadlineReminder {
 export interface TodoItem extends BaseItem {
   type: 'todo'
   tasks: TodoTask[]
+  panelExpanded: boolean
 }
 
 export type StickyItem = NoteItem | TodoItem
@@ -73,13 +74,24 @@ export interface FolderItem {
   parentFolderId: string | null
   order: number
   collapsed: boolean
+  detached: boolean
+  windowBounds: WindowBounds | null
   deletedAt: string | null
   createdAt: string
   updatedAt: string
 }
 
 export type FolderPatch = Partial<
-  Pick<FolderItem, 'title' | 'parentFolderId' | 'order' | 'collapsed' | 'deletedAt'>
+  Pick<
+    FolderItem,
+    | 'title'
+    | 'parentFolderId'
+    | 'order'
+    | 'collapsed'
+    | 'detached'
+    | 'windowBounds'
+    | 'deletedAt'
+  >
 >
 
 export interface NotesFile {
@@ -118,6 +130,7 @@ export type StickyItemPatch = Partial<
   >
 > & {
   contentMarkdown?: string
+  panelExpanded?: boolean
 }
 
 export type TodoTaskPatch = Partial<

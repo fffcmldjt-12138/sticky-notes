@@ -67,6 +67,7 @@ function migrateVersion1Item(value: unknown, index: number): StickyItem {
     return {
       ...base,
       type: 'todo',
+      panelExpanded: false,
       tasks: contentMarkdown || item.remindAt
         ? [{
             id: `task_${randomUUID()}`,
@@ -114,7 +115,18 @@ function normalizeVersion3(
 ): NotesFile {
   return {
     version: 3,
-    folders: (source.folders ?? []) as NotesFile['folders'],
+    folders: (source.folders ?? []).map((value, index) => {
+      const folder = value as NotesFile['folders'][number]
+      return {
+        ...folder,
+        parentFolderId: folder.parentFolderId ?? null,
+        order: Number.isFinite(folder.order) ? folder.order : index,
+        collapsed: Boolean(folder.collapsed),
+        detached: Boolean(folder.detached),
+        windowBounds: folder.windowBounds ?? null,
+        deletedAt: folder.deletedAt ?? null
+      }
+    }),
     items: (source.items ?? []).map((value, index) => {
       const item = value as StickyItem
       const normalized = {
@@ -137,6 +149,7 @@ function normalizeTodoTasks(item: StickyItem): StickyItem {
   if (item.type !== 'todo') return item
   return {
     ...item,
+    panelExpanded: Boolean(item.panelExpanded),
     tasks: item.tasks.map((task) => ({
       ...task,
       tags: Array.isArray(task.tags) ? task.tags : [],

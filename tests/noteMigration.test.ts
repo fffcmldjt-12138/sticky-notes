@@ -142,11 +142,34 @@ describe('migrateNotesFile', () => {
 
     expect(result.items[0]).toMatchObject({
       type: 'todo',
+      panelExpanded: false,
       tasks: [{
         tags: [],
         deadlineAt: null,
         deadlineReminders: []
       }]
+    })
+  })
+
+  it('normalizes detached window fields for existing version 3 folders', () => {
+    const result = migrateNotesFile({
+      version: 3,
+      folders: [{
+        id: 'folder_1',
+        title: 'Folder',
+        parentFolderId: null,
+        order: 0,
+        collapsed: false,
+        deletedAt: null,
+        createdAt: '2026-06-14T09:00:00.000Z',
+        updatedAt: '2026-06-14T09:00:00.000Z'
+      }],
+      items: []
+    })
+
+    expect(result.folders[0]).toMatchObject({
+      detached: false,
+      windowBounds: null
     })
   })
 
