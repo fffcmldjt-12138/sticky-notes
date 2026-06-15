@@ -9,6 +9,7 @@ import type {
 import { extractTags } from '../../../shared/tags'
 import { DeadlinePopover } from './DeadlinePopover'
 import { ReminderPopover } from './ReminderPopover'
+import { TodoTaskInput } from './TodoTaskInput'
 
 type ActivePopover = 'reminder' | 'deadline' | null
 
@@ -57,12 +58,9 @@ export function TodoTaskRow({
         checked={task.completed}
         onChange={(event) => onUpdate({ completed: event.target.checked })}
       />
-      <input
-        className="task-content-input"
-        aria-label="任务内容"
-        type="text"
+      <TodoTaskInput
         value={task.contentMarkdown}
-        onChange={(event) => onUpdate({ contentMarkdown: event.target.value })}
+        onCommit={(contentMarkdown) => onUpdate({ contentMarkdown })}
       />
       <button
         className="task-delete-button"
