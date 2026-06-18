@@ -221,6 +221,35 @@ function PanelApp(): React.JSX.Element {
               )
             }
           }}
+          onAddSubtask={async (taskId) => {
+            await window.stickyApi.notes.addTodoSubtask(selected.id, taskId)
+            await loadItems()
+          }}
+          onUpdateSubtask={async (taskId, subtaskId, patch) => {
+            const updated = await window.stickyApi.notes.updateTodoSubtask(
+              selected.id,
+              taskId,
+              subtaskId,
+              patch
+            )
+            if (updated) {
+              setItems((current) =>
+                current.map((item) => item.id === updated.id ? updated : item)
+              )
+            }
+          }}
+          onDeleteSubtask={async (taskId, subtaskId) => {
+            const updated = await window.stickyApi.notes.deleteTodoSubtask(
+              selected.id,
+              taskId,
+              subtaskId
+            )
+            if (updated) {
+              setItems((current) =>
+                current.map((item) => item.id === updated.id ? updated : item)
+              )
+            }
+          }}
           onBack={() => setSelectedId(null)}
           onDelete={() => void remove(selected)}
         />

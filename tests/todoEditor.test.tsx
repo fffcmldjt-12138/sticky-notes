@@ -18,163 +18,85 @@ const todo: TodoItem = {
   tags: [],
   order: 0,
   deletedAt: null,
-  tasks: [
-    {
-      id: 'task_1',
-      contentMarkdown: 'First',
-      completed: false,
-      remindAt: null,
-      reminded: false,
+  panelExpanded: false,
+  tasks: [{
+    id: 'task_1',
+    contentMarkdown: 'First',
+    completed: false,
+    tags: [],
+    importance: 'normal',
+    urgency: 'normal',
+    children: [{
+      id: 'subtask_1',
+      contentMarkdown: 'Detail',
+      completed: true,
       tags: [],
-      deadlineAt: null,
-      deadlineReminders: []
-    }
-  ],
+      importance: 'normal',
+      urgency: 'urgent',
+      schedule: null
+    }],
+    schedule: null
+  }],
   createdAt: '2026-06-14T09:00:00.000Z',
   updatedAt: '2026-06-14T09:00:00.000Z'
 }
 
-function renderEditor(onUpdateTask = vi.fn()): ReturnType<typeof render> {
+function renderEditor(overrides: Record<string, ReturnType<typeof vi.fn>> = {}) {
   return render(
     <TodoEditor
       item={todo}
       onSave={vi.fn()}
       onAddTask={vi.fn()}
-      onUpdateTask={onUpdateTask}
+      onUpdateTask={overrides.onUpdateTask ?? vi.fn()}
       onDeleteTask={vi.fn()}
       onReorderTasks={vi.fn()}
+      onAddSubtask={overrides.onAddSubtask ?? vi.fn()}
+      onUpdateSubtask={overrides.onUpdateSubtask ?? vi.fn()}
+      onDeleteSubtask={overrides.onDeleteSubtask ?? vi.fn()}
       onBack={vi.fn()}
       onDelete={vi.fn()}
     />
   )
 }
 
-function chooseDateTime(
-  prefix: '提醒' | 'DDL ',
-  date: string,
-  hour: string,
-  minute: string
-): void {
-  fireEvent.change(screen.getByLabelText(`${prefix}日期`), {
-    target: { value: date }
-  })
-  fireEvent.change(screen.getByLabelText(`${prefix}小时`), {
-    target: { value: hour }
-  })
-  fireEvent.change(screen.getByLabelText(`${prefix}分钟`), {
-    target: { value: minute }
-  })
-  fireEvent.click(
-    screen.getByRole('button', {
-      name: prefix === '提醒' ? '确认提醒时间' : '确认DDL时间'
-    })
-  )
-}
-
 describe('TodoEditor', () => {
-  it('shows a compact row with a large checkbox and only two setting buttons', () => {
+  it('uses one schedule button and exposes quadrant selection', () => {
     renderEditor()
 
-    expect(screen.getByLabelText('完成状态')).toHaveClass('task-complete-checkbox')
-    expect(screen.getByLabelText('任务内容')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '设置提醒' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '设置 DDL' })).toBeInTheDocument()
-    expect(screen.queryByLabelText('提醒时间')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('DDL 时间')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '时间设置' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '设置提醒' })).not
+      .toBeInTheDocument()
+    expect(screen.getByLabelText('任务四象限')).toBeInTheDocument()
   })
 
-  it('opens reminder settings near the reminder button and saves once', () => {
+  it('updates a task quadrant', () => {
     const onUpdateTask = vi.fn()
-    renderEditor(onUpdateTask)
+    renderEditor({ onUpdateTask })
 
-    fireEvent.click(screen.getByRole('button', { name: '设置提醒' }))
-    chooseDateTime('提醒', '2026-06-16', '09', '30')
-
-    expect(onUpdateTask).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: '保存提醒' }))
-
-    expect(onUpdateTask).toHaveBeenCalledOnce()
-    expect(onUpdateTask).toHaveBeenCalledWith('task_1', {
-      remindAt: new Date('2026-06-16T09:30').toISOString(),
-      reminded: false
+    fireEvent.change(screen.getByLabelText('任务四象限'), {
+      target: { value: 'important-urgent' }
     })
-    expect(screen.queryByLabelText('提醒时间')).not.toBeInTheDocument()
-  })
-
-  it('clears an existing reminder from the popover', () => {
-    const onUpdateTask = vi.fn()
-    renderEditor(onUpdateTask)
-
-    fireEvent.click(screen.getByRole('button', { name: '设置提醒' }))
-    fireEvent.click(screen.getByRole('button', { name: '清除提醒' }))
 
     expect(onUpdateTask).toHaveBeenCalledWith('task_1', {
-      remindAt: null,
-      reminded: false
+      importance: 'important',
+      urgency: 'urgent'
     })
   })
 
-  it('opens DDL settings and saves the deadline with selected reminders once', () => {
-    const onUpdateTask = vi.fn()
-    renderEditor(onUpdateTask)
+  it('adds and edits one-level subtasks without a nested add action', () => {
+    const onAddSubtask = vi.fn()
+    renderEditor({ onAddSubtask })
 
-    fireEvent.click(screen.getByRole('button', { name: '设置 DDL' }))
-    chooseDateTime('DDL ', '2026-06-20', '18', '00')
-    fireEvent.click(screen.getByRole('button', { name: '提前 3 天' }))
-    fireEvent.click(screen.getByRole('button', { name: '提前 6 小时' }))
+    fireEvent.click(screen.getByRole('button', { name: '添加子待办' }))
 
-    expect(onUpdateTask).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: '保存 DDL' }))
-
-    expect(onUpdateTask).toHaveBeenCalledOnce()
-    expect(onUpdateTask).toHaveBeenCalledWith('task_1', {
-      deadlineAt: new Date('2026-06-20T18:00').toISOString(),
-      deadlineReminders: [
-        {
-          id: 'preset-4320',
-          offsetMinutes: 4320,
-          remindedAt: null
-        },
-        {
-          id: 'preset-360',
-          offsetMinutes: 360,
-          remindedAt: null
-        }
-      ]
-    })
+    expect(onAddSubtask).toHaveBeenCalledWith('task_1')
+    expect(screen.getByLabelText('子待办内容')).toHaveValue('Detail')
+    expect(screen.getAllByRole('button', { name: '添加子待办' })).toHaveLength(1)
   })
 
-  it('switches from reminder to DDL and clears the deadline', () => {
-    const onUpdateTask = vi.fn()
-    renderEditor(onUpdateTask)
+  it('styles completed subtasks with a strike-through class', () => {
+    const { container } = renderEditor()
 
-    fireEvent.click(screen.getByRole('button', { name: '设置提醒' }))
-    expect(screen.getByRole('dialog', { name: '提醒设置' })).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: '设置 DDL' }))
-    expect(screen.queryByRole('dialog', { name: '提醒设置' })).not.toBeInTheDocument()
-    expect(screen.getByRole('dialog', { name: 'DDL 设置' })).toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: '清除 DDL' }))
-    expect(onUpdateTask).toHaveBeenCalledWith('task_1', {
-      deadlineAt: null,
-      deadlineReminders: []
-    })
-  })
-
-  it('closes reminder settings without saving on cancel or Escape', () => {
-    const onUpdateTask = vi.fn()
-    renderEditor(onUpdateTask)
-
-    fireEvent.click(screen.getByRole('button', { name: '设置提醒' }))
-    chooseDateTime('提醒', '2026-06-16', '09', '30')
-    fireEvent.click(screen.getByRole('button', { name: '取消' }))
-    expect(onUpdateTask).not.toHaveBeenCalled()
-    expect(screen.queryByRole('dialog', { name: '提醒设置' })).not.toBeInTheDocument()
-
-    fireEvent.click(screen.getByRole('button', { name: '设置提醒' }))
-    fireEvent.keyDown(document, { key: 'Escape' })
-    expect(screen.queryByRole('dialog', { name: '提醒设置' })).not.toBeInTheDocument()
-    expect(onUpdateTask).not.toHaveBeenCalled()
+    expect(container.querySelector('.todo-subtask-row.completed')).toBeTruthy()
   })
 })

@@ -80,6 +80,27 @@ export function DetachedEditor({ itemId }: { itemId: string }): React.JSX.Elemen
         const updated = await window.stickyApi.notes.reorderTodoTasks(item.id, taskIds)
         if (updated) setItem(updated)
       }}
+      onAddSubtask={async (taskId) => {
+        await window.stickyApi.notes.addTodoSubtask(item.id, taskId)
+        await load()
+      }}
+      onUpdateSubtask={async (taskId, subtaskId, patch) => {
+        const updated = await window.stickyApi.notes.updateTodoSubtask(
+          item.id,
+          taskId,
+          subtaskId,
+          patch
+        )
+        if (updated) setItem(updated)
+      }}
+      onDeleteSubtask={async (taskId, subtaskId) => {
+        const updated = await window.stickyApi.notes.deleteTodoSubtask(
+          item.id,
+          taskId,
+          subtaskId
+        )
+        if (updated) setItem(updated)
+      }}
       onBack={attach}
       onDelete={() => void remove()}
     />

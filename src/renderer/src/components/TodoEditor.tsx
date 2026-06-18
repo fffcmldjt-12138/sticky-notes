@@ -17,6 +17,7 @@ import {
 import type {
   StickyItemPatch,
   TodoItem,
+  TodoSubtaskPatch,
   TodoTaskPatch
 } from '../../../shared/models'
 import { BodyThemeToggle } from './BodyThemeToggle'
@@ -32,6 +33,13 @@ interface Props {
   onUpdateTask(taskId: string, patch: TodoTaskPatch): void
   onDeleteTask(taskId: string): void
   onReorderTasks(taskIds: string[]): void
+  onAddSubtask(taskId: string): void
+  onUpdateSubtask(
+    taskId: string,
+    subtaskId: string,
+    patch: TodoSubtaskPatch
+  ): void
+  onDeleteSubtask(taskId: string, subtaskId: string): void
   onBack(): void
   onDelete(): void
   detached?: boolean
@@ -44,6 +52,9 @@ export function TodoEditor({
   onUpdateTask,
   onDeleteTask,
   onReorderTasks,
+  onAddSubtask,
+  onUpdateSubtask,
+  onDeleteSubtask,
   onBack,
   onDelete,
   detached = false
@@ -161,6 +172,13 @@ export function TodoEditor({
                 bodyTheme={draft.bodyTheme}
                 onUpdate={(patch) => onUpdateTask(task.id, patch)}
                 onDelete={() => onDeleteTask(task.id)}
+                onAddSubtask={() => onAddSubtask(task.id)}
+                onUpdateSubtask={(subtaskId, patch) =>
+                  onUpdateSubtask(task.id, subtaskId, patch)
+                }
+                onDeleteSubtask={(subtaskId) =>
+                  onDeleteSubtask(task.id, subtaskId)
+                }
               />
             ))}
             <button className="primary-button add-task-button" onClick={onAddTask}>

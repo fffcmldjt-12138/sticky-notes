@@ -1,10 +1,5 @@
 import type { TodoSchedule } from '../../shared/models'
-
-export function getScheduleDueAt(schedule: TodoSchedule): string {
-  return schedule.mode === 'range' && schedule.endAt
-    ? schedule.endAt
-    : schedule.startAt
-}
+export { getScheduleDueAt } from '../../shared/taskSchedule'
 
 export function advanceRecurringSchedule(
   schedule: TodoSchedule

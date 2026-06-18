@@ -4,10 +4,12 @@ const SAVE_DELAY = 300
 
 export function TodoTaskInput({
   value,
-  onCommit
+  onCommit,
+  ariaLabel = '任务内容'
 }: {
   value: string
   onCommit(value: string): void
+  ariaLabel?: string
 }): React.JSX.Element {
   const [draft, setDraft] = useState(value)
   const composingRef = useRef(false)
@@ -76,7 +78,7 @@ export function TodoTaskInput({
   return (
     <input
       className="task-content-input"
-      aria-label="任务内容"
+      aria-label={ariaLabel}
       type="text"
       value={draft}
       onCompositionStart={() => {

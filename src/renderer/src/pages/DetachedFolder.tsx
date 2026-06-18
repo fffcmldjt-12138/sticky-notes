@@ -205,6 +205,27 @@ export function DetachedFolder({
           await window.stickyApi.notes.reorderTodoTasks(selected.id, taskIds)
           await load()
         }}
+        onAddSubtask={async (taskId) => {
+          await window.stickyApi.notes.addTodoSubtask(selected.id, taskId)
+          await load()
+        }}
+        onUpdateSubtask={async (taskId, subtaskId, patch) => {
+          await window.stickyApi.notes.updateTodoSubtask(
+            selected.id,
+            taskId,
+            subtaskId,
+            patch
+          )
+          await load()
+        }}
+        onDeleteSubtask={async (taskId, subtaskId) => {
+          await window.stickyApi.notes.deleteTodoSubtask(
+            selected.id,
+            taskId,
+            subtaskId
+          )
+          await load()
+        }}
         onBack={() => setSelectedItemId(null)}
         onDelete={async () => {
           if (!window.confirm(`确定删除“${selected.title}”吗？`)) return

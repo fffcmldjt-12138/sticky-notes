@@ -3,30 +3,36 @@ import { CSS } from '@dnd-kit/utilities'
 import { useSortable } from '@dnd-kit/sortable'
 import type {
   BodyTheme,
+  TodoSubtaskPatch,
   TodoTask,
   TodoTaskPatch
 } from '../../../shared/models'
 import { extractTags } from '../../../shared/tags'
-import { DeadlinePopover } from './DeadlinePopover'
-import { ReminderPopover } from './ReminderPopover'
+import { getScheduleDueAt } from '../../../shared/taskSchedule'
+import { TaskQuadrantPicker } from './TaskQuadrantPicker'
+import { TaskSchedulePopover } from './TaskSchedulePopover'
+import { TodoSubtaskRow } from './TodoSubtaskRow'
 import { TodoTaskInput } from './TodoTaskInput'
-
-type ActivePopover = 'reminder' | 'deadline' | null
 
 export function TodoTaskRow({
   task,
   bodyTheme,
   onUpdate,
-  onDelete
+  onDelete,
+  onAddSubtask,
+  onUpdateSubtask,
+  onDeleteSubtask
 }: {
   task: TodoTask
   bodyTheme: BodyTheme
   onUpdate(patch: TodoTaskPatch): void
   onDelete(): void
+  onAddSubtask(): void
+  onUpdateSubtask(subtaskId: string, patch: TodoSubtaskPatch): void
+  onDeleteSubtask(subtaskId: string): void
 }): React.JSX.Element {
-  const [activePopover, setActivePopover] = useState<ActivePopover>(null)
-  const reminderButtonRef = useRef<HTMLButtonElement>(null)
-  const deadlineButtonRef = useRef<HTMLButtonElement>(null)
+  const [scheduleOpen, setScheduleOpen] = useState(false)
+  const scheduleButtonRef = useRef<HTMLButtonElement>(null)
   const {
     attributes,
     listeners,
@@ -35,12 +41,17 @@ export function TodoTaskRow({
     transition,
     isDragging
   } = useSortable({ id: task.id })
-  const status = getDeadlineStatus(task)
+  const status = getScheduleStatus(task)
 
   return (
     <div
       ref={setNodeRef}
-      className={`todo-task-row deadline-${status} ${isDragging ? 'dragging' : ''}`}
+      className={[
+        'todo-task-row',
+        `deadline-${status}`,
+        task.completed ? 'completed' : '',
+        isDragging ? 'dragging' : ''
+      ].filter(Boolean).join(' ')}
       style={{ transform: CSS.Transform.toString(transform), transition }}
     >
       <button
@@ -70,60 +81,60 @@ export function TodoTaskRow({
         ×
       </button>
       <div className="task-setting-buttons">
+        <TaskQuadrantPicker
+          ariaLabel="任务四象限"
+          importance={task.importance}
+          urgency={task.urgency}
+          onChange={(importance, urgency) => onUpdate({ importance, urgency })}
+        />
         <div className="task-setting-anchor">
           <button
-            ref={reminderButtonRef}
+            ref={scheduleButtonRef}
             type="button"
-            className={`task-setting-button ${task.remindAt ? 'active' : ''}`}
-            aria-label="设置提醒"
-            onClick={() =>
-              setActivePopover((current) =>
-                current === 'reminder' ? null : 'reminder'
-              )
-            }
+            className={`task-setting-button ${task.schedule ? 'active' : ''}`}
+            aria-label="时间设置"
+            onClick={() => setScheduleOpen((open) => !open)}
           >
-            提醒{task.remindAt ? ` · ${formatShortDate(task.remindAt)}` : ''}
+            时间{task.schedule ? ` · ${formatShortDate(
+              getScheduleDueAt(task.schedule)
+            )}` : ''}
           </button>
-          {activePopover === 'reminder' && (
-            <ReminderPopover
-              value={task.remindAt ?? null}
-              anchor={reminderButtonRef.current}
+          {scheduleOpen && (
+            <TaskSchedulePopover
+              value={task.schedule}
+              anchor={scheduleButtonRef.current}
               bodyTheme={bodyTheme}
-              onSave={onUpdate}
-              onClose={() => setActivePopover(null)}
+              onSave={(schedule) => onUpdate({ schedule })}
+              onClose={() => setScheduleOpen(false)}
             />
           )}
         </div>
-        <div className="task-setting-anchor">
-          <button
-            ref={deadlineButtonRef}
-            type="button"
-            className={`task-setting-button ${task.deadlineAt ? 'active' : ''}`}
-            aria-label="设置 DDL"
-            onClick={() =>
-              setActivePopover((current) =>
-                current === 'deadline' ? null : 'deadline'
-              )
-            }
-          >
-            DDL{task.deadlineAt ? ` · ${formatShortDate(task.deadlineAt)}` : ''}
-          </button>
-          {activePopover === 'deadline' && (
-            <DeadlinePopover
-              deadlineAt={task.deadlineAt ?? null}
-              reminders={task.deadlineReminders ?? []}
-              anchor={deadlineButtonRef.current}
-              bodyTheme={bodyTheme}
-              onSave={onUpdate}
-              onClose={() => setActivePopover(null)}
-            />
-          )}
-        </div>
+        <button
+          type="button"
+          className="task-setting-button"
+          aria-label="添加子待办"
+          onClick={onAddSubtask}
+        >
+          ＋ 子待办
+        </button>
       </div>
       {extractTags(task.contentMarkdown).length > 0 && (
         <div className="task-inline-tags">
           {extractTags(task.contentMarkdown).map((tag) => (
             <span key={tag}>#{tag}</span>
+          ))}
+        </div>
+      )}
+      {task.children.length > 0 && (
+        <div className="todo-subtask-list">
+          {task.children.map((subtask) => (
+            <TodoSubtaskRow
+              key={subtask.id}
+              subtask={subtask}
+              bodyTheme={bodyTheme}
+              onUpdate={(patch) => onUpdateSubtask(subtask.id, patch)}
+              onDelete={() => onDeleteSubtask(subtask.id)}
+            />
           ))}
         </div>
       )}
@@ -140,14 +151,14 @@ function formatShortDate(iso: string): string {
   }).format(new Date(iso))
 }
 
-export function getDeadlineStatus(
-  task: Pick<TodoTask, 'completed' | 'deadlineAt'>,
+export function getScheduleStatus(
+  task: Pick<TodoTask, 'completed' | 'schedule'>,
   now = Date.now()
 ): 'neutral' | 'approaching' | 'overdue' {
-  if (task.completed || !task.deadlineAt) return 'neutral'
-  const deadline = new Date(task.deadlineAt).getTime()
-  if (deadline <= now) return 'overdue'
-  return deadline - now <= 3 * 24 * 60 * 60 * 1000
+  if (task.completed || !task.schedule) return 'neutral'
+  const dueAt = new Date(getScheduleDueAt(task.schedule)).getTime()
+  if (dueAt <= now) return 'overdue'
+  return dueAt - now <= 3 * 24 * 60 * 60 * 1000
     ? 'approaching'
     : 'neutral'
 }

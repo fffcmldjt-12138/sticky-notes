@@ -23,11 +23,11 @@ const todo: TodoItem = {
     id: `task_${index + 1}`,
     contentMarkdown: `Task ${index + 1}`,
     completed: false,
-    remindAt: null,
-    reminded: false,
     tags: [],
-    deadlineAt: null,
-    deadlineReminders: []
+    importance: index === 4 ? 'important' : 'normal',
+    urgency: index === 4 ? 'urgent' : 'normal',
+    children: [],
+    schedule: null
   })),
   createdAt: '2026-06-15T00:00:00.000Z',
   updatedAt: '2026-06-15T00:00:00.000Z'
@@ -63,5 +63,22 @@ describe('TodoCard expansion', () => {
     fireEvent.click(screen.getByRole('button', { name: '展开全部待办' }))
 
     expect(onToggleExpanded).toHaveBeenCalledWith(true)
+  })
+
+  it('shows important urgent tasks first and strikes completed tasks', () => {
+    const ranked: TodoItem = {
+      ...todo,
+      panelExpanded: true,
+      tasks: todo.tasks.map((task, index) => ({
+        ...task,
+        completed: index === 0
+      }))
+    }
+    const { container } = renderCard(ranked)
+    const labels = Array.from(container.querySelectorAll('.todo-check span'))
+      .map((element) => element.textContent)
+
+    expect(labels[0]).toBe('Task 5')
+    expect(container.querySelector('.todo-check.completed')).toBeTruthy()
   })
 })

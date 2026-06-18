@@ -1,6 +1,7 @@
 import type { TodoItem } from '../../../shared/models'
 import { StickyCard } from './StickyCard'
 import { getItemTags } from '../../../shared/tags'
+import { sortTasksForDisplay } from '../../../shared/todoPriority'
 
 export function TodoCard({
   item,
@@ -18,15 +19,15 @@ export function TodoCard({
   onDetach(): void
 }): React.JSX.Element {
   const completedCount = item.tasks.filter((task) => task.completed).length
-  const nextReminder = item.tasks
-    .filter((task) => !task.completed && task.remindAt)
-    .sort((a, b) => String(a.remindAt).localeCompare(String(b.remindAt)))[0]
-  const nextDeadline = item.tasks
-    .filter((task) => !task.completed && task.deadlineAt)
-    .sort((a, b) => String(a.deadlineAt).localeCompare(String(b.deadlineAt)))[0]
+  const sortedTasks = sortTasksForDisplay(item.tasks)
+  const nextScheduled = item.tasks
+    .filter((task) => !task.completed && task.schedule)
+    .sort((a, b) =>
+      scheduleDueAt(a.schedule!).localeCompare(scheduleDueAt(b.schedule!))
+    )[0]
   const visibleTasks = item.panelExpanded
-    ? item.tasks
-    : item.tasks.slice(0, 3)
+    ? sortedTasks
+    : sortedTasks.slice(0, 3)
 
   return (
     <StickyCard
@@ -36,14 +37,31 @@ export function TodoCard({
       onDetach={onDetach}
     >
       {visibleTasks.map((task) => (
-        <label className="todo-check" key={task.id}>
+        <div
+          className={`todo-check ${task.completed ? 'completed' : ''}`}
+          key={task.id}
+        >
           <input
             type="checkbox"
             checked={task.completed}
             onChange={(event) => onToggle(task.id, event.target.checked)}
           />
-          <span>{task.contentMarkdown || '空任务'}</span>
-        </label>
+          <div>
+            <span>{task.contentMarkdown || '空任务'}</span>
+            {task.children.length > 0 && (
+              <div className="todo-subtasks-preview">
+                {task.children.map((child) => (
+                  <small
+                    key={child.id}
+                    className={child.completed ? 'completed' : ''}
+                  >
+                    {child.contentMarkdown || '空子待办'}
+                  </small>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       ))}
       <div className="card-tags">
         {getItemTags(item).map((tag) => <span key={tag}>#{tag}</span>)}
@@ -66,13 +84,18 @@ export function TodoCard({
       )}
       <time>
         {completedCount}/{item.tasks.length} 已完成
-        {nextReminder?.remindAt
-          ? ` · 最近提醒 ${new Date(nextReminder.remindAt).toLocaleString('zh-CN')}`
-          : ''}
-        {nextDeadline?.deadlineAt
-          ? ` · DDL ${new Date(nextDeadline.deadlineAt).toLocaleString('zh-CN')}`
+        {nextScheduled?.schedule
+          ? ` · 时间 ${new Date(
+              scheduleDueAt(nextScheduled.schedule)
+            ).toLocaleString('zh-CN')}`
           : ''}
       </time>
     </StickyCard>
   )
+}
+
+function scheduleDueAt(schedule: NonNullable<TodoItem['tasks'][number]['schedule']>): string {
+  return schedule.mode === 'range' && schedule.endAt
+    ? schedule.endAt
+    : schedule.startAt
 }
