@@ -86,7 +86,7 @@ export function TodoTaskRow({
           </button>
           {activePopover === 'reminder' && (
             <ReminderPopover
-              value={task.remindAt}
+              value={task.remindAt ?? null}
               anchor={reminderButtonRef.current}
               bodyTheme={bodyTheme}
               onSave={onUpdate}
@@ -110,7 +110,7 @@ export function TodoTaskRow({
           </button>
           {activePopover === 'deadline' && (
             <DeadlinePopover
-              deadlineAt={task.deadlineAt}
+              deadlineAt={task.deadlineAt ?? null}
               reminders={task.deadlineReminders ?? []}
               anchor={deadlineButtonRef.current}
               bodyTheme={bodyTheme}

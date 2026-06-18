@@ -27,7 +27,7 @@ export class NoteStore {
   constructor(userDataPath: string) {
     this.filePath = join(userDataPath, 'notes.json')
     this.file = new JsonFileStore(this.filePath, () => ({
-      version: 3,
+      version: 4,
       items: [],
       folders: []
     }))
@@ -385,11 +385,11 @@ export class NoteStore {
       id: `task_${randomUUID()}`,
       contentMarkdown,
       completed: false,
-      remindAt: null,
-      reminded: false,
       tags: [],
-      deadlineAt: null,
-      deadlineReminders: []
+      importance: 'normal',
+      urgency: 'normal',
+      children: [],
+      schedule: null
     }
     const updated = await this.changeTodo(todoId, (todo) => ({
       ...todo,
@@ -407,26 +407,18 @@ export class NoteStore {
       ...todo,
       tasks: todo.tasks.map((task) => {
         if (task.id !== taskId) return task
-        const nextPatch = { ...patch }
-        if (
-          Object.hasOwn(nextPatch, 'remindAt') &&
-          nextPatch.remindAt !== task.remindAt
-        ) {
-          nextPatch.reminded = false
-        }
-        const deadlineChanged =
-          Object.hasOwn(nextPatch, 'deadlineAt') &&
-          nextPatch.deadlineAt !== task.deadlineAt
-        const selectionChanged =
-          Object.hasOwn(nextPatch, 'deadlineReminders') &&
-          reminderSelection(task.deadlineReminders) !==
-            reminderSelection(nextPatch.deadlineReminders ?? [])
-        const updated = { ...task, ...nextPatch }
-        if (deadlineChanged || selectionChanged) {
-          updated.deadlineReminders = updated.deadlineReminders.map((reminder) => ({
-            ...reminder,
-            remindedAt: null
-          }))
+        const scheduleChanged =
+          Object.hasOwn(patch, 'schedule') &&
+          JSON.stringify(patch.schedule) !== JSON.stringify(task.schedule)
+        const updated = { ...task, ...patch }
+        if (scheduleChanged && updated.schedule) {
+          updated.schedule = {
+            ...updated.schedule,
+            reminders: updated.schedule.reminders.map((reminder) => ({
+              ...reminder,
+              remindedAt: null
+            }))
+          }
         }
         return updated
       })
@@ -484,10 +476,10 @@ export class NoteStore {
       const raw = JSON.parse(await readFile(this.filePath, 'utf8')) as {
         version?: number
       }
-      if (raw.version === 1 || raw.version === 2) {
+      if (raw.version === 1 || raw.version === 2 || raw.version === 3) {
         await copyFile(this.filePath, `${this.filePath}.backup-${Date.now()}`)
         await this.file.write(migrateNotesFile(raw))
-      } else if (raw.version === 3) {
+      } else if (raw.version === 4) {
         const normalized = migrateNotesFile(raw)
         await this.file.write(normalized)
       } else {
@@ -496,7 +488,7 @@ export class NoteStore {
     } catch (error) {
       const nodeError = error as NodeJS.ErrnoException
       if (nodeError.code !== 'ENOENT') throw error
-      await this.file.write({ version: 3, items: [], folders: [] })
+      await this.file.write({ version: 4, items: [], folders: [] })
     }
   }
 
@@ -508,15 +500,6 @@ export class NoteStore {
     )
     return result
   }
-}
-
-function reminderSelection(
-  reminders: TodoTask['deadlineReminders']
-): string {
-  return reminders
-    .map(({ id, offsetMinutes }) => `${id}:${offsetMinutes}`)
-    .sort()
-    .join('|')
 }
 
 function assertFolderDepth(

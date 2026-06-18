@@ -13,10 +13,10 @@ describe('NoteStore', () => {
     store = new NoteStore(directory)
   })
 
-  it('creates an empty version 3 file on first load', async () => {
+  it('creates an empty version 4 file on first load', async () => {
     expect(await store.list()).toEqual([])
     expect(JSON.parse(await readFile(join(directory, 'notes.json'), 'utf8'))).toEqual({
-      version: 3,
+      version: 4,
       items: [],
       folders: []
     })
@@ -43,44 +43,18 @@ describe('NoteStore', () => {
     })
   })
 
-  it('manages independent Todo tasks and resets only the changed reminder', async () => {
+  it('creates todo tasks with advanced defaults', async () => {
     const todo = await store.create('todo')
-    const first = await store.addTodoTask(todo.id, 'First')
-    const second = await store.addTodoTask(todo.id, 'Second')
-    await store.updateTodoTask(todo.id, first!.id, {
-      remindAt: '2026-06-14T20:00:00.000Z'
-    })
-    await store.updateTodoTask(todo.id, first!.id, { reminded: true })
-    await store.updateTodoTask(todo.id, second!.id, { reminded: true })
-    await store.updateTodoTask(todo.id, first!.id, {
-      remindAt: '2026-06-15T20:00:00.000Z'
-    })
+    const task = await store.addTodoTask(todo.id, 'First')
 
-    const changed = (await store.list()).find((item) => item.id === todo.id)
-    expect(changed?.type).toBe('todo')
-    if (changed?.type !== 'todo') throw new Error('Expected Todo')
-    expect(changed.tasks.find((task) => task.id === first!.id)?.reminded).toBe(false)
-    expect(changed.tasks.find((task) => task.id === second!.id)?.reminded).toBe(true)
-  })
-
-  it('resets deadline delivery state when the deadline changes', async () => {
-    const todo = await store.create('todo')
-    const task = await store.addTodoTask(todo.id, 'Deadline task')
-    await store.updateTodoTask(todo.id, task!.id, {
-      deadlineAt: '2026-06-20T12:00:00.000Z',
-      deadlineReminders: [{
-        id: 'one-day',
-        offsetMinutes: 1440,
-        remindedAt: '2026-06-19T12:00:00.000Z'
-      }]
+    expect(task).toMatchObject({
+      contentMarkdown: 'First',
+      completed: false,
+      importance: 'normal',
+      urgency: 'normal',
+      children: [],
+      schedule: null
     })
-    await store.updateTodoTask(todo.id, task!.id, {
-      deadlineAt: '2026-06-21T12:00:00.000Z'
-    })
-
-    const changed = (await store.list()).find((item) => item.id === todo.id)
-    if (changed?.type !== 'todo') throw new Error('Expected Todo')
-    expect(changed.tasks[0].deadlineReminders[0].remindedAt).toBeNull()
   })
 
   it('serializes concurrent updates without losing either change', async () => {

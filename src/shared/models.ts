@@ -38,15 +38,47 @@ export interface NoteItem extends BaseItem {
   syncedToSiyuan: false
 }
 
+export type TaskImportance = 'important' | 'normal'
+export type TaskUrgency = 'urgent' | 'normal'
+export type TaskRepeat = 'none' | 'daily' | 'weekly' | 'weekdays'
+
+export interface TaskReminder {
+  id: string
+  offsetMinutes: number
+  remindedAt: string | null
+}
+
+export interface TodoSchedule {
+  mode: 'point' | 'range'
+  startAt: string
+  endAt: string | null
+  reminders: TaskReminder[]
+  repeat: TaskRepeat
+}
+
+export interface TodoSubtask {
+  id: string
+  contentMarkdown: string
+  completed: boolean
+  importance: TaskImportance
+  urgency: TaskUrgency
+  tags: string[]
+  schedule: TodoSchedule | null
+}
+
 export interface TodoTask {
   id: string
   contentMarkdown: string
   completed: boolean
-  remindAt: string | null
-  reminded: boolean
   tags: string[]
-  deadlineAt: string | null
-  deadlineReminders: DeadlineReminder[]
+  importance: TaskImportance
+  urgency: TaskUrgency
+  children: TodoSubtask[]
+  schedule: TodoSchedule | null
+  remindAt?: string | null
+  reminded?: boolean
+  deadlineAt?: string | null
+  deadlineReminders?: DeadlineReminder[]
 }
 
 export interface DeadlineReminder {
@@ -95,7 +127,7 @@ export type FolderPatch = Partial<
 >
 
 export interface NotesFile {
-  version: 3
+  version: 4
   items: StickyItem[]
   folders: FolderItem[]
 }
@@ -138,10 +170,26 @@ export type TodoTaskPatch = Partial<
     TodoTask,
     | 'contentMarkdown'
     | 'completed'
+    | 'tags'
+    | 'importance'
+    | 'urgency'
+    | 'children'
+    | 'schedule'
     | 'remindAt'
     | 'reminded'
-    | 'tags'
     | 'deadlineAt'
     | 'deadlineReminders'
+  >
+>
+
+export type TodoSubtaskPatch = Partial<
+  Pick<
+    TodoSubtask,
+    | 'contentMarkdown'
+    | 'completed'
+    | 'tags'
+    | 'importance'
+    | 'urgency'
+    | 'schedule'
   >
 >

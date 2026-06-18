@@ -21,9 +21,13 @@ const dueTodo: TodoItem = {
       contentMarkdown: 'Submit assignment',
       completed: false,
       remindAt: '2026-06-14T10:00:00.000Z',
-      reminded: false,
-      tags: [],
-      deadlineAt: null,
+    reminded: false,
+    tags: [],
+    importance: 'normal',
+    urgency: 'normal',
+    children: [],
+    schedule: null,
+    deadlineAt: null,
       deadlineReminders: []
     }
   ],
@@ -87,13 +91,13 @@ describe('ReminderService', () => {
     )
     expect(updateTodoTask).toHaveBeenCalledWith('todo_1', 'task_1', {
       deadlineReminders: [
-        deadlineTodo.tasks[0].deadlineReminders[0],
+        deadlineTodo.tasks[0].deadlineReminders![0],
         {
           id: 'one-day',
           offsetMinutes: 1440,
           remindedAt: '2026-06-19T12:00:00.000Z'
         },
-        deadlineTodo.tasks[0].deadlineReminders[2]
+        deadlineTodo.tasks[0].deadlineReminders![2]
       ]
     })
   })

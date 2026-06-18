@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { migrateNotesFile } from '../src/main/services/noteMigration'
 
 describe('migrateNotesFile', () => {
-  it('migrates version 1 notes and todos to version 3 without data loss', () => {
+  it('migrates version 1 notes and todos to version 4 without data loss', () => {
     const result = migrateNotesFile({
       version: 1,
       items: [
@@ -36,7 +36,7 @@ describe('migrateNotesFile', () => {
     })
 
     expect(result).toMatchObject({
-      version: 3,
+      version: 4,
       folders: [],
       items: [
         {
@@ -62,11 +62,20 @@ describe('migrateNotesFile', () => {
             {
               contentMarkdown: '- [ ] legacy task',
               completed: false,
-              remindAt: '2026-06-14T20:00:00.000Z',
-              reminded: false,
               tags: [],
-              deadlineAt: null,
-              deadlineReminders: []
+              importance: 'normal',
+              urgency: 'normal',
+              children: [],
+              schedule: {
+                mode: 'point',
+                startAt: '2026-06-14T20:00:00.000Z',
+                endAt: null,
+                repeat: 'none',
+                reminders: [{
+                  offsetMinutes: 0,
+                  remindedAt: null
+                }]
+              }
             }
           ]
         }
@@ -74,7 +83,7 @@ describe('migrateNotesFile', () => {
     })
   })
 
-  it('migrates version 2 items to version 3 organization fields', () => {
+  it('migrates version 2 items to version 4 organization fields', () => {
     const result = migrateNotesFile({
       version: 2,
       items: [
@@ -96,7 +105,7 @@ describe('migrateNotesFile', () => {
     })
 
     expect(result).toEqual({
-      version: 3,
+      version: 4,
       folders: [],
       items: [
         expect.objectContaining({
@@ -111,7 +120,7 @@ describe('migrateNotesFile', () => {
     })
   })
 
-  it('normalizes existing version 3 todo tasks with deadline fields', () => {
+  it('migrates existing version 3 todo tasks to unified schedule fields', () => {
     const result = migrateNotesFile({
       version: 3,
       folders: [],
@@ -132,8 +141,14 @@ describe('migrateNotesFile', () => {
           id: 'task_1',
           contentMarkdown: 'Submit',
           completed: false,
-          remindAt: null,
-          reminded: false
+          remindAt: '2026-06-19T12:00:00.000Z',
+          reminded: true,
+          deadlineAt: '2026-06-20T12:00:00.000Z',
+          deadlineReminders: [{
+            id: 'one-day',
+            offsetMinutes: 1440,
+            remindedAt: '2026-06-19T12:00:00.000Z'
+          }]
         }],
         createdAt: '2026-06-14T09:00:00.000Z',
         updatedAt: '2026-06-14T09:00:00.000Z'
@@ -145,13 +160,25 @@ describe('migrateNotesFile', () => {
       panelExpanded: false,
       tasks: [{
         tags: [],
-        deadlineAt: null,
-        deadlineReminders: []
+        importance: 'normal',
+        urgency: 'normal',
+        children: [],
+        schedule: {
+          mode: 'point',
+          startAt: '2026-06-20T12:00:00.000Z',
+          endAt: null,
+          repeat: 'none',
+          reminders: [{
+            id: 'one-day',
+            offsetMinutes: 1440,
+            remindedAt: '2026-06-19T12:00:00.000Z'
+          }]
+        }
       }]
     })
   })
 
-  it('normalizes detached window fields for existing version 3 folders', () => {
+  it('normalizes detached window fields while migrating version 3 folders', () => {
     const result = migrateNotesFile({
       version: 3,
       folders: [{

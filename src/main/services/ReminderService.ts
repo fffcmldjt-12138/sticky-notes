@@ -33,6 +33,7 @@ export class ReminderService {
         if (
           !task.reminded &&
           task.remindAt !== null &&
+          task.remindAt !== undefined &&
           new Date(task.remindAt).getTime() <= now
         ) {
           this.notify(task.contentMarkdown || item.title || '待办提醒', '待办提醒')
@@ -42,7 +43,7 @@ export class ReminderService {
         if (task.deadlineAt) {
           const deadline = new Date(task.deadlineAt).getTime()
           let changed = false
-          const deadlineReminders = task.deadlineReminders.map((reminder) => {
+          const deadlineReminders = (task.deadlineReminders ?? []).map((reminder) => {
             const triggerAt = deadline - reminder.offsetMinutes * 60_000
             if (reminder.remindedAt || triggerAt > now) return reminder
             changed = true
