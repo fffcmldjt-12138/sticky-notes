@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { FolderItem, NoteItem } from '../src/shared/models'
+import type { FolderItem, NoteItem, TodoItem } from '../src/shared/models'
 import { buildFolderTree } from '../src/renderer/src/lib/folderTree'
 
 const baseFolder = {
@@ -58,5 +58,47 @@ describe('buildFolderTree', () => {
       'folder:f1',
       'item:later-note'
     ])
+  })
+
+  it('places pinned items before every unpinned sibling', () => {
+    const pinned = {
+      ...note,
+      id: 'pinned',
+      parentFolderId: null,
+      order: 3,
+      pinned: true
+    }
+    const rootFolder = { ...folders[0], order: 0 }
+
+    const tree = buildFolderTree([rootFolder], [pinned])
+
+    expect(tree.entries.map((entry) => entry.id)).toEqual(['pinned', 'f1'])
+  })
+
+  it('places important urgent todo cards before ordinary siblings', () => {
+    const rootNote = { ...note, parentFolderId: null, order: 0 }
+    const todo: TodoItem = {
+      ...note,
+      id: 'todo_1',
+      type: 'todo',
+      title: 'Urgent',
+      parentFolderId: null,
+      order: 2,
+      panelExpanded: false,
+      tasks: [{
+        id: 'task_1',
+        contentMarkdown: 'Now',
+        completed: false,
+        tags: [],
+        importance: 'important',
+        urgency: 'urgent',
+        children: [],
+        schedule: null
+      }]
+    }
+
+    const tree = buildFolderTree([], [rootNote, todo])
+
+    expect(tree.entries.map((entry) => entry.id)).toEqual(['todo_1', 'note_1'])
   })
 })

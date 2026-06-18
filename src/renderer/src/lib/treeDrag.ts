@@ -3,6 +3,7 @@ import type {
   OrderedNodeRef,
   StickyItem
 } from '../../../shared/models'
+import { getItemDisplayRank } from '../../../shared/todoPriority'
 
 export interface TreeDropPosition {
   parentFolderId: string | null
@@ -48,7 +49,12 @@ export function siblingReferences(
       .filter(
         (item) => !item.deletedAt && item.parentFolderId === parentFolderId
       )
-      .map((item) => ({ kind: 'item' as const, id: item.id, order: item.order })),
+      .map((item) => ({
+        kind: 'item' as const,
+        id: item.id,
+        order: item.order,
+        rank: getItemDisplayRank(item)
+      })),
     ...folders
       .filter(
         (folder) =>
@@ -57,10 +63,11 @@ export function siblingReferences(
       .map((folder) => ({
         kind: 'folder' as const,
         id: folder.id,
-        order: folder.order
+        order: folder.order,
+        rank: 4
       }))
   ]
-    .sort((left, right) => left.order - right.order)
+    .sort((left, right) => left.rank - right.rank || left.order - right.order)
     .map(({ kind, id }) => ({ kind, id }))
 }
 

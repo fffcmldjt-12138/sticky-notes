@@ -1,4 +1,5 @@
 import type { FolderItem, StickyItem } from '../../../shared/models'
+import { getItemDisplayRank } from '../../../shared/todoPriority'
 
 export interface FolderTreeNode extends FolderItem {
   children: FolderTreeNode[]
@@ -85,6 +86,12 @@ function mixedEntries(
       order: item.order
     }))
   ]
-    .sort((a, b) => a.order - b.order)
+    .sort((a, b) => {
+      const leftRank =
+        a.kind === 'item' ? getItemDisplayRank(a.item) : 4
+      const rightRank =
+        b.kind === 'item' ? getItemDisplayRank(b.item) : 4
+      return leftRank - rightRank || a.order - b.order
+    })
     .map(({ order: _order, ...entry }) => entry)
 }

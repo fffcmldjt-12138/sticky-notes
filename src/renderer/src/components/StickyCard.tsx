@@ -52,6 +52,7 @@ export function StickyCard({
         <button className="sticky-card-open" onClick={onOpen}>
           <span className="type-badge">{item.type === 'note' ? '笔记' : '待办'}</span>
           <span className="card-title">{item.title || '无标题'}</span>
+          {item.pinned && <span className="pin-indicator" title="已置顶">置顶</span>}
         </button>
       </div>
       <div className="sticky-card-body">{children}</div>

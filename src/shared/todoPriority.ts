@@ -1,4 +1,4 @@
-import type { TodoItem, TodoTask, TodoSubtask } from './models'
+import type { StickyItem, TodoItem, TodoTask, TodoSubtask } from './models'
 
 type PrioritizedTask = Pick<
   TodoTask | TodoSubtask,
@@ -36,4 +36,9 @@ export function sortTasksForDisplay(tasks: TodoTask[]): TodoTask[] {
       return rank || left.index - right.index
     })
     .map(({ task }) => task)
+}
+
+export function getItemDisplayRank(item: StickyItem): number {
+  if (item.pinned) return -1
+  return item.type === 'todo' ? getTodoPriority(item) : 4
 }
