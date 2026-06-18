@@ -3,6 +3,7 @@ import type {
   NoteType,
   StickyItem,
   StickyItemPatch,
+  TodoSubtaskPatch,
   TodoTaskPatch
 } from '../../shared/models'
 import { ipcChannels } from '../../shared/ipcChannels'
@@ -65,6 +66,52 @@ export function registerNoteIpc(store: NoteStore, events: NoteIpcEvents): void {
     ipcChannels.todoTaskReorder,
     async (_event, todoId: string, taskIds: string[]) => {
       const item = await store.reorderTodoTasks(todoId, taskIds)
+      if (item) events.changed(item)
+      return item
+    }
+  )
+  ipcMain.handle(
+    ipcChannels.todoSubtaskAdd,
+    async (
+      _event,
+      todoId: string,
+      taskId: string,
+      contentMarkdown?: string
+    ) => {
+      const child = await store.addTodoSubtask(todoId, taskId, contentMarkdown)
+      const item = (await store.list()).find((entry) => entry.id === todoId)
+      if (item) events.changed(item)
+      return child
+    }
+  )
+  ipcMain.handle(
+    ipcChannels.todoSubtaskUpdate,
+    async (
+      _event,
+      todoId: string,
+      taskId: string,
+      subtaskId: string,
+      patch: TodoSubtaskPatch
+    ) => {
+      const item = await store.updateTodoSubtask(
+        todoId,
+        taskId,
+        subtaskId,
+        patch
+      )
+      if (item) events.changed(item)
+      return item
+    }
+  )
+  ipcMain.handle(
+    ipcChannels.todoSubtaskDelete,
+    async (
+      _event,
+      todoId: string,
+      taskId: string,
+      subtaskId: string
+    ) => {
+      const item = await store.deleteTodoSubtask(todoId, taskId, subtaskId)
       if (item) events.changed(item)
       return item
     }

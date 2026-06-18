@@ -57,6 +57,34 @@ describe('NoteStore', () => {
     })
   })
 
+  it('adds updates and deletes one-level subtasks', async () => {
+    const todo = await store.create('todo')
+    const task = await store.addTodoTask(todo.id, 'Parent')
+    const child = await store.addTodoSubtask(todo.id, task!.id, 'Child')
+
+    expect(child).toMatchObject({
+      contentMarkdown: 'Child',
+      completed: false,
+      importance: 'normal',
+      urgency: 'normal',
+      schedule: null
+    })
+
+    const updated = await store.updateTodoSubtask(
+      todo.id,
+      task!.id,
+      child!.id,
+      { importance: 'important', completed: true }
+    )
+    expect(updated?.tasks[0].children[0]).toMatchObject({
+      importance: 'important',
+      completed: true
+    })
+
+    const deleted = await store.deleteTodoSubtask(todo.id, task!.id, child!.id)
+    expect(deleted?.tasks[0].children).toEqual([])
+  })
+
   it('serializes concurrent updates without losing either change', async () => {
     const first = await store.create('note')
     const second = await store.create('note')

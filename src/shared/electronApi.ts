@@ -9,6 +9,8 @@ import type {
   StickyItem,
   StickyItemPatch,
   TodoItem,
+  TodoSubtask,
+  TodoSubtaskPatch,
   TodoTask,
   TodoTaskPatch
 } from './models'
@@ -27,6 +29,22 @@ export interface StickyApi {
     ): Promise<TodoItem | null>
     deleteTodoTask(todoId: string, taskId: string): Promise<TodoItem | null>
     reorderTodoTasks(todoId: string, taskIds: string[]): Promise<TodoItem | null>
+    addTodoSubtask(
+      todoId: string,
+      taskId: string,
+      contentMarkdown?: string
+    ): Promise<TodoSubtask | null>
+    updateTodoSubtask(
+      todoId: string,
+      taskId: string,
+      subtaskId: string,
+      patch: TodoSubtaskPatch
+    ): Promise<TodoItem | null>
+    deleteTodoSubtask(
+      todoId: string,
+      taskId: string,
+      subtaskId: string
+    ): Promise<TodoItem | null>
   }
   config: {
     get(): Promise<AppConfig>

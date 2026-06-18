@@ -21,7 +21,29 @@ const api: StickyApi = {
     deleteTodoTask: (todoId, taskId) =>
       ipcRenderer.invoke(ipcChannels.todoTaskDelete, todoId, taskId),
     reorderTodoTasks: (todoId, taskIds) =>
-      ipcRenderer.invoke(ipcChannels.todoTaskReorder, todoId, taskIds)
+      ipcRenderer.invoke(ipcChannels.todoTaskReorder, todoId, taskIds),
+    addTodoSubtask: (todoId, taskId, contentMarkdown) =>
+      ipcRenderer.invoke(
+        ipcChannels.todoSubtaskAdd,
+        todoId,
+        taskId,
+        contentMarkdown
+      ),
+    updateTodoSubtask: (todoId, taskId, subtaskId, patch) =>
+      ipcRenderer.invoke(
+        ipcChannels.todoSubtaskUpdate,
+        todoId,
+        taskId,
+        subtaskId,
+        patch
+      ),
+    deleteTodoSubtask: (todoId, taskId, subtaskId) =>
+      ipcRenderer.invoke(
+        ipcChannels.todoSubtaskDelete,
+        todoId,
+        taskId,
+        subtaskId
+      )
   },
   config: {
     get: () => ipcRenderer.invoke(ipcChannels.configGet),

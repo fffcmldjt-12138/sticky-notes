@@ -12,6 +12,8 @@ import type {
   StickyItem,
   StickyItemPatch,
   TodoItem,
+  TodoSubtask,
+  TodoSubtaskPatch,
   TodoTask,
   TodoTaskPatch
 } from '../../shared/models'
@@ -429,6 +431,70 @@ export class NoteStore {
     return this.changeTodo(todoId, (todo) => ({
       ...todo,
       tasks: todo.tasks.filter((task) => task.id !== taskId)
+    }))
+  }
+
+  async addTodoSubtask(
+    todoId: string,
+    taskId: string,
+    contentMarkdown = ''
+  ): Promise<TodoSubtask | null> {
+    const child: TodoSubtask = {
+      id: `subtask_${randomUUID()}`,
+      contentMarkdown,
+      completed: false,
+      importance: 'normal',
+      urgency: 'normal',
+      tags: [],
+      schedule: null
+    }
+    const updated = await this.changeTodo(todoId, (todo) => ({
+      ...todo,
+      tasks: todo.tasks.map((task) =>
+        task.id === taskId
+          ? { ...task, children: [...task.children, child] }
+          : task
+      )
+    }))
+    return updated ? child : null
+  }
+
+  async updateTodoSubtask(
+    todoId: string,
+    taskId: string,
+    subtaskId: string,
+    patch: TodoSubtaskPatch
+  ): Promise<TodoItem | null> {
+    return this.changeTodo(todoId, (todo) => ({
+      ...todo,
+      tasks: todo.tasks.map((task) =>
+        task.id === taskId
+          ? {
+              ...task,
+              children: task.children.map((child) =>
+                child.id === subtaskId ? { ...child, ...patch } : child
+              )
+            }
+          : task
+      )
+    }))
+  }
+
+  async deleteTodoSubtask(
+    todoId: string,
+    taskId: string,
+    subtaskId: string
+  ): Promise<TodoItem | null> {
+    return this.changeTodo(todoId, (todo) => ({
+      ...todo,
+      tasks: todo.tasks.map((task) =>
+        task.id === taskId
+          ? {
+              ...task,
+              children: task.children.filter((child) => child.id !== subtaskId)
+            }
+          : task
+      )
     }))
   }
 
