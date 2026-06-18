@@ -5,16 +5,23 @@ import { endedOutsidePanel } from '../lib/dragBoundary'
 export function FolderCard({
   node,
   onOpenItem,
+  onItemContextMenu,
   onToggle,
   onContextMenu,
+  onCreate,
   onDetachItem,
   onDetachFolder,
   onReorder
 }: {
   node: FolderTreeNode
   onOpenItem(item: StickyItem): void
+  onItemContextMenu(
+    item: StickyItem,
+    event: React.MouseEvent<HTMLElement>
+  ): void
   onToggle(node: FolderTreeNode): void
   onContextMenu(node: FolderTreeNode, event: React.MouseEvent<HTMLElement>): void
+  onCreate(node: FolderTreeNode): void
   onDetachItem(item: StickyItem): void
   onDetachFolder(node: FolderTreeNode): void
   onReorder(parentFolderId: string | null, orderedNodes: OrderedNodeRef[]): void
@@ -69,6 +76,16 @@ export function FolderCard({
         </button>
         <span className="folder-title">文件夹 {node.title}</span>
         <small>{node.descendantItemCount}</small>
+        <button
+          className="folder-create-button"
+          aria-label={`在${node.title}中新建`}
+          onClick={(event) => {
+            event.stopPropagation()
+            onCreate(node)
+          }}
+        >
+          ＋
+        </button>
       </div>
       {!node.collapsed && (
         <div className="folder-contents">
@@ -84,13 +101,16 @@ export function FolderCard({
                   item={entry.item}
                   onOpen={onOpenItem}
                   onDetach={onDetachItem}
+                  onContextMenu={onItemContextMenu}
                 />
               ) : (
                 <FolderCard
                   node={entry.folder}
                   onOpenItem={onOpenItem}
+                  onItemContextMenu={onItemContextMenu}
                   onToggle={onToggle}
                   onContextMenu={onContextMenu}
+                  onCreate={onCreate}
                   onDetachItem={onDetachItem}
                   onDetachFolder={onDetachFolder}
                   onReorder={onReorder}
@@ -112,17 +132,24 @@ export function FolderCard({
 function FolderItemTitle({
   item,
   onOpen,
-  onDetach
+  onDetach,
+  onContextMenu
 }: {
   item: StickyItem
   onOpen(item: StickyItem): void
   onDetach(item: StickyItem): void
+  onContextMenu(item: StickyItem, event: React.MouseEvent<HTMLElement>): void
 }): React.JSX.Element {
   return (
     <button
       className="folder-item-title"
       style={{ borderLeftColor: item.headerColor }}
       onClick={() => onOpen(item)}
+      onContextMenu={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        onContextMenu(item, event)
+      }}
       draggable
       onDragStart={(event) => {
         event.dataTransfer.setData('text/sticky-item', item.id)

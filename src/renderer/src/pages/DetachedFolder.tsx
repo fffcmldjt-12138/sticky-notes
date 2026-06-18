@@ -1,14 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type {
   FolderItem,
+  NoteType,
   OrderedNodeRef,
   StickyItem,
   StickyItemPatch,
   TodoTaskPatch
 } from '../../../shared/models'
+import { CardContextMenu, type CardAction } from '../components/CardContextMenu'
+import { CreateMenu } from '../components/CreateMenu'
+import { FolderContextMenu } from '../components/FolderContextMenu'
+import { FolderDialog } from '../components/FolderDialog'
 import { FolderCard } from '../components/FolderCard'
 import { NoteEditor } from '../components/NoteEditor'
 import { TodoEditor } from '../components/TodoEditor'
+import { TitleDialog } from '../components/TitleDialog'
 import { buildFolderTree } from '../lib/folderTree'
 import type { FolderTreeNode } from '../lib/folderTree'
 
@@ -33,6 +39,22 @@ export function DetachedFolder({
   const [folders, setFolders] = useState<FolderItem[]>([])
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [createOpen, setCreateOpen] = useState(false)
+  const [createParentId, setCreateParentId] = useState(folderId)
+  const [folderDialogOpen, setFolderDialogOpen] = useState(false)
+  const [pendingRename, setPendingRename] = useState<StickyItem | null>(null)
+  const [pendingFolderRename, setPendingFolderRename] =
+    useState<FolderTreeNode | null>(null)
+  const [contextMenu, setContextMenu] = useState<{
+    item: StickyItem
+    x: number
+    y: number
+  } | null>(null)
+  const [folderContextMenu, setFolderContextMenu] = useState<{
+    folder: FolderTreeNode
+    x: number
+    y: number
+  } | null>(null)
 
   const load = useCallback(async () => {
     const [nextItems, nextFolders] = await Promise.all([
@@ -106,6 +128,43 @@ export function DetachedFolder({
     await load()
   }
 
+  async function createItem(type: NoteType, parentFolderId: string): Promise<void> {
+    const created = await window.stickyApi.notes.create(
+      type,
+      undefined,
+      parentFolderId
+    )
+    setCreateOpen(false)
+    await load()
+    setSelectedItemId(created.id)
+  }
+
+  async function handleCardAction(
+    item: StickyItem,
+    action: CardAction
+  ): Promise<void> {
+    if (action.type === 'edit') setSelectedItemId(item.id)
+    if (action.type === 'rename') setPendingRename(item)
+    if (action.type === 'color') await save(item.id, { headerColor: action.color })
+    if (action.type === 'theme') await save(item.id, { bodyTheme: action.theme })
+    if (action.type === 'pin') await save(item.id, { pinned: action.pinned })
+    if (action.type === 'add-task' && item.type === 'todo') {
+      await window.stickyApi.notes.addTodoTask(item.id)
+      await load()
+      setSelectedItemId(item.id)
+    }
+    if (action.type === 'detach') {
+      if (item.detached) await window.stickyApi.window.attach(item.id)
+      else await window.stickyApi.window.detach(item.id)
+      await load()
+    }
+    if (action.type === 'delete') {
+      if (!window.confirm(`确定删除“${item.title || '无标题'}”吗？`)) return
+      await window.stickyApi.notes.delete(item.id)
+      await load()
+    }
+  }
+
   if (error) return <div className="detached-error">{error}</div>
   if (!root) return <div className="detached-loading">正在加载...</div>
 
@@ -160,25 +219,64 @@ export function DetachedFolder({
     <section className="detached-folder-shell">
       <header className="detached-folder-header">
         <strong>{root.title}</strong>
-        <button
-          className="icon-button"
-          aria-label="关闭文件夹窗口"
-          onClick={() => void window.stickyApi.window.attachFolder(folderId)}
-        >
-          ×
-        </button>
+        <div className="detached-folder-actions">
+          <button
+            className="primary-button"
+            onClick={() => {
+              setCreateParentId(root.id)
+              setCreateOpen((open) => !open)
+            }}
+          >
+            ＋ 新建
+          </button>
+          <button
+            className="icon-button"
+            aria-label="关闭文件夹窗口"
+            onClick={() => void window.stickyApi.window.attachFolder(folderId)}
+          >
+            ×
+          </button>
+        </div>
       </header>
+      {createOpen && (
+        <CreateMenu
+          onCreate={(type) => void createItem(type, createParentId)}
+          canCreateFolder={folderDepth(folders, createParentId) < 3}
+          onCreateFolder={() => {
+            setCreateOpen(false)
+            setFolderDialogOpen(true)
+          }}
+          onClose={() => setCreateOpen(false)}
+        />
+      )}
       <div className="detached-folder-tree">
         <FolderCard
           node={root}
           onOpenItem={(item) => setSelectedItemId(item.id)}
+          onItemContextMenu={(item, event) =>
+            setContextMenu({
+              item,
+              x: event.clientX,
+              y: event.clientY
+            })
+          }
           onToggle={async (folder) => {
             await window.stickyApi.folders.update(folder.id, {
               collapsed: !folder.collapsed
             })
             await load()
           }}
-          onContextMenu={() => undefined}
+          onContextMenu={(folder, event) =>
+            setFolderContextMenu({
+              folder,
+              x: event.clientX,
+              y: event.clientY
+            })
+          }
+          onCreate={(folder) => {
+            setCreateParentId(folder.id)
+            setCreateOpen(true)
+          }}
           onDetachItem={(item) =>
             void window.stickyApi.window.detach(item.id)
           }
@@ -190,6 +288,91 @@ export function DetachedFolder({
           }
         />
       </div>
+      {contextMenu && (
+        <CardContextMenu
+          item={contextMenu.item}
+          position={{ x: contextMenu.x, y: contextMenu.y }}
+          onAction={(action) =>
+            void handleCardAction(contextMenu.item, action)
+          }
+          onClose={() => setContextMenu(null)}
+        />
+      )}
+      {folderContextMenu && (
+        <FolderContextMenu
+          position={{ x: folderContextMenu.x, y: folderContextMenu.y }}
+          canCreateFolder={
+            folderDepth(folders, folderContextMenu.folder.id) < 3
+          }
+          onCreate={(type) => {
+            const targetId = folderContextMenu.folder.id
+            setFolderContextMenu(null)
+            setCreateParentId(targetId)
+            if (type === 'folder') {
+              setFolderDialogOpen(true)
+            } else {
+              void createItem(type, targetId)
+            }
+          }}
+          onRename={() => {
+            setPendingFolderRename(folderContextMenu.folder)
+            setFolderContextMenu(null)
+          }}
+          onDelete={() => {
+            const target = folderContextMenu.folder
+            setFolderContextMenu(null)
+            if (!window.confirm(`确定删除“${target.title}”吗？其中内容会移到上一级。`)) {
+              return
+            }
+            void window.stickyApi.folders.delete(target.id).then(load)
+          }}
+          onClose={() => setFolderContextMenu(null)}
+        />
+      )}
+      {folderDialogOpen && (
+        <FolderDialog
+          onConfirm={async (title) => {
+            await window.stickyApi.folders.create(title, createParentId)
+            setFolderDialogOpen(false)
+            await load()
+          }}
+          onCancel={() => setFolderDialogOpen(false)}
+        />
+      )}
+      {pendingRename && (
+        <TitleDialog
+          type={pendingRename.type}
+          initialTitle={pendingRename.title}
+          onConfirm={(title) => {
+            void save(pendingRename.id, { title })
+            setPendingRename(null)
+          }}
+          onCancel={() => setPendingRename(null)}
+        />
+      )}
+      {pendingFolderRename && (
+        <FolderDialog
+          initialTitle={pendingFolderRename.title}
+          onConfirm={async (title) => {
+            await window.stickyApi.folders.update(pendingFolderRename.id, {
+              title
+            })
+            setPendingFolderRename(null)
+            await load()
+          }}
+          onCancel={() => setPendingFolderRename(null)}
+        />
+      )}
     </section>
   )
+}
+
+function folderDepth(folders: FolderItem[], folderId: string): number {
+  let depth = 0
+  let current: string | null = folderId
+  while (current) {
+    depth += 1
+    current = folders.find((folder) => folder.id === current)?.parentFolderId ?? null
+  }
+  return depth
 }

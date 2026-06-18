@@ -35,7 +35,11 @@ function PanelApp(): React.JSX.Element {
   const [folders, setFolders] = useState<FolderItem[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
+  const [createTargetFolderId, setCreateTargetFolderId] =
+    useState<string | null>(null)
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
+  const [pendingFolderParentId, setPendingFolderParentId] =
+    useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [config, setConfig] = useState<AppConfig | null>(null)
   const [pendingRename, setPendingRename] = useState<StickyItem | null>(null)
@@ -79,19 +83,28 @@ function PanelApp(): React.JSX.Element {
     }
   }, [])
 
-  const createItem = useCallback(async (type: NoteType, title?: string) => {
-    const item = await window.stickyApi.notes.create(type, title)
+  const createItem = useCallback(async (
+    type: NoteType,
+    title?: string,
+    parentFolderId: string | null = null
+  ) => {
+    const item = await window.stickyApi.notes.create(type, title, parentFolderId)
     setItems((current) => upsertItem(current, item))
     setSelectedId(item.id)
     setCreateOpen(false)
+    setCreateTargetFolderId(null)
   }, [])
 
   const createFolder = useCallback(async (title: string) => {
-    const folder = await window.stickyApi.folders.create(title)
+    const folder = await window.stickyApi.folders.create(
+      title,
+      pendingFolderParentId
+    )
     setFolders((current) => [...current, folder])
+    setPendingFolderParentId(null)
     setFolderDialogOpen(false)
     setCreateOpen(false)
-  }, [])
+  }, [pendingFolderParentId])
 
   useEffect(
     () => window.stickyApi.onOpenEditor((type) => void createItem(type)),
@@ -139,6 +152,7 @@ function PanelApp(): React.JSX.Element {
     if (action.type === 'rename') setPendingRename(item)
     if (action.type === 'color') await save(item.id, { headerColor: action.color })
     if (action.type === 'theme') await save(item.id, { bodyTheme: action.theme })
+    if (action.type === 'pin') await save(item.id, { pinned: action.pinned })
     if (action.type === 'add-task' && item.type === 'todo') {
       await window.stickyApi.notes.addTodoTask(item.id)
       await loadItems()
@@ -242,19 +256,35 @@ function PanelApp(): React.JSX.Element {
             </div>
             <div className="header-actions">
               <button className="icon-button" onClick={() => setSettingsOpen(true)} aria-label="设置">⚙</button>
-              <button className="primary-button" onClick={() => setCreateOpen((open) => !open)}>＋ 新建</button>
+              <button
+                className="primary-button"
+                onClick={() => {
+                  setCreateTargetFolderId(null)
+                  setCreateOpen((open) => !open)
+                }}
+              >
+                ＋ 新建
+              </button>
             </div>
           </header>
           {createOpen && (
             <CreateMenu
               onCreate={(type) => {
-                void createItem(type)
+                void createItem(type, undefined, createTargetFolderId)
               }}
+              canCreateFolder={
+                !createTargetFolderId ||
+                folderDepth(folders, createTargetFolderId) < 3
+              }
               onCreateFolder={() => {
                 setCreateOpen(false)
+                setPendingFolderParentId(createTargetFolderId)
                 setFolderDialogOpen(true)
               }}
-              onClose={() => setCreateOpen(false)}
+              onClose={() => {
+                setCreateOpen(false)
+                setCreateTargetFolderId(null)
+              }}
             />
           )}
           <StickyPanel
@@ -298,6 +328,10 @@ function PanelApp(): React.JSX.Element {
                 y: event.clientY
               })
             }
+            onCreateInFolder={(folder) => {
+              setCreateTargetFolderId(folder.id)
+              setCreateOpen(true)
+            }}
             onDetachFolder={(folder) => {
               void window.stickyApi.window.detachFolder(folder.id)
             }}
@@ -326,6 +360,17 @@ function PanelApp(): React.JSX.Element {
       {folderContextMenu && (
         <FolderContextMenu
           position={{ x: folderContextMenu.x, y: folderContextMenu.y }}
+          canCreateFolder={folderDepth(folders, folderContextMenu.folder.id) < 3}
+          onCreate={(type) => {
+            const targetId = folderContextMenu.folder.id
+            setFolderContextMenu(null)
+            if (type === 'folder') {
+              setPendingFolderParentId(targetId)
+              setFolderDialogOpen(true)
+              return
+            }
+            void createItem(type, undefined, targetId)
+          }}
           onRename={() => {
             setPendingFolderRename(folderContextMenu.folder)
             setFolderContextMenu(null)
@@ -358,7 +403,10 @@ function PanelApp(): React.JSX.Element {
       {folderDialogOpen && (
         <FolderDialog
           onConfirm={createFolder}
-          onCancel={() => setFolderDialogOpen(false)}
+          onCancel={() => {
+            setFolderDialogOpen(false)
+            setPendingFolderParentId(null)
+          }}
         />
       )}
       {pendingFolderRename && (
@@ -376,4 +424,14 @@ function PanelApp(): React.JSX.Element {
       )}
     </div>
   )
+}
+
+function folderDepth(folders: FolderItem[], folderId: string): number {
+  let depth = 0
+  let current: string | null = folderId
+  while (current) {
+    depth += 1
+    current = folders.find((folder) => folder.id === current)?.parentFolderId ?? null
+  }
+  return depth
 }

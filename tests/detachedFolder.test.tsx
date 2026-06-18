@@ -54,6 +54,7 @@ beforeEach(() => {
     value: {
       notes: {
         list: vi.fn().mockResolvedValue([note]),
+        create: vi.fn().mockResolvedValue({ ...note, id: 'note_new' }),
         update: vi.fn().mockImplementation(
           async (_id, patch) => ({ ...note, ...patch })
         ),
@@ -65,11 +66,14 @@ beforeEach(() => {
       },
       folders: {
         list: vi.fn().mockResolvedValue([rootFolder, childFolder]),
+        create: vi.fn(),
         update: vi.fn(),
+        delete: vi.fn(),
         reorderChildren: vi.fn()
       },
       window: {
         attachFolder,
+        attach: vi.fn(),
         detach: vi.fn(),
         detachFolder: vi.fn()
       },
@@ -111,5 +115,28 @@ describe('DetachedFolder', () => {
 
     expect((await screen.findAllByText(/Child/)).length).toBeGreaterThan(0)
     expect(screen.getByText('Nested note')).toBeInTheDocument()
+  })
+
+  it('creates a note directly in the detached root folder', async () => {
+    render(<DetachedFolder folderId={rootFolder.id} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '＋ 新建' }))
+    fireEvent.click(screen.getByRole('button', { name: /新建笔记/ }))
+
+    await waitFor(() => {
+      expect(window.stickyApi.notes.create).toHaveBeenCalledWith(
+        'note',
+        undefined,
+        rootFolder.id
+      )
+    })
+  })
+
+  it('opens the item context menu inside a detached folder', async () => {
+    render(<DetachedFolder folderId={rootFolder.id} />)
+
+    fireEvent.contextMenu(await screen.findByText('Nested note'))
+
+    expect(screen.getByRole('menuitem', { name: '编辑' })).toBeInTheDocument()
   })
 })

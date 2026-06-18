@@ -14,6 +14,7 @@ export function StickyPanel({
   onDetach,
   onToggleFolder,
   onFolderContextMenu,
+  onCreateInFolder,
   onDetachFolder,
   onReorder
 }: {
@@ -29,6 +30,7 @@ export function StickyPanel({
     folder: FolderTreeNode,
     event: React.MouseEvent<HTMLElement>
   ): void
+  onCreateInFolder(folder: FolderTreeNode): void
   onDetachFolder(folder: FolderTreeNode): void
   onReorder(parentFolderId: string | null, orderedNodes: OrderedNodeRef[]): void
 }): React.JSX.Element {
@@ -81,8 +83,10 @@ export function StickyPanel({
             <FolderCard
               node={entry.folder}
               onOpenItem={onOpen}
+              onItemContextMenu={onContextMenu}
               onToggle={onToggleFolder}
               onContextMenu={onFolderContextMenu}
+              onCreate={onCreateInFolder}
               onDetachItem={onDetach}
               onDetachFolder={onDetachFolder}
               onReorder={onReorder}

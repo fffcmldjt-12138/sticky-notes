@@ -6,6 +6,7 @@ import type { NoteItem, TodoItem } from '../src/shared/models'
 import { SettingsPanel } from '../src/renderer/src/pages/SettingsPanel'
 import { StickyCard } from '../src/renderer/src/components/StickyCard'
 import { CardContextMenu } from '../src/renderer/src/components/CardContextMenu'
+import { FolderContextMenu } from '../src/renderer/src/components/FolderContextMenu'
 import { TitleDialog } from '../src/renderer/src/components/TitleDialog'
 
 const note: NoteItem = {
@@ -87,6 +88,38 @@ describe('card and navigation actions', () => {
     expect(screen.getByRole('menu')).toBeVisible()
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+  })
+
+  it('offers pinning from the item context menu', () => {
+    const onAction = vi.fn()
+    render(
+      <CardContextMenu
+        item={note}
+        position={{ x: 10, y: 20 }}
+        onAction={onAction}
+        onClose={vi.fn()}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('menuitem', { name: '置顶' }))
+    expect(onAction).toHaveBeenCalledWith({ type: 'pin', pinned: true })
+  })
+
+  it('offers local creation from a folder context menu', () => {
+    const onCreate = vi.fn()
+    render(
+      <FolderContextMenu
+        position={{ x: 10, y: 20 }}
+        canCreateFolder
+        onCreate={onCreate}
+        onRename={vi.fn()}
+        onDelete={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+
+    fireEvent.click(screen.getByRole('menuitem', { name: '新建待办' }))
+    expect(onCreate).toHaveBeenCalledWith('todo')
   })
 
   it('does not create an item when the title dialog is cancelled', () => {

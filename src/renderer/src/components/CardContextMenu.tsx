@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { BodyTheme, HeaderColor, StickyItem } from '../../../shared/models'
+import { clampFloatingPosition } from '../lib/floatingPosition'
 
 export type CardAction =
   | { type: 'edit' }
@@ -8,6 +9,7 @@ export type CardAction =
   | { type: 'color'; color: HeaderColor }
   | { type: 'theme'; theme: BodyTheme }
   | { type: 'add-task' }
+  | { type: 'pin'; pinned: boolean }
   | { type: 'delete' }
 
 export function CardContextMenu({
@@ -22,6 +24,18 @@ export function CardContextMenu({
   onClose(): void
 }): React.JSX.Element | null {
   const [open, setOpen] = useState(true)
+  const [menuPosition, setMenuPosition] = useState(position)
+  const menuRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    const bounds = menuRef.current?.getBoundingClientRect()
+    if (!bounds) return
+    setMenuPosition(clampFloatingPosition(
+      position,
+      { width: bounds.width, height: bounds.height },
+      { width: window.innerWidth, height: window.innerHeight }
+    ))
+  }, [position])
 
   useEffect(() => {
     const close = (): void => {
@@ -50,9 +64,10 @@ export function CardContextMenu({
 
   return (
     <div
+      ref={menuRef}
       className="card-context-menu"
       role="menu"
-      style={{ left: position.x, top: position.y }}
+      style={{ left: menuPosition.x, top: menuPosition.y }}
       onPointerDown={(event) => event.stopPropagation()}
     >
       <button role="menuitem" onClick={() => act({ type: 'edit' })}>编辑</button>
@@ -60,6 +75,12 @@ export function CardContextMenu({
         {item.detached ? '收回主面板' : '拖出为小窗'}
       </button>
       <button role="menuitem" onClick={() => act({ type: 'rename' })}>修改标题</button>
+      <button
+        role="menuitem"
+        onClick={() => act({ type: 'pin', pinned: !item.pinned })}
+      >
+        {item.pinned ? '取消置顶' : '置顶'}
+      </button>
       <label className="context-color">
         修改头部颜色
         <input
@@ -92,4 +113,3 @@ export function CardContextMenu({
     </div>
   )
 }
-

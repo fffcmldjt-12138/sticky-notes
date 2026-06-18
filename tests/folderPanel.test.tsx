@@ -40,6 +40,7 @@ const note: NoteItem = {
 function renderPanel(overrides: {
   onDetach?: ReturnType<typeof vi.fn>
   onDetachFolder?: ReturnType<typeof vi.fn>
+  onContextMenu?: ReturnType<typeof vi.fn>
 } = {}): ReturnType<typeof render> {
   return render(
     <StickyPanel
@@ -48,10 +49,11 @@ function renderPanel(overrides: {
       onOpen={vi.fn()}
       onToggleTodo={vi.fn()}
       onToggleTodoExpanded={vi.fn()}
-      onContextMenu={vi.fn()}
+      onContextMenu={overrides.onContextMenu ?? vi.fn()}
       onDetach={overrides.onDetach ?? vi.fn()}
       onToggleFolder={vi.fn()}
       onFolderContextMenu={vi.fn()}
+      onCreateInFolder={vi.fn()}
       onDetachFolder={overrides.onDetachFolder ?? vi.fn()}
       onReorder={vi.fn()}
     />
@@ -93,6 +95,18 @@ describe('StickyPanel folders', () => {
 
     expect(onDetachFolder).toHaveBeenCalledWith(
       expect.objectContaining({ id: folder.id })
+    )
+  })
+
+  it('opens the shared item context menu for a folder child', () => {
+    const onContextMenu = vi.fn()
+    renderPanel({ onContextMenu })
+
+    fireEvent.contextMenu(screen.getByText('文件夹内笔记').closest('button')!)
+
+    expect(onContextMenu).toHaveBeenCalledWith(
+      note,
+      expect.objectContaining({ clientX: 0, clientY: 0 })
     )
   })
 })

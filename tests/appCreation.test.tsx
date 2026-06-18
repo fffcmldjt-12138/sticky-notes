@@ -104,7 +104,11 @@ describe('App creation flow', () => {
     await waitFor(() => {
       expect(window.stickyApi.notes.create).toHaveBeenCalledOnce()
     })
-    expect(window.stickyApi.notes.create).toHaveBeenCalledWith('note', undefined)
+    expect(window.stickyApi.notes.create).toHaveBeenCalledWith(
+      'note',
+      undefined,
+      null
+    )
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     expect(await screen.findByLabelText('标题')).toHaveValue('新建笔记')
   })
@@ -124,7 +128,7 @@ describe('App creation flow', () => {
     await waitFor(() => {
       expect(window.stickyApi.folders.create).toHaveBeenCalledOnce()
     })
-    expect(window.stickyApi.folders.create).toHaveBeenCalledWith('项目资料')
+    expect(window.stickyApi.folders.create).toHaveBeenCalledWith('项目资料', null)
     expect(screen.getByText(/项目资料/)).toBeInTheDocument()
   })
 })
