@@ -2,10 +2,10 @@ import { describe, expect, it, vi } from 'vitest'
 import type { TodoItem } from '../src/shared/models'
 import { ReminderService } from '../src/main/services/ReminderService'
 
-const dueTodo: TodoItem = {
+const todo: TodoItem = {
   id: 'todo_1',
   type: 'todo',
-  title: 'Submit assignment',
+  title: '作业',
   headerColor: '#5b8def',
   bodyTheme: 'light',
   pinned: false,
@@ -15,68 +15,38 @@ const dueTodo: TodoItem = {
   tags: [],
   order: 0,
   deletedAt: null,
-  tasks: [
-    {
-      id: 'task_1',
-      contentMarkdown: 'Submit assignment',
-      completed: false,
-      remindAt: '2026-06-14T10:00:00.000Z',
-    reminded: false,
+  tasks: [{
+    id: 'task_1',
+    contentMarkdown: '提交作业',
+    completed: false,
     tags: [],
-    importance: 'normal',
-    urgency: 'normal',
+    importance: 'important',
+    urgency: 'urgent',
     children: [],
-    schedule: null,
-    deadlineAt: null,
-      deadlineReminders: []
+    schedule: {
+      mode: 'point',
+      startAt: '2026-06-20T12:00:00.000Z',
+      endAt: null,
+      repeat: 'none',
+      reminders: [
+        { id: 'one-day', offsetMinutes: 1440, remindedAt: null }
+      ]
     }
-  ],
+  }],
   panelExpanded: false,
   createdAt: '2026-06-14T09:00:00.000Z',
   updatedAt: '2026-06-14T09:00:00.000Z'
 }
 
 describe('ReminderService', () => {
-  it('notifies and marks an overdue incomplete Todo once', async () => {
-    const list = vi.fn().mockResolvedValue([dueTodo])
-    const updateTodoTask = vi.fn().mockResolvedValue(undefined)
-    const notify = vi.fn()
-    const service = new ReminderService(
-      { list, updateTodoTask },
-      notify,
-      () => new Date('2026-06-14T10:01:00.000Z')
-    )
-
-    await service.check()
-
-    expect(notify).toHaveBeenCalledWith('Submit assignment', '待办提醒')
-    expect(updateTodoTask).toHaveBeenCalledWith('todo_1', 'task_1', { reminded: true })
-  })
-
-  it('delivers each selected deadline reminder independently', async () => {
-    const deadlineTodo: TodoItem = {
-      ...dueTodo,
-      tasks: [{
-        ...dueTodo.tasks[0],
-        remindAt: null,
-        deadlineAt: '2026-06-20T12:00:00.000Z',
-        deadlineReminders: [
-          {
-            id: 'three-days',
-            offsetMinutes: 4320,
-            remindedAt: '2026-06-17T12:00:00.000Z'
-          },
-          { id: 'one-day', offsetMinutes: 1440, remindedAt: null },
-          { id: 'six-hours', offsetMinutes: 360, remindedAt: null }
-        ]
-      }]
-    }
+  it('delivers each selected schedule reminder once', async () => {
     const updateTodoTask = vi.fn().mockResolvedValue(undefined)
     const notify = vi.fn()
     const service = new ReminderService(
       {
-        list: vi.fn().mockResolvedValue([deadlineTodo]),
-        updateTodoTask
+        list: vi.fn().mockResolvedValue([todo]),
+        updateTodoTask,
+        updateTodoSubtask: vi.fn()
       },
       notify,
       () => new Date('2026-06-19T12:00:00.000Z')
@@ -84,41 +54,95 @@ describe('ReminderService', () => {
 
     await service.check()
 
-    expect(notify).toHaveBeenCalledOnce()
     expect(notify).toHaveBeenCalledWith(
-      'Submit assignment',
-      'DDL 提醒：距离截止还有 1 天'
+      '提交作业',
+      '截止提醒：距离时间还有 1 天'
     )
     expect(updateTodoTask).toHaveBeenCalledWith('todo_1', 'task_1', {
-      deadlineReminders: [
-        deadlineTodo.tasks[0].deadlineReminders![0],
-        {
+      schedule: {
+        ...todo.tasks[0].schedule,
+        reminders: [{
           id: 'one-day',
           offsetMinutes: 1440,
           remindedAt: '2026-06-19T12:00:00.000Z'
-        },
-        deadlineTodo.tasks[0].deadlineReminders![2]
-      ]
+        }]
+      }
     })
   })
 
-  it('does not deliver deadline reminders for completed tasks', async () => {
-    const notify = vi.fn()
-    const updateTodoTask = vi.fn()
+  it('advances a completed recurring task and resets completion', async () => {
+    const recurring = {
+      ...todo,
+      tasks: [{
+        ...todo.tasks[0],
+        completed: true,
+        schedule: {
+          ...todo.tasks[0].schedule!,
+          repeat: 'daily' as const,
+          reminders: [{
+            id: 'at-time',
+            offsetMinutes: 0,
+            remindedAt: '2026-06-20T12:00:00.000Z'
+          }]
+        }
+      }]
+    }
+    const updateTodoTask = vi.fn().mockResolvedValue(undefined)
     const service = new ReminderService(
       {
-        list: vi.fn().mockResolvedValue([{
-          ...dueTodo,
-          tasks: [{
-            ...dueTodo.tasks[0],
-            completed: true,
-            deadlineAt: '2026-06-20T12:00:00.000Z',
-            deadlineReminders: [
-              { id: 'one-day', offsetMinutes: 1440, remindedAt: null }
-            ]
-          }]
-        }]),
-        updateTodoTask
+        list: vi.fn().mockResolvedValue([recurring]),
+        updateTodoTask,
+        updateTodoSubtask: vi.fn()
+      },
+      vi.fn(),
+      () => new Date('2026-06-20T12:01:00.000Z')
+    )
+
+    await service.check()
+
+    expect(updateTodoTask).toHaveBeenCalledWith('todo_1', 'task_1', {
+      completed: false,
+      schedule: expect.objectContaining({
+        startAt: '2026-06-21T12:00:00.000Z',
+        reminders: [expect.objectContaining({ remindedAt: null })]
+      })
+    })
+  })
+
+  it('delivers reminders for incomplete subtasks', async () => {
+    const withChild: TodoItem = {
+      ...todo,
+      tasks: [{
+        ...todo.tasks[0],
+        schedule: null,
+        children: [{
+          id: 'subtask_1',
+          contentMarkdown: '上传附件',
+          completed: false,
+          tags: [],
+          importance: 'normal',
+          urgency: 'urgent',
+          schedule: {
+            mode: 'point',
+            startAt: '2026-06-19T12:00:00.000Z',
+            endAt: null,
+            repeat: 'none',
+            reminders: [{
+              id: 'at-time',
+              offsetMinutes: 0,
+              remindedAt: null
+            }]
+          }
+        }]
+      }]
+    }
+    const updateTodoSubtask = vi.fn().mockResolvedValue(undefined)
+    const notify = vi.fn()
+    const service = new ReminderService(
+      {
+        list: vi.fn().mockResolvedValue([withChild]),
+        updateTodoTask: vi.fn(),
+        updateTodoSubtask
       },
       notify,
       () => new Date('2026-06-19T12:00:00.000Z')
@@ -126,7 +150,12 @@ describe('ReminderService', () => {
 
     await service.check()
 
-    expect(notify).not.toHaveBeenCalled()
-    expect(updateTodoTask).not.toHaveBeenCalled()
+    expect(notify).toHaveBeenCalledWith('上传附件', '截止时间已到')
+    expect(updateTodoSubtask).toHaveBeenCalledWith(
+      'todo_1',
+      'task_1',
+      'subtask_1',
+      { schedule: expect.any(Object) }
+    )
   })
 })
