@@ -79,6 +79,7 @@ export function TodoEditor({
       setDraft((current) => ({ ...current, tasks: item.tasks }))
       return
     }
+    if (document.activeElement?.closest('.editor')) return
     setDraft(item)
   }, [item])
   useEffect(() => {

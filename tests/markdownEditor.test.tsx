@@ -17,6 +17,17 @@ describe('MarkdownEditor', () => {
     ).toBe(true)
   })
 
+  it('does not replace content while the editor is focused', () => {
+    expect(
+      shouldApplyExternalMarkdown(
+        '正在输入的新内容',
+        '上一次已保存',
+        '迟到的旧内容',
+        true
+      )
+    ).toBe(false)
+  })
+
   it('keeps a formatting toolbar visible and renders Markdown immediately', async () => {
     render(<MarkdownEditor value="## Heading" onChange={vi.fn()} />)
 

@@ -9,8 +9,10 @@ import { MarkdownToolbar } from './MarkdownToolbar'
 export function shouldApplyExternalMarkdown(
   currentValue: string,
   lastEmittedValue: string,
-  incomingValue: string
+  incomingValue: string,
+  isFocused = false
 ): boolean {
+  if (isFocused) return false
   return incomingValue !== currentValue && incomingValue !== lastEmittedValue
 }
 
@@ -155,7 +157,8 @@ export function MarkdownEditor({
       !shouldApplyExternalMarkdown(
         editor.getMarkdown(),
         lastEmittedValue.current,
-        value
+        value,
+        editor.isFocused
       )
     ) {
       return

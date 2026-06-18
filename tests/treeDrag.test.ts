@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { OrderedNodeRef } from '../src/shared/models'
 import {
+  resolveTreeDragOutcome,
   pointOutsideViewport,
   resolveTreeDrop
 } from '../src/renderer/src/lib/treeDrag'
@@ -62,5 +63,11 @@ describe('resolveTreeDrop', () => {
       { x: 399, y: 599 },
       { width: 400, height: 600 }
     )).toBe(false)
+  })
+
+  it('detaches outside the window even when dnd-kit reports a drop target', () => {
+    expect(resolveTreeDragOutcome(true, true)).toBe('detach')
+    expect(resolveTreeDragOutcome(false, true)).toBe('drop')
+    expect(resolveTreeDragOutcome(false, false)).toBe('cancel')
   })
 })

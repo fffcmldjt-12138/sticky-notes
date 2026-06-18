@@ -86,3 +86,12 @@ export function pointOutsideViewport(
     point.y > viewport.height
   )
 }
+
+export function resolveTreeDragOutcome(
+  outsideViewport: boolean,
+  hasDropTarget: boolean
+): 'detach' | 'drop' | 'cancel' {
+  if (outsideViewport) return 'detach'
+  if (hasDropTarget) return 'drop'
+  return 'cancel'
+}

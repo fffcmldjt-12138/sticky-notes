@@ -17,6 +17,7 @@ import type {
 } from '../../../shared/models'
 import {
   resolveTreeDrop,
+  resolveTreeDragOutcome,
   siblingReferences,
   pointOutsideViewport,
   type TreeDropPosition
@@ -69,22 +70,6 @@ export function TreeDndContext({
     setActive(null)
     if (!data) return
 
-    const drop = event.over?.data.current?.position as
-      | TreeDropPosition
-      | undefined
-    if (drop) {
-      const siblings = siblingReferences(
-        items,
-        folders,
-        drop.parentFolderId
-      )
-      const resolved = resolveTreeDrop(data.node, drop, siblings)
-      if (resolved) {
-        onReorder(resolved.parentFolderId, resolved.orderedNodes)
-      }
-      return
-    }
-
     const activator = event.activatorEvent
     const start =
       activator instanceof MouseEvent
@@ -101,13 +86,31 @@ export function TreeDndContext({
           { width: window.innerWidth, height: window.innerHeight }
         )
       : false
-    if (outside) {
+    const drop = event.over?.data.current?.position as
+      | TreeDropPosition
+      | undefined
+    const outcome = resolveTreeDragOutcome(outside, Boolean(drop))
+
+    if (outcome === 'detach') {
       if (data.node.kind === 'item') {
         const item = itemById.get(data.node.id)
         if (item) onDetachItem(item)
       } else {
         const folder = folderById.get(data.node.id)
         if (folder) onDetachFolder(folder)
+      }
+      return
+    }
+
+    if (outcome === 'drop' && drop) {
+      const siblings = siblingReferences(
+        items,
+        folders,
+        drop.parentFolderId
+      )
+      const resolved = resolveTreeDrop(data.node, drop, siblings)
+      if (resolved) {
+        onReorder(resolved.parentFolderId, resolved.orderedNodes)
       }
     }
   }

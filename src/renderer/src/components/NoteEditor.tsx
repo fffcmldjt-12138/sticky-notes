@@ -37,6 +37,7 @@ export function NoteEditor({
     ) {
       return
     }
+    if (document.activeElement?.closest('.editor')) return
     setDraft(item)
   }, [item])
   useEffect(() => {
