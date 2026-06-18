@@ -85,6 +85,42 @@ describe('NoteStore', () => {
     expect(deleted?.tasks[0].children).toEqual([])
   })
 
+  it('keeps delivered reminder state but resets it when schedule rules change', async () => {
+    const todo = await store.create('todo')
+    const task = await store.addTodoTask(todo.id, 'Scheduled')
+    const baseSchedule = {
+      mode: 'point' as const,
+      startAt: '2026-06-20T12:00:00.000Z',
+      endAt: null,
+      repeat: 'none' as const,
+      reminders: [{
+        id: 'one-day',
+        offsetMinutes: 1440,
+        remindedAt: null
+      }]
+    }
+    await store.updateTodoTask(todo.id, task!.id, { schedule: baseSchedule })
+    const deliveredAt = '2026-06-19T12:00:00.000Z'
+    const delivered = await store.updateTodoTask(todo.id, task!.id, {
+      schedule: {
+        ...baseSchedule,
+        reminders: [{ ...baseSchedule.reminders[0], remindedAt: deliveredAt }]
+      }
+    })
+    expect(delivered?.tasks[0].schedule?.reminders[0].remindedAt).toBe(
+      deliveredAt
+    )
+
+    const changed = await store.updateTodoTask(todo.id, task!.id, {
+      schedule: {
+        ...baseSchedule,
+        startAt: '2026-06-21T12:00:00.000Z',
+        reminders: [{ ...baseSchedule.reminders[0], remindedAt: deliveredAt }]
+      }
+    })
+    expect(changed?.tasks[0].schedule?.reminders[0].remindedAt).toBeNull()
+  })
+
   it('serializes concurrent updates without losing either change', async () => {
     const first = await store.create('note')
     const second = await store.create('note')

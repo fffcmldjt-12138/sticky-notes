@@ -35,21 +35,23 @@ export function TodoSubtaskRow({
         value={subtask.contentMarkdown}
         onCommit={(contentMarkdown) => onUpdate({ contentMarkdown })}
       />
-      <TaskQuadrantPicker
-        ariaLabel="子待办四象限"
-        importance={subtask.importance}
-        urgency={subtask.urgency}
-        onChange={(importance, urgency) => onUpdate({ importance, urgency })}
-      />
-      <button
-        ref={scheduleButtonRef}
-        type="button"
-        className={`task-setting-button ${subtask.schedule ? 'active' : ''}`}
-        aria-label="子待办时间设置"
-        onClick={() => setScheduleOpen((open) => !open)}
-      >
-        时间
-      </button>
+      <div className="subtask-settings">
+        <TaskQuadrantPicker
+          ariaLabel="子待办四象限"
+          importance={subtask.importance}
+          urgency={subtask.urgency}
+          onChange={(importance, urgency) => onUpdate({ importance, urgency })}
+        />
+        <button
+          ref={scheduleButtonRef}
+          type="button"
+          className={`task-setting-button ${subtask.schedule ? 'active' : ''}`}
+          aria-label="子待办时间设置"
+          onClick={() => setScheduleOpen((open) => !open)}
+        >
+          时间
+        </button>
+      </div>
       {scheduleOpen && (
         <TaskSchedulePopover
           value={subtask.schedule}

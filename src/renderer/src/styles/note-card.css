@@ -344,12 +344,22 @@
 .todo-subtask-row {
   padding: 8px;
   display: grid;
-  grid-template-columns: 22px minmax(100px,1fr) minmax(88px,auto) auto 28px;
+  grid-template-columns: 22px minmax(0,1fr) 28px;
   gap: 6px;
   align-items: center;
   border-left: 3px solid rgba(91,141,239,.35);
   border-radius: 8px;
   background: rgba(91,141,239,.06);
+}
+.todo-subtask-row .subtask-settings {
+  grid-column: 2 / 4;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.todo-subtask-row > .task-delete-button {
+  grid-column: 3;
+  grid-row: 1;
 }
 .todo-subtask-row > input[type="checkbox"] {
   width: 18px;

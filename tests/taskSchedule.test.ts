@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { TodoSchedule } from '../src/shared/models'
 import {
   advanceRecurringSchedule,
+  advanceRecurringSchedulePast,
   getScheduleDueAt
 } from '../src/main/services/taskSchedule'
 
@@ -60,5 +61,14 @@ describe('task schedules', () => {
     expect(advanceRecurringSchedule(
       schedule('none', '2026-06-18T09:00:00.000Z')
     )).toBeNull()
+  })
+
+  it('catches an overdue recurring schedule up to the next future occurrence', () => {
+    const next = advanceRecurringSchedulePast(
+      schedule('daily', '2026-06-15T09:00:00.000Z'),
+      new Date('2026-06-18T12:00:00.000Z')
+    )
+
+    expect(next?.startAt).toBe('2026-06-19T09:00:00.000Z')
   })
 })

@@ -1,4 +1,5 @@
 import type { TodoSchedule } from '../../shared/models'
+import { getScheduleDueAt } from '../../shared/taskSchedule'
 export { getScheduleDueAt } from '../../shared/taskSchedule'
 
 export function advanceRecurringSchedule(
@@ -20,6 +21,23 @@ export function advanceRecurringSchedule(
       remindedAt: null
     }))
   }
+}
+
+export function advanceRecurringSchedulePast(
+  schedule: TodoSchedule,
+  now: Date
+): TodoSchedule | null {
+  let next = advanceRecurringSchedule(schedule)
+  let iterations = 0
+  while (
+    next &&
+    new Date(getScheduleDueAt(next)).getTime() <= now.getTime() &&
+    iterations < 10_000
+  ) {
+    next = advanceRecurringSchedule(next)
+    iterations += 1
+  }
+  return next
 }
 
 function advanceDate(

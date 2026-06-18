@@ -122,11 +122,15 @@ export function DetachedFolder({
     parentFolderId: string | null,
     orderedNodes: OrderedNodeRef[]
   ): Promise<void> {
-    await window.stickyApi.folders.reorderChildren(
-      parentFolderId,
-      orderedNodes
-    )
-    await load()
+    try {
+      await window.stickyApi.folders.reorderChildren(
+        parentFolderId,
+        orderedNodes
+      )
+      await load()
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : '移动失败')
+    }
   }
 
   async function createItem(type: NoteType, parentFolderId: string): Promise<void> {

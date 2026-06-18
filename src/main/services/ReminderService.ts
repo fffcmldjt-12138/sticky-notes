@@ -6,7 +6,7 @@ import type {
   TodoTaskPatch
 } from '../../shared/models'
 import {
-  advanceRecurringSchedule,
+  advanceRecurringSchedulePast,
   getScheduleDueAt
 } from './taskSchedule'
 
@@ -112,7 +112,10 @@ function processSchedule(
   })
 
   if (dueAt <= now) {
-    const next = advanceRecurringSchedule({ ...schedule, reminders })
+    const next = advanceRecurringSchedulePast(
+      { ...schedule, reminders },
+      current
+    )
     if (next) return { completed: false, schedule: next }
   }
 

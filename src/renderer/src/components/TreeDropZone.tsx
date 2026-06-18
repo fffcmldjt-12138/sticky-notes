@@ -1,4 +1,4 @@
-import { useDroppable } from '@dnd-kit/core'
+import { useDndContext, useDroppable } from '@dnd-kit/core'
 import type { TreeDropPosition } from '../lib/treeDrag'
 
 export function TreeDropZone({
@@ -14,12 +14,14 @@ export function TreeDropZone({
     id,
     data: { position }
   })
+  const { active } = useDndContext()
 
   return (
     <div
       ref={setNodeRef}
       className={[
         'mixed-drop-marker',
+        active ? 'drag-active' : '',
         isOver ? 'active' : '',
         parentExit ? 'parent-exit' : ''
       ].filter(Boolean).join(' ')}

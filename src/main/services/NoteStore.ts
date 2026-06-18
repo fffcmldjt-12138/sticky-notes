@@ -14,6 +14,7 @@ import type {
   TodoItem,
   TodoSubtask,
   TodoSubtaskPatch,
+  TodoSchedule,
   TodoTask,
   TodoTaskPatch
 } from '../../shared/models'
@@ -421,11 +422,12 @@ export class NoteStore {
       ...todo,
       tasks: todo.tasks.map((task) => {
         if (task.id !== taskId) return task
-        const scheduleChanged =
+        const scheduleRulesChanged =
           Object.hasOwn(patch, 'schedule') &&
-          JSON.stringify(patch.schedule) !== JSON.stringify(task.schedule)
+          scheduleRuleKey(patch.schedule ?? null) !==
+            scheduleRuleKey(task.schedule)
         const updated = { ...task, ...patch }
-        if (scheduleChanged && updated.schedule) {
+        if (scheduleRulesChanged && updated.schedule) {
           updated.schedule = {
             ...updated.schedule,
             reminders: updated.schedule.reminders.map((reminder) => ({
@@ -484,7 +486,9 @@ export class NoteStore {
           ? {
               ...task,
               children: task.children.map((child) =>
-                child.id === subtaskId ? { ...child, ...patch } : child
+                child.id === subtaskId
+                  ? applySubtaskPatch(child, patch)
+                  : child
               )
             }
           : task
@@ -578,6 +582,41 @@ export class NoteStore {
     )
     return result
   }
+}
+
+function applySubtaskPatch(
+  child: TodoSubtask,
+  patch: TodoSubtaskPatch
+): TodoSubtask {
+  const scheduleRulesChanged =
+    Object.hasOwn(patch, 'schedule') &&
+    scheduleRuleKey(patch.schedule ?? null) !== scheduleRuleKey(child.schedule)
+  const updated = { ...child, ...patch }
+  if (scheduleRulesChanged && updated.schedule) {
+    updated.schedule = {
+      ...updated.schedule,
+      reminders: updated.schedule.reminders.map((reminder) => ({
+        ...reminder,
+        remindedAt: null
+      }))
+    }
+  }
+  return updated
+}
+
+function scheduleRuleKey(schedule: TodoSchedule | null): string {
+  if (!schedule) return 'none'
+  return JSON.stringify({
+    mode: schedule.mode,
+    startAt: schedule.startAt,
+    endAt: schedule.endAt,
+    repeat: schedule.repeat,
+    reminders: schedule.reminders
+      .map(({ id, offsetMinutes }) => ({ id, offsetMinutes }))
+      .sort((left, right) =>
+        left.offsetMinutes - right.offsetMinutes || left.id.localeCompare(right.id)
+      )
+  })
 }
 
 function assertFolderDepth(
