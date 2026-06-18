@@ -18,7 +18,11 @@ import type {
 export interface StickyApi {
   notes: {
     list(): Promise<StickyItem[]>
-    create(type: NoteType, title?: string): Promise<StickyItem>
+    create(
+      type: NoteType,
+      title?: string,
+      parentFolderId?: string | null
+    ): Promise<StickyItem>
     update(id: string, patch: StickyItemPatch): Promise<StickyItem | null>
     delete(id: string): Promise<boolean>
     addTodoTask(todoId: string, contentMarkdown?: string): Promise<TodoTask | null>

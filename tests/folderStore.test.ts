@@ -36,6 +36,35 @@ describe('folder storage', () => {
     ])
   })
 
+  it('creates notes and todos directly inside a folder', async () => {
+    const folder = await store.createFolder('项目')
+    const note = await store.create('note', undefined, folder.id)
+    const todo = await store.create('todo', undefined, folder.id)
+
+    expect(note).toMatchObject({ parentFolderId: folder.id, order: 0 })
+    expect(todo).toMatchObject({ parentFolderId: folder.id, order: 1 })
+  })
+
+  it('moves a nested item and folder out to their parent level', async () => {
+    const parent = await store.createFolder('上一级')
+    const child = await store.createFolder('当前', parent.id)
+    const note = await store.create('note', undefined, child.id)
+    const nested = await store.createFolder('子文件夹', child.id)
+
+    await store.reorderChildren(parent.id, [
+      { kind: 'folder', id: child.id },
+      { kind: 'item', id: note.id },
+      { kind: 'folder', id: nested.id }
+    ])
+
+    expect((await store.list()).find((item) => item.id === note.id)).toMatchObject({
+      parentFolderId: parent.id,
+      order: 1
+    })
+    expect((await store.listFolders()).find((folder) => folder.id === nested.id))
+      .toMatchObject({ parentFolderId: parent.id, order: 2 })
+  })
+
   it('rejects moving a folder tree when descendants would exceed three levels', async () => {
     const destination = await store.createFolder('目标一级')
     const destinationChild = await store.createFolder('目标二级', destination.id)

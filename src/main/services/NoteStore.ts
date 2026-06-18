@@ -230,10 +230,22 @@ export class NoteStore {
     })
   }
 
-  async create(type: NoteType, title?: string): Promise<StickyItem> {
+  async create(
+    type: NoteType,
+    title?: string,
+    parentFolderId: string | null = null
+  ): Promise<StickyItem> {
     await this.ensureInitialized()
     return this.mutate(async () => {
       const data = await this.file.read()
+      if (
+        parentFolderId &&
+        !data.folders.some(
+          (folder) => folder.id === parentFolderId && !folder.deletedAt
+        )
+      ) {
+        throw new Error('目标文件夹不存在')
+      }
       const now = new Date().toISOString()
       const base = {
         id: `${type}_${randomUUID()}`,
@@ -245,9 +257,9 @@ export class NoteStore {
         pinned: false,
         detached: false,
         windowBounds: null,
-        parentFolderId: null,
+        parentFolderId,
         tags: [],
-        order: nextSiblingOrder(data, null),
+        order: nextSiblingOrder(data, parentFolderId),
         deletedAt: null,
         createdAt: now,
         updatedAt: now

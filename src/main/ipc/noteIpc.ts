@@ -18,8 +18,13 @@ export function registerNoteIpc(store: NoteStore, events: NoteIpcEvents): void {
   ipcMain.handle(ipcChannels.notesList, () => store.list())
   ipcMain.handle(
     ipcChannels.notesCreate,
-    async (_event, type: NoteType, title?: string) => {
-      const item = await store.create(type, title)
+    async (
+      _event,
+      type: NoteType,
+      title?: string,
+      parentFolderId?: string | null
+    ) => {
+      const item = await store.create(type, title, parentFolderId ?? null)
       events.changed(item)
       return item
     }
