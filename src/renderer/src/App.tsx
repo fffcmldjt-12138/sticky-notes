@@ -346,6 +346,11 @@ function PanelApp(): React.JSX.Element {
                   window.alert(error instanceof Error ? error.message : '移动失败')
                 )
             }}
+            onBeginDrag={() => {
+              setContextMenu(null)
+              setFolderContextMenu(null)
+              setCreateOpen(false)
+            }}
           />
         </>
       )}

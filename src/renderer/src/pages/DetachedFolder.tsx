@@ -12,6 +12,7 @@ import { CreateMenu } from '../components/CreateMenu'
 import { FolderContextMenu } from '../components/FolderContextMenu'
 import { FolderDialog } from '../components/FolderDialog'
 import { FolderCard } from '../components/FolderCard'
+import { TreeDndContext } from '../components/TreeDndContext'
 import { NoteEditor } from '../components/NoteEditor'
 import { TodoEditor } from '../components/TodoEditor'
 import { TitleDialog } from '../components/TitleDialog'
@@ -216,7 +217,20 @@ export function DetachedFolder({
   }
 
   return (
-    <section className="detached-folder-shell">
+    <TreeDndContext
+      items={items}
+      folders={folders}
+      onReorder={(parentId, orderedNodes) =>
+        void reorder(parentId, orderedNodes)
+      }
+      onDetachItem={(item) =>
+        void window.stickyApi.window.detach(item.id)
+      }
+      onDetachFolder={(folder) =>
+        void window.stickyApi.window.detachFolder(folder.id)
+      }
+    >
+      <section className="detached-folder-shell">
       <header className="detached-folder-header">
         <strong>{root.title}</strong>
         <div className="detached-folder-actions">
@@ -277,15 +291,6 @@ export function DetachedFolder({
             setCreateParentId(folder.id)
             setCreateOpen(true)
           }}
-          onDetachItem={(item) =>
-            void window.stickyApi.window.detach(item.id)
-          }
-          onDetachFolder={(folder) =>
-            void window.stickyApi.window.detachFolder(folder.id)
-          }
-          onReorder={(parentId, orderedNodes) =>
-            void reorder(parentId, orderedNodes)
-          }
         />
       </div>
       {contextMenu && (
@@ -363,7 +368,8 @@ export function DetachedFolder({
           onCancel={() => setPendingFolderRename(null)}
         />
       )}
-    </section>
+      </section>
+    </TreeDndContext>
   )
 }
 

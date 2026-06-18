@@ -1,6 +1,8 @@
 import type { FolderItem, OrderedNodeRef, StickyItem } from '../../../shared/models'
-import { DropMarker, FolderCard } from '../components/FolderCard'
+import { FolderCard } from '../components/FolderCard'
 import { NoteCard } from '../components/NoteCard'
+import { TreeDndContext } from '../components/TreeDndContext'
+import { TreeDropZone } from '../components/TreeDropZone'
 import { TodoCard } from '../components/TodoCard'
 import { buildFolderTree, type FolderTreeNode } from '../lib/folderTree'
 
@@ -17,6 +19,7 @@ export function StickyPanel({
   onCreateInFolder,
   onDetachFolder,
   onReorder
+  , onBeginDrag
 }: {
   items: StickyItem[]
   folders: FolderItem[]
@@ -31,8 +34,9 @@ export function StickyPanel({
     event: React.MouseEvent<HTMLElement>
   ): void
   onCreateInFolder(folder: FolderTreeNode): void
-  onDetachFolder(folder: FolderTreeNode): void
+  onDetachFolder(folder: FolderItem): void
   onReorder(parentFolderId: string | null, orderedNodes: OrderedNodeRef[]): void
+  onBeginDrag?(): void
 }): React.JSX.Element {
   const tree = buildFolderTree(folders, items)
 
@@ -46,19 +50,22 @@ export function StickyPanel({
     )
   }
 
-  const reorderAt = (dragged: OrderedNodeRef, index: number): void => {
-    const ordered = tree.entries
-      .map(({ kind, id }) => ({ kind, id }))
-      .filter((node) => node.kind !== dragged.kind || node.id !== dragged.id)
-    ordered.splice(Math.min(index, ordered.length), 0, dragged)
-    onReorder(null, ordered)
-  }
-
   return (
-    <main className="card-list">
-      {tree.entries.map((entry, index) => (
-        <div key={`${entry.kind}:${entry.id}`}>
-          <DropMarker onDrop={(dragged) => reorderAt(dragged, index)} />
+    <TreeDndContext
+      items={items}
+      folders={folders}
+      onReorder={onReorder}
+      onDetachItem={onDetach}
+      onDetachFolder={onDetachFolder}
+      onDragStart={onBeginDrag}
+    >
+      <main className="card-list">
+        {tree.entries.map((entry, index) => (
+          <div key={`${entry.kind}:${entry.id}`}>
+            <TreeDropZone
+              id={`drop:root:${index}`}
+              position={{ parentFolderId: null, index }}
+            />
           {entry.kind === 'item' && entry.item.type === 'note' ? (
             <NoteCard
               item={entry.item}
@@ -87,14 +94,15 @@ export function StickyPanel({
               onToggle={onToggleFolder}
               onContextMenu={onFolderContextMenu}
               onCreate={onCreateInFolder}
-              onDetachItem={onDetach}
-              onDetachFolder={onDetachFolder}
-              onReorder={onReorder}
             />
           ) : null}
-        </div>
-      ))}
-      <DropMarker onDrop={(dragged) => reorderAt(dragged, tree.entries.length)} />
-    </main>
+          </div>
+        ))}
+        <TreeDropZone
+          id="drop:root:end"
+          position={{ parentFolderId: null, index: Number.MAX_SAFE_INTEGER }}
+        />
+      </main>
+    </TreeDndContext>
   )
 }

@@ -56,17 +56,9 @@ function renderPanel(overrides: {
       onCreateInFolder={vi.fn()}
       onDetachFolder={overrides.onDetachFolder ?? vi.fn()}
       onReorder={vi.fn()}
+      onBeginDrag={vi.fn()}
     />
   )
-}
-
-function dragEndOutside(element: Element): void {
-  const event = new Event('dragend', { bubbles: true })
-  Object.defineProperties(event, {
-    clientX: { value: -1 },
-    clientY: { value: 100 }
-  })
-  fireEvent(element, event)
 }
 
 describe('StickyPanel folders', () => {
@@ -78,24 +70,13 @@ describe('StickyPanel folders', () => {
     expect(screen.queryByText('这段正文不应在文件夹中显示')).not.toBeInTheDocument()
   })
 
-  it('detaches a folder child item when its drag ends outside the panel', () => {
-    const onDetach = vi.fn()
-    renderPanel({ onDetach })
+  it('uses dedicated dnd-kit handles instead of native draggable rows', () => {
+    renderPanel()
 
-    dragEndOutside(screen.getByText('文件夹内笔记').closest('button')!)
-
-    expect(onDetach).toHaveBeenCalledWith(note)
-  })
-
-  it('detaches a folder when its title drag ends outside the panel', () => {
-    const onDetachFolder = vi.fn()
-    renderPanel({ onDetachFolder })
-
-    dragEndOutside(screen.getByText(/项目资料/).closest('.folder-title-bar')!)
-
-    expect(onDetachFolder).toHaveBeenCalledWith(
-      expect.objectContaining({ id: folder.id })
-    )
+    expect(screen.getByText('文件夹内笔记').closest('button')).not
+      .toHaveAttribute('draggable')
+    expect(screen.getByLabelText('拖动文件夹 项目资料')).toBeInTheDocument()
+    expect(screen.getByLabelText('拖动笔记 文件夹内笔记')).toBeInTheDocument()
   })
 
   it('opens the shared item context menu for a folder child', () => {

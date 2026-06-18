@@ -1,6 +1,10 @@
-import type { OrderedNodeRef, StickyItem } from '../../../shared/models'
-import type { FolderTreeEntry, FolderTreeNode } from '../lib/folderTree'
-import { endedOutsidePanel } from '../lib/dragBoundary'
+import { useDraggable, useDroppable } from '@dnd-kit/core'
+import { CSS } from '@dnd-kit/utilities'
+import type { StickyItem } from '../../../shared/models'
+import type { FolderTreeNode } from '../lib/folderTree'
+import { draggableId } from '../lib/treeDrag'
+import { TreeDragHandle } from './TreeDragHandle'
+import { TreeDropZone } from './TreeDropZone'
 
 export function FolderCard({
   node,
@@ -8,10 +12,7 @@ export function FolderCard({
   onItemContextMenu,
   onToggle,
   onContextMenu,
-  onCreate,
-  onDetachItem,
-  onDetachFolder,
-  onReorder
+  onCreate
 }: {
   node: FolderTreeNode
   onOpenItem(item: StickyItem): void
@@ -22,25 +23,44 @@ export function FolderCard({
   onToggle(node: FolderTreeNode): void
   onContextMenu(node: FolderTreeNode, event: React.MouseEvent<HTMLElement>): void
   onCreate(node: FolderTreeNode): void
-  onDetachItem(item: StickyItem): void
-  onDetachFolder(node: FolderTreeNode): void
-  onReorder(parentFolderId: string | null, orderedNodes: OrderedNodeRef[]): void
 }): React.JSX.Element {
+  const dragNode = { kind: 'folder' as const, id: node.id }
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDragRef,
+    transform,
+    isDragging
+  } = useDraggable({
+    id: draggableId(dragNode),
+    data: {
+      node: dragNode,
+      parentFolderId: node.parentFolderId,
+      label: node.title
+    }
+  })
+  const { setNodeRef: setDropRef, isOver } = useDroppable({
+    id: `inside-folder:${node.id}`,
+    data: {
+      position: {
+        parentFolderId: node.id,
+        index: Number.MAX_SAFE_INTEGER
+      }
+    }
+  })
+
   return (
     <section
-      className="folder-card"
-      onDragOver={(event) => {
-        event.preventDefault()
-        event.dataTransfer.dropEffect = 'move'
+      ref={(element) => {
+        setDragRef(element)
+        setDropRef(element)
       }}
-      onDrop={(event) => {
-        event.preventDefault()
-        event.stopPropagation()
-        const dragged = readDraggedNode(event.dataTransfer)
-        if (dragged && dragged.id !== node.id) {
-          onReorder(node.id, appendDragged(node.entries, dragged))
-        }
-      }}
+      className={[
+        'folder-card',
+        isDragging ? 'dragging' : '',
+        isOver ? 'drop-inside' : ''
+      ].filter(Boolean).join(' ')}
+      style={{ transform: CSS.Translate.toString(transform) }}
     >
       <div
         className="folder-title-bar"
@@ -48,25 +68,12 @@ export function FolderCard({
           event.preventDefault()
           onContextMenu(node, event)
         }}
-        draggable
-        onDragStart={(event) => {
-          event.stopPropagation()
-          event.dataTransfer.setData('text/sticky-folder', node.id)
-          event.dataTransfer.effectAllowed = 'move'
-        }}
-        onDragEnd={(event) => {
-          if (
-            endedOutsidePanel(
-              event.clientX,
-              event.clientY,
-              window.innerWidth,
-              window.innerHeight
-            )
-          ) {
-            onDetachFolder(node)
-          }
-        }}
       >
+        <TreeDragHandle
+          label={`拖动文件夹 ${node.title}`}
+          attributes={attributes}
+          listeners={listeners}
+        />
         <button
           className={`folder-toggle ${node.collapsed ? '' : 'expanded'}`}
           onClick={() => onToggle(node)}
@@ -89,18 +96,24 @@ export function FolderCard({
       </div>
       {!node.collapsed && (
         <div className="folder-contents">
+          <TreeDropZone
+            id={`parent-exit:${node.id}`}
+            position={{
+              parentFolderId: node.parentFolderId,
+              index: Number.MAX_SAFE_INTEGER
+            }}
+            parentExit
+          />
           {node.entries.map((entry, index) => (
             <div key={`${entry.kind}:${entry.id}`}>
-              <DropMarker
-                onDrop={(dragged) =>
-                  onReorder(node.id, insertDragged(node.entries, dragged, index))
-                }
+              <TreeDropZone
+                id={`drop:${node.id}:${index}`}
+                position={{ parentFolderId: node.id, index }}
               />
               {entry.kind === 'item' ? (
                 <FolderItemTitle
                   item={entry.item}
                   onOpen={onOpenItem}
-                  onDetach={onDetachItem}
                   onContextMenu={onItemContextMenu}
                 />
               ) : (
@@ -111,17 +124,16 @@ export function FolderCard({
                   onToggle={onToggle}
                   onContextMenu={onContextMenu}
                   onCreate={onCreate}
-                  onDetachItem={onDetachItem}
-                  onDetachFolder={onDetachFolder}
-                  onReorder={onReorder}
                 />
               )}
             </div>
           ))}
-          <DropMarker
-            onDrop={(dragged) =>
-              onReorder(node.id, appendDragged(node.entries, dragged))
-            }
+          <TreeDropZone
+            id={`drop:${node.id}:end`}
+            position={{
+              parentFolderId: node.id,
+              index: Number.MAX_SAFE_INTEGER
+            }}
           />
         </div>
       )}
@@ -132,92 +144,46 @@ export function FolderCard({
 function FolderItemTitle({
   item,
   onOpen,
-  onDetach,
   onContextMenu
 }: {
   item: StickyItem
   onOpen(item: StickyItem): void
-  onDetach(item: StickyItem): void
   onContextMenu(item: StickyItem, event: React.MouseEvent<HTMLElement>): void
 }): React.JSX.Element {
+  const node = { kind: 'item' as const, id: item.id }
+  const { attributes, listeners, setNodeRef, transform, isDragging } =
+    useDraggable({
+      id: draggableId(node),
+      data: {
+        node,
+        parentFolderId: item.parentFolderId,
+        label: item.title || '无标题'
+      }
+    })
+
   return (
-    <button
-      className="folder-item-title"
-      style={{ borderLeftColor: item.headerColor }}
-      onClick={() => onOpen(item)}
+    <div
+      ref={setNodeRef}
+      className={`folder-item-title ${isDragging ? 'dragging' : ''}`}
+      style={{
+        borderLeftColor: item.headerColor,
+        transform: CSS.Translate.toString(transform)
+      }}
       onContextMenu={(event) => {
         event.preventDefault()
         event.stopPropagation()
         onContextMenu(item, event)
       }}
-      draggable
-      onDragStart={(event) => {
-        event.dataTransfer.setData('text/sticky-item', item.id)
-        event.dataTransfer.effectAllowed = 'move'
-      }}
-      onDragEnd={(event) => {
-        if (
-          endedOutsidePanel(
-            event.clientX,
-            event.clientY,
-            window.innerWidth,
-            window.innerHeight
-          )
-        ) {
-          onDetach(item)
-        }
-      }}
     >
-      <span>{item.type === 'note' ? '笔记' : '待办'}</span>
-      <strong>{item.title || '无标题'}</strong>
-    </button>
+      <TreeDragHandle
+        label={`拖动${item.type === 'note' ? '笔记' : '待办'} ${item.title || '无标题'}`}
+        attributes={attributes}
+        listeners={listeners}
+      />
+      <button className="folder-item-open" onClick={() => onOpen(item)}>
+        <span>{item.type === 'note' ? '笔记' : '待办'}</span>
+        <strong>{item.title || '无标题'}</strong>
+      </button>
+    </div>
   )
-}
-
-export function DropMarker({
-  onDrop
-}: {
-  onDrop(node: OrderedNodeRef): void
-}): React.JSX.Element {
-  return (
-    <div
-      className="mixed-drop-marker"
-      onDragOver={(event) => {
-        event.preventDefault()
-        event.stopPropagation()
-      }}
-      onDrop={(event) => {
-        event.preventDefault()
-        event.stopPropagation()
-        const dragged = readDraggedNode(event.dataTransfer)
-        if (dragged) onDrop(dragged)
-      }}
-    />
-  )
-}
-
-function readDraggedNode(dataTransfer: DataTransfer): OrderedNodeRef | null {
-  const itemId = dataTransfer.getData('text/sticky-item')
-  if (itemId) return { kind: 'item', id: itemId }
-  const folderId = dataTransfer.getData('text/sticky-folder')
-  return folderId ? { kind: 'folder', id: folderId } : null
-}
-
-function insertDragged(
-  entries: FolderTreeEntry[],
-  dragged: OrderedNodeRef,
-  index: number
-): OrderedNodeRef[] {
-  const ordered = entries
-    .map(({ kind, id }) => ({ kind, id }))
-    .filter((entry) => entry.kind !== dragged.kind || entry.id !== dragged.id)
-  ordered.splice(Math.min(index, ordered.length), 0, dragged)
-  return ordered
-}
-
-function appendDragged(
-  entries: FolderTreeEntry[],
-  dragged: OrderedNodeRef
-): OrderedNodeRef[] {
-  return insertDragged(entries, dragged, entries.length)
 }
