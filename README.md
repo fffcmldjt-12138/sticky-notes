@@ -2,6 +2,13 @@
 
 一个面向 Windows 10/11 的轻量桌面便签工具，使用 Electron、React、TypeScript 和 Vite 开发。
 
+## 下载
+
+Windows 安装包发布在
+[GitHub Releases](https://github.com/fffcmldjt-12138/sticky-notes/releases)。
+安装包不提交进 Git 仓库；推送 `v*` 版本标签后，GitHub Actions 会自动测试、
+构建并上传 NSIS 安装包。
+
 ## 功能
 
 - 右侧贴边面板、自动隐藏、系统托盘和开机自启
