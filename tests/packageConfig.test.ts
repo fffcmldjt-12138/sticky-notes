@@ -7,4 +7,10 @@ describe('Windows installer configuration', () => {
 
     expect(packageJson.build.nsis.allowToChangeInstallationDirectory).toBe(false)
   })
+
+  it('builds release artifacts without electron-builder publishing them', async () => {
+    const workflow = await readFile('.github/workflows/release.yml', 'utf8')
+
+    expect(workflow).toContain('npm run dist -- --publish never')
+  })
 })
