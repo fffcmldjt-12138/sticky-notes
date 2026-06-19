@@ -175,10 +175,14 @@
 .body-dark .task-content-input { background: rgba(255,255,255,.08); }
 .task-setting-buttons {
   grid-column: 3 / 5;
+  min-width: 0;
+  width: 100%;
   display: flex;
   align-items: center;
   gap: 7px;
+  flex-wrap: wrap;
 }
+.task-setting-buttons > * { max-width: 100%; }
 .task-quadrant-picker {
   min-width: 92px;
   min-height: 28px;
@@ -189,7 +193,12 @@
   color: inherit;
   font-size: 11px;
 }
-.task-setting-anchor { position: relative; }
+.task-setting-anchor { position: relative; min-width: 0; max-width: 100%; }
+.task-setting-anchor .task-setting-button {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .task-setting-button {
   min-height: 28px;
   padding: 5px 10px;
@@ -359,6 +368,10 @@
 }
 .todo-subtask-row > .task-delete-button {
   grid-column: 3;
+  grid-row: 1;
+}
+.todo-subtask-row > .task-content-input {
+  grid-column: 2;
   grid-row: 1;
 }
 .todo-subtask-row > input[type="checkbox"] {
