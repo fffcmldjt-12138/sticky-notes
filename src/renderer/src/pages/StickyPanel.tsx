@@ -20,6 +20,7 @@ export function StickyPanel({
   onDetachFolder,
   onReorder
   , onBeginDrag
+  , onDragStateChange
 }: {
   items: StickyItem[]
   folders: FolderItem[]
@@ -37,6 +38,7 @@ export function StickyPanel({
   onDetachFolder(folder: FolderItem): void
   onReorder(parentFolderId: string | null, orderedNodes: OrderedNodeRef[]): void
   onBeginDrag?(): void
+  onDragStateChange?(active: boolean): void
 }): React.JSX.Element {
   const tree = buildFolderTree(folders, items)
 
@@ -58,6 +60,7 @@ export function StickyPanel({
       onDetachItem={onDetach}
       onDetachFolder={onDetachFolder}
       onDragStart={onBeginDrag}
+      onDragStateChange={onDragStateChange}
     >
       <main className="card-list">
         {tree.entries.map((entry, index) => (

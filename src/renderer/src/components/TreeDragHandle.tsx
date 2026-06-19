@@ -6,17 +6,21 @@ import type {
 export function TreeDragHandle({
   label,
   attributes,
-  listeners
+  listeners,
+  decorative = false
 }: {
   label: string
-  attributes: DraggableAttributes
-  listeners: DraggableSyntheticListeners
+  attributes?: DraggableAttributes
+  listeners?: DraggableSyntheticListeners
+  decorative?: boolean
 }): React.JSX.Element {
   return (
     <button
       type="button"
       className="tree-drag-handle"
       aria-label={label}
+      tabIndex={decorative ? -1 : undefined}
+      aria-hidden={decorative || undefined}
       {...attributes}
       {...listeners}
     >

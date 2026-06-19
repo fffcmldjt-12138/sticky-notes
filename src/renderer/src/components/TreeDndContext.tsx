@@ -22,11 +22,10 @@ import {
   pointOutsideViewport,
   type TreeDropPosition
 } from '../lib/treeDrag'
-
-interface ActiveTreeDrag {
-  node: OrderedNodeRef
-  label: string
-}
+import {
+  TreeDragOverlay,
+  type ActiveTreeDrag
+} from './TreeDragOverlay'
 
 export function TreeDndContext({
   items,
@@ -35,6 +34,7 @@ export function TreeDndContext({
   onDetachItem,
   onDetachFolder,
   onDragStart,
+  onDragStateChange,
   children
 }: React.PropsWithChildren<{
   items: StickyItem[]
@@ -43,6 +43,7 @@ export function TreeDndContext({
   onDetachItem(item: StickyItem): void
   onDetachFolder(folder: FolderItem): void
   onDragStart?(): void
+  onDragStateChange?(active: boolean): void
 }>): React.JSX.Element {
   const [active, setActive] = useState<ActiveTreeDrag | null>(null)
   const sensors = useSensors(
@@ -63,11 +64,13 @@ export function TreeDndContext({
     if (!data) return
     setActive(data)
     onDragStart?.()
+    onDragStateChange?.(true)
   }
 
   function handleEnd(event: DragEndEvent): void {
     const data = event.active.data.current as ActiveTreeDrag | undefined
     setActive(null)
+    onDragStateChange?.(false)
     if (!data) return
 
     const activator = event.activatorEvent
@@ -120,12 +123,15 @@ export function TreeDndContext({
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragStart={handleStart}
-      onDragCancel={() => setActive(null)}
+      onDragCancel={() => {
+        setActive(null)
+        onDragStateChange?.(false)
+      }}
       onDragEnd={handleEnd}
     >
       {children}
-      <DragOverlay>
-        {active ? <div className="tree-drag-overlay">{active.label}</div> : null}
+      <DragOverlay dropAnimation={null}>
+        {active ? <TreeDragOverlay active={active} /> : null}
       </DragOverlay>
     </DndContext>
   )

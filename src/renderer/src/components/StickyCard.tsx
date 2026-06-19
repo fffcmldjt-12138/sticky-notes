@@ -24,9 +24,10 @@ export function StickyCard({
     useDraggable({
       id: draggableId(node),
       data: {
+        kind: 'item',
         node,
         parentFolderId: item.parentFolderId,
-        label: item.title || '无标题'
+        item
       }
     })
 
@@ -43,11 +44,12 @@ export function StickyCard({
       <div
         className="sticky-card-header"
         style={{ backgroundColor: item.headerColor }}
+        {...attributes}
+        {...listeners}
       >
         <TreeDragHandle
           label={`拖动${item.type === 'note' ? '笔记' : '待办'} ${item.title || '无标题'}`}
-          attributes={attributes}
-          listeners={listeners}
+          decorative
         />
         <button className="sticky-card-open" onClick={onOpen}>
           <span className="type-badge">{item.type === 'note' ? '笔记' : '待办'}</span>

@@ -216,19 +216,51 @@
   cursor: grab;
   touch-action: none;
 }
+.sticky-card-header > .tree-drag-handle,
+.folder-title-bar > .tree-drag-handle {
+  pointer-events: none;
+}
 .tree-drag-handle:active { cursor: grabbing; }
 .tree-drag-overlay {
-  max-width: 260px;
-  padding: 10px 14px;
+  width: min(310px, calc(100vw - 24px));
   overflow: hidden;
   border: 1px solid #cfd8e6;
-  border-radius: 10px;
+  border-radius: 14px;
   background: white;
   color: #303744;
   box-shadow: 0 14px 36px rgba(24,31,43,.24);
-  font-weight: 700;
+  cursor: grabbing;
+  opacity: .94;
+}
+.tree-drag-overlay.folder-preview {
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  background: #f4f6f9;
+}
+.tree-drag-preview-header {
+  min-height: 52px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--drag-header-color);
+}
+.tree-drag-preview-header strong {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.tree-drag-preview-body {
+  padding: 12px;
+  color: #737d8b;
+  font-size: 12px;
+}
+.tree-drag-grip {
+  color: #697381;
+  font-size: 16px;
 }
 
 .settings-panel { height: 100%; }

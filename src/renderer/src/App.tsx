@@ -46,6 +46,7 @@ function PanelApp(): React.JSX.Element {
   const [pendingFolderRename, setPendingFolderRename] =
     useState<FolderItem | null>(null)
   const [activeTag, setActiveTag] = useState<string | null>(null)
+  const [treeDragActive, setTreeDragActive] = useState(false)
   const [contextMenu, setContextMenu] = useState<{
     item: StickyItem
     x: number
@@ -125,6 +126,7 @@ function PanelApp(): React.JSX.Element {
     pendingFolderRename ||
     contextMenu ||
     folderContextMenu
+    || treeDragActive
   )
   useEffect(() => {
     window.stickyApi.window.suspendAutoHide(suspendAutoHide)
@@ -380,6 +382,7 @@ function PanelApp(): React.JSX.Element {
               setFolderContextMenu(null)
               setCreateOpen(false)
             }}
+            onDragStateChange={setTreeDragActive}
           />
         </>
       )}

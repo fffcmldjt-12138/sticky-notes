@@ -3,6 +3,7 @@ import { BrowserWindow, screen } from 'electron'
 import { is } from '@electron-toolkit/utils'
 import { getCollapsedBounds, getExpandedBounds } from './windowGeometry'
 import { WindowLifecycle } from './WindowLifecycle'
+import { PanelVisibilityState } from './PanelVisibilityState'
 
 const PANEL_WIDTH = 360
 const HOT_EDGE_WIDTH = 8
@@ -12,6 +13,7 @@ export class WindowService {
   private window: BrowserWindow | null = null
   private collapseTimer: NodeJS.Timeout | null = null
   private autoHideSuspended = false
+  private readonly visibility = new PanelVisibilityState(Date.now())
   private readonly lifecycle = new WindowLifecycle()
 
   create(): BrowserWindow {
@@ -65,23 +67,26 @@ export class WindowService {
 
   expand(): void {
     const window = this.window
-    if (!window) return
+    if (!window || !this.visibility.requestExpand(Date.now())) return
     const workArea = screen.getDisplayMatching(window.getBounds()).workArea
-    window.setBounds(getExpandedBounds(workArea, PANEL_WIDTH), true)
+    window.setBounds(getExpandedBounds(workArea, PANEL_WIDTH), false)
   }
 
   scheduleCollapse(): void {
     this.cancelCollapse()
     if (this.autoHideSuspended) return
+    const delay = this.visibility.collapseDelay(Date.now(), COLLAPSE_DELAY)
+    if (delay === null) return
     this.collapseTimer = setTimeout(() => {
       const window = this.window
       if (!window || this.autoHideSuspended) return
+      if (!this.visibility.markCollapsed()) return
       const workArea = screen.getDisplayMatching(window.getBounds()).workArea
       window.setBounds(
         getCollapsedBounds(workArea, PANEL_WIDTH, HOT_EDGE_WIDTH),
-        true
+        false
       )
-    }, COLLAPSE_DELAY)
+    }, delay)
   }
 
   cancelCollapse(): void {
@@ -91,6 +96,7 @@ export class WindowService {
 
   suspendAutoHide(suspended: boolean): void {
     this.autoHideSuspended = suspended
+    this.visibility.setSuspended(suspended)
     if (suspended) this.cancelCollapse()
   }
 

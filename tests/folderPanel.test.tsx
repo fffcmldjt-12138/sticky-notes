@@ -41,6 +41,7 @@ function renderPanel(overrides: {
   onDetach?: ReturnType<typeof vi.fn>
   onDetachFolder?: ReturnType<typeof vi.fn>
   onContextMenu?: ReturnType<typeof vi.fn>
+  onDragStateChange?: ReturnType<typeof vi.fn>
 } = {}): ReturnType<typeof render> {
   return render(
     <StickyPanel
@@ -57,6 +58,7 @@ function renderPanel(overrides: {
       onDetachFolder={overrides.onDetachFolder ?? vi.fn()}
       onReorder={vi.fn()}
       onBeginDrag={vi.fn()}
+      onDragStateChange={overrides.onDragStateChange ?? vi.fn()}
     />
   )
 }
@@ -77,6 +79,24 @@ describe('StickyPanel folders', () => {
       .toHaveAttribute('draggable')
     expect(screen.getByLabelText('拖动文件夹 项目资料')).toBeInTheDocument()
     expect(screen.getByLabelText('拖动笔记 文件夹内笔记')).toBeInTheDocument()
+  })
+
+  it('uses the full folder title bar as the dnd-kit activator', () => {
+    renderPanel()
+
+    const titleBar = screen.getByText(/项目资料/).closest('.folder-title-bar')
+    expect(titleBar).toHaveAttribute('role', 'button')
+    expect(titleBar).toHaveAttribute('tabindex', '0')
+  })
+
+  it('reports active drag state from the folder title bar', () => {
+    const onDragStateChange = vi.fn()
+    renderPanel({ onDragStateChange })
+    const titleBar = screen.getByText(/项目资料/).closest('.folder-title-bar')!
+
+    fireEvent.keyDown(titleBar, { code: 'Space', key: ' ' })
+
+    expect(onDragStateChange).toHaveBeenCalledWith(true)
   })
 
   it('opens the shared item context menu for a folder child', () => {

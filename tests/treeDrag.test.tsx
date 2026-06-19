@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { OrderedNodeRef } from '../src/shared/models'
+import type { NoteItem } from '../src/shared/models'
+import { render, screen } from '@testing-library/react'
+import { TreeDragOverlay } from '../src/renderer/src/components/TreeDragOverlay'
 import {
   resolveTreeDragOutcome,
   pointOutsideViewport,
@@ -70,4 +73,37 @@ describe('resolveTreeDrop', () => {
     expect(resolveTreeDragOutcome(false, true)).toBe('drop')
     expect(resolveTreeDragOutcome(false, false)).toBe('cancel')
   })
+
+  it('renders a visual card overlay with type title and header color', () => {
+    const item: NoteItem = {
+      id: 'note_1',
+      type: 'note',
+      title: '视觉预览',
+      contentMarkdown: '',
+      headerColor: '#f2c94c',
+      bodyTheme: 'light',
+      pinned: false,
+      detached: false,
+      windowBounds: null,
+      parentFolderId: null,
+      tags: [],
+      order: 0,
+      deletedAt: null,
+      syncedToSiyuan: false,
+      createdAt: '',
+      updatedAt: ''
+    }
+    render(
+      <TreeDragOverlay
+        active={{ kind: 'item', node: { kind: 'item', id: item.id }, item }}
+      />
+    )
+
+    expect(screen.getByText('笔记')).toBeInTheDocument()
+    expect(screen.getByText('视觉预览')).toBeInTheDocument()
+    expect(screen.getByTestId('tree-drag-overlay')).toHaveStyle({
+      '--drag-header-color': '#f2c94c'
+    })
+  })
 })
+// @vitest-environment jsdom

@@ -33,10 +33,11 @@ export function FolderCard({
     isDragging
   } = useDraggable({
     id: draggableId(dragNode),
-    data: {
-      node: dragNode,
-      parentFolderId: node.parentFolderId,
-      label: node.title
+      data: {
+        kind: 'folder',
+        node: dragNode,
+        parentFolderId: node.parentFolderId,
+        folder: node
     }
   })
   const { setNodeRef: setDropRef, isOver } = useDroppable({
@@ -64,6 +65,8 @@ export function FolderCard({
     >
       <div
         className="folder-title-bar"
+        {...attributes}
+        {...listeners}
         onContextMenu={(event) => {
           event.preventDefault()
           onContextMenu(node, event)
@@ -71,12 +74,12 @@ export function FolderCard({
       >
         <TreeDragHandle
           label={`拖动文件夹 ${node.title}`}
-          attributes={attributes}
-          listeners={listeners}
+          decorative
         />
         <button
           className={`folder-toggle ${node.collapsed ? '' : 'expanded'}`}
           onClick={() => onToggle(node)}
+          onPointerDown={(event) => event.stopPropagation()}
           aria-label={node.collapsed ? '展开文件夹' : '收起文件夹'}
         >
           ›
@@ -90,6 +93,7 @@ export function FolderCard({
             event.stopPropagation()
             onCreate(node)
           }}
+          onPointerDown={(event) => event.stopPropagation()}
         >
           ＋
         </button>
@@ -155,9 +159,10 @@ function FolderItemTitle({
     useDraggable({
       id: draggableId(node),
       data: {
+        kind: 'item',
         node,
         parentFolderId: item.parentFolderId,
-        label: item.title || '无标题'
+        item
       }
     })
 
