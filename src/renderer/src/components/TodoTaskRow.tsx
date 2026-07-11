@@ -21,7 +21,8 @@ export function TodoTaskRow({
   onDelete,
   onAddSubtask,
   onUpdateSubtask,
-  onDeleteSubtask
+  onDeleteSubtask,
+  inputRef
 }: {
   task: TodoTask
   bodyTheme: BodyTheme
@@ -30,6 +31,7 @@ export function TodoTaskRow({
   onAddSubtask(): void
   onUpdateSubtask(subtaskId: string, patch: TodoSubtaskPatch): void
   onDeleteSubtask(subtaskId: string): void
+  inputRef?: (element: HTMLInputElement | null) => void
 }): React.JSX.Element {
   const [scheduleOpen, setScheduleOpen] = useState(false)
   const scheduleButtonRef = useRef<HTMLButtonElement>(null)
@@ -70,6 +72,7 @@ export function TodoTaskRow({
         onChange={(event) => onUpdate({ completed: event.target.checked })}
       />
       <TodoTaskInput
+        ref={inputRef}
         value={task.contentMarkdown}
         onCommit={(contentMarkdown) => onUpdate({ contentMarkdown })}
       />

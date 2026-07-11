@@ -40,12 +40,14 @@ function createService(window = fakeWindow()) {
     )
   }
   const factory = { create: vi.fn().mockReturnValue(window) }
+  const onChanged = vi.fn()
   const service = new FolderWindowService(
     store,
     factory,
-    () => [{ x: 0, y: 0, width: 1920, height: 1040 }]
+    () => [{ x: 0, y: 0, width: 1920, height: 1040 }],
+    onChanged
   )
-  return { service, store, factory, window }
+  return { service, store, factory, window, onChanged }
 }
 
 afterEach(() => vi.useRealTimers())
@@ -125,6 +127,40 @@ describe('FolderWindowService', () => {
     expect(factory.create).toHaveBeenCalledWith(
       expect.objectContaining({ id: folder.id }),
       { x: 1540, y: 520, width: 380, height: 520 }
+    )
+  })
+
+  it('places a dragged-out folder near the drop point', async () => {
+    const { service, store, factory } = createService()
+
+    await service.detach(
+      { ...folder, windowBounds: { x: 10, y: 10, width: 380, height: 520 } },
+      { x: 900, y: 520 }
+    )
+
+    expect(factory.create).toHaveBeenCalledWith(
+      expect.objectContaining({ id: folder.id }),
+      { x: 860, y: 480, width: 380, height: 520 }
+    )
+    expect(store.updateFolder).toHaveBeenCalledWith(folder.id, {
+      detached: true,
+      windowBounds: { x: 860, y: 480, width: 380, height: 520 }
+    })
+  })
+
+  it('publishes detached and attached folder state changes', async () => {
+    const { service, window, onChanged } = createService()
+
+    await service.detach(folder)
+    expect(onChanged).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: folder.id, detached: true })
+    )
+
+    window.emit('close')
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(onChanged).toHaveBeenLastCalledWith(
+      expect.objectContaining({ id: folder.id, detached: false })
     )
   })
 })

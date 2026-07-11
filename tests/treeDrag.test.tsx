@@ -3,6 +3,7 @@ import type { OrderedNodeRef } from '../src/shared/models'
 import type { NoteItem } from '../src/shared/models'
 import { render, screen } from '@testing-library/react'
 import { TreeDragOverlay } from '../src/renderer/src/components/TreeDragOverlay'
+import { toDragPreviewPayload } from '../src/renderer/src/components/TreeDndContext'
 import {
   resolveTreeDragOutcome,
   pointOutsideViewport,
@@ -103,6 +104,39 @@ describe('resolveTreeDrop', () => {
     expect(screen.getByText('视觉预览')).toBeInTheDocument()
     expect(screen.getByTestId('tree-drag-overlay')).toHaveStyle({
       '--drag-header-color': '#f2c94c'
+    })
+  })
+
+  it('builds a native drag preview payload for dragged items', () => {
+    const item: NoteItem = {
+      id: 'note_1',
+      type: 'note',
+      title: '视觉预览',
+      contentMarkdown: '',
+      headerColor: '#f2c94c',
+      bodyTheme: 'light',
+      pinned: false,
+      detached: false,
+      windowBounds: null,
+      parentFolderId: null,
+      tags: [],
+      order: 0,
+      deletedAt: null,
+      syncedToSiyuan: false,
+      createdAt: '',
+      updatedAt: ''
+    }
+
+    expect(toDragPreviewPayload({
+      kind: 'item',
+      node: { kind: 'item', id: item.id },
+      item
+    })).toEqual({
+      kind: 'item',
+      itemType: 'note',
+      title: '视觉预览',
+      headerColor: '#f2c94c',
+      bodyTheme: 'light'
     })
   })
 })

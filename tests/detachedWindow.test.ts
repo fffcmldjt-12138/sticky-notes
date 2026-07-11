@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { NoteItem, WindowBounds } from '../src/shared/models'
 import {
   DetachedWindowService,
+  windowBoundsFromDropPoint,
   ensureVisibleBounds,
   type DetachedWindowHandle
 } from '../src/main/services/DetachedWindowService'
@@ -88,6 +89,40 @@ describe('DetachedWindowService', () => {
     )
 
     expect(result).toEqual({ x: 1600, y: 620, width: 320, height: 420 })
+  })
+
+  it('places a dragged-out note near the drop point', async () => {
+    const window = fakeWindow()
+    const factory = { create: vi.fn().mockReturnValue(window) }
+    const store = { update: vi.fn().mockResolvedValue(item) }
+    const service = new DetachedWindowService(
+      store,
+      factory,
+      () => [{ x: 0, y: 0, width: 1920, height: 1040 }]
+    )
+
+    await service.detach(
+      { ...item, windowBounds: { x: 20, y: 20, width: 340, height: 440 } },
+      { x: 900, y: 520 }
+    )
+
+    expect(factory.create).toHaveBeenCalledWith(
+      expect.objectContaining({ id: item.id }),
+      { x: 860, y: 480, width: 340, height: 440 }
+    )
+    expect(store.update).toHaveBeenCalledWith(item.id, {
+      detached: true,
+      windowBounds: { x: 860, y: 480, width: 340, height: 440 }
+    })
+  })
+
+  it('clamps dragged-out bounds when the drop point is near the display edge', () => {
+    expect(windowBoundsFromDropPoint(
+      { x: 1900, y: 1020 },
+      340,
+      440,
+      [{ x: 0, y: 0, width: 1920, height: 1040 }]
+    )).toEqual({ x: 1580, y: 600, width: 340, height: 440 })
   })
 
   it('preserves detached state when application shutdown closes windows', async () => {

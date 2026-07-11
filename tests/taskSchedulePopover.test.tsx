@@ -29,7 +29,7 @@ describe('TaskSchedulePopover', () => {
     fireEvent.change(screen.getByLabelText('重复'), {
       target: { value: 'weekdays' }
     })
-    fireEvent.click(screen.getByRole('button', { name: '保存时间设置' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
 
     expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
       mode: 'range',
@@ -60,9 +60,38 @@ describe('TaskSchedulePopover', () => {
     fireEvent.change(screen.getByLabelText('结束时间'), {
       target: { value: '2026-06-20T09:00' }
     })
-    fireEvent.click(screen.getByRole('button', { name: '保存时间设置' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
 
     expect(screen.getByText('结束时间必须晚于开始时间')).toBeInTheDocument()
     expect(onSave).not.toHaveBeenCalled()
+  })
+
+  it('adds a custom advance reminder as a selectable rule', () => {
+    const onSave = vi.fn()
+    render(
+      <TaskSchedulePopover
+        value={null}
+        anchor={document.body}
+        bodyTheme="light"
+        onSave={onSave}
+        onClose={vi.fn()}
+      />
+    )
+
+    fireEvent.change(screen.getByLabelText('开始时间'), {
+      target: { value: '2026-06-20T09:00' }
+    })
+    fireEvent.change(screen.getByLabelText('自定义提前数值'), {
+      target: { value: '2' }
+    })
+    fireEvent.change(screen.getByLabelText('自定义提前单位'), {
+      target: { value: 'days' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: '添加提前提醒' }))
+    fireEvent.click(screen.getByRole('button', { name: '保存' }))
+
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      reminders: [expect.objectContaining({ offsetMinutes: 2880 })]
+    }))
   })
 })

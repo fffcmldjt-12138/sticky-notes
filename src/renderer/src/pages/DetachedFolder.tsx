@@ -7,6 +7,7 @@ import type {
   StickyItemPatch,
   TodoTaskPatch
 } from '../../../shared/models'
+import type { DetachWindowOptions } from '../../../shared/electronApi'
 import { CardContextMenu, type CardAction } from '../components/CardContextMenu'
 import { CreateMenu } from '../components/CreateMenu'
 import { FolderContextMenu } from '../components/FolderContextMenu'
@@ -248,11 +249,11 @@ export function DetachedFolder({
       onReorder={(parentId, orderedNodes) =>
         void reorder(parentId, orderedNodes)
       }
-      onDetachItem={(item) =>
-        void window.stickyApi.window.detach(item.id)
+      onDetachItem={(item, options?: DetachWindowOptions) =>
+        void window.stickyApi.window.detach(item.id, options)
       }
-      onDetachFolder={(folder) =>
-        void window.stickyApi.window.detachFolder(folder.id)
+      onDetachFolder={(folder, options?: DetachWindowOptions) =>
+        void window.stickyApi.window.detachFolder(folder.id, options)
       }
     >
       <section className="detached-folder-shell">

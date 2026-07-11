@@ -173,7 +173,7 @@ export function TaskSchedulePopover({
             <option value="hours">小时</option>
             <option value="days">天</option>
           </select>
-          <button type="button" onClick={addCustomReminder}>添加</button>
+          <button type="button" onClick={addCustomReminder}>添加提前提醒</button>
         </div>
       </section>
       <section className="schedule-section">
@@ -208,7 +208,7 @@ export function TaskSchedulePopover({
           className="primary-button"
           onClick={save}
         >
-          保存时间设置
+          保存
         </button>
       </div>
     </AnchoredPopover>

@@ -1,16 +1,16 @@
-import { useEffect, useRef, useState } from 'react'
+import { forwardRef, useEffect, useRef, useState } from 'react'
 
 const SAVE_DELAY = 300
 
-export function TodoTaskInput({
-  value,
-  onCommit,
-  ariaLabel = '任务内容'
-}: {
+export const TodoTaskInput = forwardRef<HTMLInputElement, {
   value: string
   onCommit(value: string): void
   ariaLabel?: string
-}): React.JSX.Element {
+}>(function TodoTaskInput({
+  value,
+  onCommit,
+  ariaLabel = '任务内容'
+}, ref): React.JSX.Element {
   const [draft, setDraft] = useState(value)
   const composingRef = useRef(false)
   const dirtyRef = useRef(false)
@@ -77,6 +77,7 @@ export function TodoTaskInput({
 
   return (
     <input
+      ref={ref}
       className="task-content-input"
       aria-label={ariaLabel}
       type="text"
@@ -116,4 +117,4 @@ export function TodoTaskInput({
       }}
     />
   )
-}
+})

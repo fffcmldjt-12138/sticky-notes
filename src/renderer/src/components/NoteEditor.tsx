@@ -72,7 +72,7 @@ export function NoteEditor({
   }
 
   return (
-    <section className={`editor body-${draft.bodyTheme}`}>
+    <section className={`editor body-${draft.bodyTheme} ${detached ? 'detached-editor' : ''}`}>
       <div
         className={`editor-header ${detached ? 'detached-header' : ''}`}
         style={{ backgroundColor: draft.headerColor }}
@@ -85,30 +85,35 @@ export function NoteEditor({
           ? <button className="icon-button" onClick={saveAndBack} aria-label="关闭">×</button>
           : <button className="icon-button danger" onClick={onDelete} aria-label="删除">×</button>}
       </div>
-      <div className="editor-toolbar editor-identity-toolbar">
-        <HeaderColorPicker
-          compact
-          value={draft.headerColor}
-          onChange={(headerColor) => setDraft({ ...draft, headerColor })}
-        />
-        <input
-          className="editor-title-input"
-          aria-label="标题"
-          value={draft.title}
-          onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-        />
-        <BodyThemeToggle value={draft.bodyTheme} onChange={(bodyTheme) => setDraft({ ...draft, bodyTheme })} />
-      </div>
-      <TagEditor
-        value={draft.tags}
-        contentTags={extractTags(draft.contentMarkdown)}
-        onChange={(tags) => setDraft({ ...draft, tags })}
-      />
+      {!detached && (
+        <>
+          <div className="editor-toolbar editor-identity-toolbar">
+            <HeaderColorPicker
+              compact
+              value={draft.headerColor}
+              onChange={(headerColor) => setDraft({ ...draft, headerColor })}
+            />
+            <input
+              className="editor-title-input"
+              aria-label="标题"
+              value={draft.title}
+              onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+            />
+            <BodyThemeToggle value={draft.bodyTheme} onChange={(bodyTheme) => setDraft({ ...draft, bodyTheme })} />
+          </div>
+          <TagEditor
+            value={draft.tags}
+            contentTags={extractTags(draft.contentMarkdown)}
+            onChange={(tags) => setDraft({ ...draft, tags })}
+          />
+        </>
+      )}
       <MarkdownEditor
         value={draft.contentMarkdown}
         onChange={(contentMarkdown) => setDraft({ ...draft, contentMarkdown })}
+        compact={detached}
       />
-      <span className="save-status">自动保存</span>
+      {!detached && <span className="save-status">自动保存</span>}
     </section>
   )
 }

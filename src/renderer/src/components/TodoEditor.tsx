@@ -62,12 +62,30 @@ export function TodoEditor({
   const [draft, setDraft] = useState(item)
   const onSaveRef = useRef(onSave)
   const lastSubmittedRef = useRef<StickyItemPatch | null>(null)
+  const taskInputRefs = useRef(new Map<string, HTMLInputElement>())
+  const previousTaskIdsRef = useRef(item.tasks.map((task) => task.id))
+  const pendingFocusTaskIdRef = useRef<string | null>(null)
+  const requestedInitialTaskRef = useRef(false)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
   useEffect(() => {
+    if (!item.tasks.length && !requestedInitialTaskRef.current) {
+      requestedInitialTaskRef.current = true
+      onAddTask()
+    }
+  }, [item.tasks.length, onAddTask])
+  useEffect(() => {
+    const previousTaskIds = previousTaskIdsRef.current
+    const nextTaskIds = item.tasks.map((task) => task.id)
+    const addedTaskId = nextTaskIds.find((id) => !previousTaskIds.includes(id))
+    previousTaskIdsRef.current = nextTaskIds
+    if (addedTaskId) {
+      pendingFocusTaskIdRef.current = addedTaskId
+    }
+
     const submitted = lastSubmittedRef.current
     if (
       submitted &&
@@ -79,9 +97,32 @@ export function TodoEditor({
       setDraft((current) => ({ ...current, tasks: item.tasks }))
       return
     }
-    if (document.activeElement?.closest('.editor')) return
+    if (document.activeElement?.closest('.editor')) {
+      if (
+        addedTaskId ||
+        JSON.stringify(draft.tasks.map((task) => task.id)) !==
+          JSON.stringify(nextTaskIds)
+      ) {
+        setDraft((current) => ({ ...current, tasks: item.tasks }))
+      }
+      return
+    }
     setDraft(item)
-  }, [item])
+  }, [draft.tasks, item])
+  useEffect(() => {
+    const taskId = pendingFocusTaskIdRef.current
+    const firstEmptyTaskId =
+      taskId ??
+      draft.tasks.find((task) => !task.contentMarkdown.trim())?.id ??
+      null
+    if (!firstEmptyTaskId) return
+    const input = taskId
+      ? taskInputRefs.current.get(taskId)
+      : taskInputRefs.current.get(firstEmptyTaskId)
+    if (!input) return
+    input.focus()
+    pendingFocusTaskIdRef.current = null
+  }, [draft.tasks])
   useEffect(() => {
     onSaveRef.current = onSave
   }, [onSave])
@@ -121,7 +162,7 @@ export function TodoEditor({
   }
 
   return (
-    <section className={`editor body-${draft.bodyTheme}`}>
+    <section className={`editor body-${draft.bodyTheme} ${detached ? 'detached-editor' : ''}`}>
       <div
         className={`editor-header ${detached ? 'detached-header' : ''}`}
         style={{ backgroundColor: draft.headerColor }}
@@ -134,28 +175,32 @@ export function TodoEditor({
           ? <button className="icon-button" onClick={saveAndBack} aria-label="关闭">×</button>
           : <button className="icon-button danger" onClick={onDelete} aria-label="删除">×</button>}
       </div>
-      <div className="editor-toolbar editor-identity-toolbar">
-        <HeaderColorPicker
-          compact
-          value={draft.headerColor}
-          onChange={(headerColor) => setDraft({ ...draft, headerColor })}
-        />
-        <input
-          className="editor-title-input"
-          aria-label="标题"
-          value={draft.title}
-          onChange={(event) => setDraft({ ...draft, title: event.target.value })}
-        />
-        <BodyThemeToggle
-          value={draft.bodyTheme}
-          onChange={(bodyTheme) => setDraft({ ...draft, bodyTheme })}
-        />
-      </div>
-      <TagEditor
-        value={draft.tags}
-        contentTags={draft.tasks.flatMap((task) => extractTags(task.contentMarkdown))}
-        onChange={(tags) => setDraft({ ...draft, tags })}
-      />
+      {!detached && (
+        <>
+          <div className="editor-toolbar editor-identity-toolbar">
+            <HeaderColorPicker
+              compact
+              value={draft.headerColor}
+              onChange={(headerColor) => setDraft({ ...draft, headerColor })}
+            />
+            <input
+              className="editor-title-input"
+              aria-label="标题"
+              value={draft.title}
+              onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+            />
+            <BodyThemeToggle
+              value={draft.bodyTheme}
+              onChange={(bodyTheme) => setDraft({ ...draft, bodyTheme })}
+            />
+          </div>
+          <TagEditor
+            value={draft.tags}
+            contentTags={draft.tasks.flatMap((task) => extractTags(task.contentMarkdown))}
+            onChange={(tags) => setDraft({ ...draft, tags })}
+          />
+        </>
+      )}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -180,6 +225,13 @@ export function TodoEditor({
                 onDeleteSubtask={(subtaskId) =>
                   onDeleteSubtask(task.id, subtaskId)
                 }
+                inputRef={(element) => {
+                  if (element) {
+                    taskInputRefs.current.set(task.id, element)
+                  } else {
+                    taskInputRefs.current.delete(task.id)
+                  }
+                }}
               />
             ))}
             <button className="primary-button add-task-button" onClick={onAddTask}>
@@ -188,7 +240,7 @@ export function TodoEditor({
           </div>
         </SortableContext>
       </DndContext>
-      <span className="save-status">自动保存</span>
+      {!detached && <span className="save-status">自动保存</span>}
     </section>
   )
 }

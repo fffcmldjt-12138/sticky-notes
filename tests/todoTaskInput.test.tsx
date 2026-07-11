@@ -64,4 +64,21 @@ describe('TodoTaskInput', () => {
     expect(onCommit).toHaveBeenCalledOnce()
     expect(onCommit).toHaveBeenCalledWith('blurred')
   })
+
+  it('keeps accepting edits while a previous save acknowledgement is pending', async () => {
+    vi.useFakeTimers()
+    const onCommit = vi.fn()
+    render(<TodoTaskInput value="" onCommit={onCommit} />)
+    const input = screen.getByRole('textbox')
+
+    fireEvent.change(input, { target: { value: 'first' } })
+    await vi.advanceTimersByTimeAsync(300)
+    expect(onCommit).toHaveBeenCalledWith('first')
+
+    fireEvent.change(input, { target: { value: 'first plus' } })
+    expect(input).toHaveValue('first plus')
+
+    await vi.advanceTimersByTimeAsync(300)
+    expect(onCommit).toHaveBeenLastCalledWith('first plus')
+  })
 })

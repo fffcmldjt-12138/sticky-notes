@@ -13,6 +13,11 @@ export interface DetachedWindowHandle {
   on(event: 'close' | 'move' | 'resize', listener: () => void): void
 }
 
+export interface WindowDropPoint {
+  x: number
+  y: number
+}
+
 interface DetachedWindowStore {
   update(id: string, patch: StickyItemPatch): Promise<StickyItem | null>
 }
@@ -23,6 +28,7 @@ interface DetachedWindowFactory {
 
 const DEFAULT_WIDTH = 340
 const DEFAULT_HEIGHT = 440
+const DROP_OFFSET = 40
 
 export function ensureVisibleBounds(
   bounds: WindowBounds,
@@ -38,6 +44,23 @@ export function ensureVisibleBounds(
     width,
     height
   }
+}
+
+export function windowBoundsFromDropPoint(
+  point: WindowDropPoint,
+  width: number,
+  height: number,
+  workAreas: WindowBounds[]
+): WindowBounds {
+  return ensureVisibleBounds(
+    {
+      x: point.x - DROP_OFFSET,
+      y: point.y - DROP_OFFSET,
+      width,
+      height
+    },
+    workAreas
+  )
 }
 
 function intersects(a: WindowBounds, b: WindowBounds): boolean {
@@ -61,7 +84,7 @@ export class DetachedWindowService {
     private readonly onChanged: (item: StickyItem) => void = () => undefined
   ) {}
 
-  async detach(item: StickyItem): Promise<void> {
+  async detach(item: StickyItem, dropPoint?: WindowDropPoint): Promise<void> {
     const existing = this.windows.get(item.id)
     if (existing) {
       existing.show()
@@ -71,15 +94,22 @@ export class DetachedWindowService {
 
     const workAreas = this.getWorkAreas()
     const first = workAreas[0] ?? { x: 0, y: 0, width: 1920, height: 1080 }
-    const bounds = ensureVisibleBounds(
-      item.windowBounds ?? {
-        x: first.x + first.width - DEFAULT_WIDTH - 24,
-        y: first.y + 48,
-        width: DEFAULT_WIDTH,
-        height: DEFAULT_HEIGHT
-      },
-      workAreas
-    )
+    const bounds = dropPoint
+      ? windowBoundsFromDropPoint(
+          dropPoint,
+          item.windowBounds?.width ?? DEFAULT_WIDTH,
+          item.windowBounds?.height ?? DEFAULT_HEIGHT,
+          workAreas
+        )
+      : ensureVisibleBounds(
+          item.windowBounds ?? {
+            x: first.x + first.width - DEFAULT_WIDTH - 24,
+            y: first.y + 48,
+            width: DEFAULT_WIDTH,
+            height: DEFAULT_HEIGHT
+          },
+          workAreas
+        )
     const window = this.factory.create(item, bounds)
     this.windows.set(item.id, window)
     this.bindWindow(item.id, window)

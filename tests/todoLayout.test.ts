@@ -29,4 +29,18 @@ describe('todo editor narrow layout', () => {
       /\.todo-subtask-row\s*>\s*\.task-delete-button\s*\{[^}]*grid-column:\s*3;[^}]*grid-row:\s*1;/s
     )
   })
+
+  it('gives subtasks a larger checkbox and moves their settings below the input row', async () => {
+    const css = await readFile(
+      'src/renderer/src/styles/note-card.css',
+      'utf8'
+    )
+
+    expect(css).toMatch(
+      /\.todo-subtask-row\s*>\s*input\[type="checkbox"\]\s*\{[^}]*grid-column:\s*1;[^}]*grid-row:\s*1;[^}]*width:\s*22px;[^}]*height:\s*22px;/s
+    )
+    expect(css).toMatch(
+      /\.todo-subtask-row\s+\.subtask-settings\s*\{[^}]*grid-column:\s*2\s*\/\s*4;[^}]*grid-row:\s*2;/s
+    )
+  })
 })

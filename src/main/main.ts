@@ -15,6 +15,7 @@ import { registerFolderIpc } from './ipc/folderIpc'
 import { registerNoteIpc } from './ipc/noteIpc'
 import { registerRecycleIpc } from './ipc/recycleIpc'
 import { registerWindowIpc } from './ipc/windowIpc'
+import { ipcChannels } from '../shared/ipcChannels'
 import { AutoLaunchService } from './services/AutoLaunchService'
 import { AssetService } from './services/AssetService'
 import { ConfigStore } from './services/ConfigStore'
@@ -27,7 +28,9 @@ import {
   type FolderWindowHandle
 } from './services/FolderWindowService'
 import { NoteStore } from './services/NoteStore'
+import { DragPreviewWindowService } from './services/DragPreviewWindowService'
 import { ReminderService } from './services/ReminderService'
+import { ReminderPresentationService } from './services/ReminderPresentationService'
 import { RecycleService } from './services/RecycleService'
 import { TrayService } from './services/TrayService'
 import { WindowService } from './services/WindowService'
@@ -54,6 +57,12 @@ if (!hasLock) {
     const config = new ConfigStore(userData)
     const autoLaunch = new AutoLaunchService()
     const windows = new WindowService()
+    const dragPreview = new DragPreviewWindowService(
+      {
+        create: (options) => new BrowserWindow(options)
+      },
+      () => screen.getCursorScreenPoint()
+    )
     const broadcast = (channel: string, value: unknown): void => {
       for (const window of BrowserWindow.getAllWindows()) {
         if (!window.isDestroyed()) window.webContents.send(channel, value)
@@ -76,7 +85,7 @@ if (!hasLock) {
               preload: join(__dirname, '../preload/index.mjs'),
               contextIsolation: true,
               nodeIntegration: false,
-              sandbox: false
+              sandbox: true
             }
           })
           const query = `mode=detached&id=${encodeURIComponent(item.id)}`
@@ -111,7 +120,7 @@ if (!hasLock) {
               preload: join(__dirname, '../preload/index.mjs'),
               contextIsolation: true,
               nodeIntegration: false,
-              sandbox: false
+              sandbox: true
             }
           })
           const query = `mode=folder&id=${encodeURIComponent(folder.id)}`
@@ -126,12 +135,18 @@ if (!hasLock) {
           return window
         }
       },
-      () => screen.getAllDisplays().map((display) => display.workArea)
+      () => screen.getAllDisplays().map((display) => display.workArea),
+      (folder) => broadcast(ipcChannels.folderChanged, folder)
     )
     const tray = new TrayService(windows, config, autoLaunch)
-    const reminder = new ReminderService(notes, (title, body) => {
-      new Notification({ title, body }).show()
-    })
+    const reminderPresentation = new ReminderPresentationService(
+      (title, body) => new Notification({ title, body }),
+      windows,
+      (payload) => broadcast(ipcChannels.reminderFired, payload)
+    )
+    const reminder = new ReminderService(notes, (title, body, payload) =>
+      reminderPresentation.present(title, body, payload)
+    )
     const recycle = new RecycleService(notes, () => new Date(), assets)
 
     const currentConfig = await config.get()
@@ -156,10 +171,12 @@ if (!hasLock) {
     })
     registerAssetIpc(assets)
     registerFolderIpc(notes, {
-      beforeDelete: (folderId) => folderWindows.closeForDelete(folderId)
+      beforeDelete: (folderId) => folderWindows.closeForDelete(folderId),
+      changed: (folder) => broadcast(ipcChannels.folderChanged, folder),
+      deleted: (folderId) => broadcast(ipcChannels.folderDeleted, folderId)
     })
     registerRecycleIpc(recycle)
-    registerWindowIpc(windows, detachedWindows, folderWindows, notes)
+    registerWindowIpc(windows, detachedWindows, folderWindows, notes, dragPreview)
     registerConfigIpc(config, autoLaunch, windows, tray)
     reminder.start()
     await detachedWindows.restore(await notes.list())
@@ -172,6 +189,7 @@ if (!hasLock) {
     app.on('second-instance', () => windows.show())
     app.on('before-quit', () => {
       reminder.stop()
+      dragPreview.stop()
       detachedWindows.beginShutdown()
       folderWindows.beginShutdown()
       windows.quit()

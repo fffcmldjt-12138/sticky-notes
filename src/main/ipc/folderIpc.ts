@@ -1,29 +1,46 @@
 import { ipcMain } from 'electron'
-import type { FolderPatch, OrderedNodeRef } from '../../shared/models'
+import type { FolderItem, FolderPatch, OrderedNodeRef } from '../../shared/models'
 import { ipcChannels } from '../../shared/ipcChannels'
 import type { NoteStore } from '../services/NoteStore'
 
 interface FolderIpcEvents {
   beforeDelete(folderId: string): void
+  changed(folder: FolderItem): void
+  deleted(folderId: string): void
+}
+
+const noFolderEvents: FolderIpcEvents = {
+  beforeDelete: () => undefined,
+  changed: () => undefined,
+  deleted: () => undefined
 }
 
 export function registerFolderIpc(
   store: NoteStore,
-  events: FolderIpcEvents = { beforeDelete: () => undefined }
+  events: FolderIpcEvents = noFolderEvents
 ): void {
   ipcMain.handle(ipcChannels.foldersList, () => store.listFolders())
   ipcMain.handle(
     ipcChannels.foldersCreate,
-    (_event, title: string, parentFolderId?: string | null) =>
-      store.createFolder(title, parentFolderId ?? null)
+    async (_event, title: string, parentFolderId?: string | null) => {
+      const folder = await store.createFolder(title, parentFolderId ?? null)
+      events.changed(folder)
+      return folder
+    }
   )
   ipcMain.handle(
     ipcChannels.foldersUpdate,
-    (_event, id: string, patch: FolderPatch) => store.updateFolder(id, patch)
+    async (_event, id: string, patch: FolderPatch) => {
+      const folder = await store.updateFolder(id, patch)
+      if (folder) events.changed(folder)
+      return folder
+    }
   )
   ipcMain.handle(ipcChannels.foldersDelete, async (_event, id: string) => {
     events.beforeDelete(id)
-    return store.deleteFolder(id)
+    const deleted = await store.deleteFolder(id)
+    if (deleted) events.deleted(id)
+    return deleted
   })
   ipcMain.handle(
     ipcChannels.foldersMoveItem,

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -35,7 +35,16 @@ describe('NoteStore', () => {
     })
     expect(todo).toMatchObject({
       type: 'todo',
-      tasks: [],
+      tasks: [
+        expect.objectContaining({
+          contentMarkdown: '',
+          completed: false,
+          importance: 'normal',
+          urgency: 'normal',
+          children: [],
+          schedule: null
+        })
+      ],
       parentFolderId: null,
       tags: [],
       order: 1,
@@ -163,5 +172,28 @@ describe('NoteStore', () => {
 
     expect(migrated[0]).toMatchObject({ headerColor: '#55b985', detached: false })
     expect(files.some((file) => file.startsWith('notes.json.backup-'))).toBe(true)
+  })
+
+  it('preserves malformed notes and recovers with an empty version 4 file', async () => {
+    await writeFile(join(directory, 'notes.json'), '{broken json', 'utf8')
+
+    expect(await store.list()).toEqual([])
+    expect(JSON.parse(await readFile(join(directory, 'notes.json'), 'utf8'))).toEqual({
+      version: 4,
+      items: [],
+      folders: []
+    })
+    const files = await readdir(directory)
+    const backup = files.find((file) => file.startsWith('notes.json.corrupt-'))
+    expect(backup).toBeDefined()
+    expect(await readFile(join(directory, backup!), 'utf8')).toBe('{broken json')
+  })
+
+  it('does not overwrite a valid notes file from a future schema version', async () => {
+    const future = JSON.stringify({ version: 99, items: [{ id: 'future' }] })
+    await writeFile(join(directory, 'notes.json'), future, 'utf8')
+
+    await expect(store.list()).rejects.toThrow('Unsupported notes version: 99')
+    expect(await readFile(join(directory, 'notes.json'), 'utf8')).toBe(future)
   })
 })

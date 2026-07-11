@@ -3,7 +3,11 @@ import type {
   FolderPatch,
   WindowBounds
 } from '../../shared/models'
-import { ensureVisibleBounds } from './DetachedWindowService'
+import {
+  ensureVisibleBounds,
+  windowBoundsFromDropPoint,
+  type WindowDropPoint
+} from './DetachedWindowService'
 
 export interface FolderWindowHandle {
   focus(): void
@@ -33,10 +37,11 @@ export class FolderWindowService {
   constructor(
     private readonly store: FolderWindowStore,
     private readonly factory: FolderWindowFactory,
-    private readonly getWorkAreas: () => WindowBounds[]
+    private readonly getWorkAreas: () => WindowBounds[],
+    private readonly onChanged: (folder: FolderItem) => void = () => undefined
   ) {}
 
-  async detach(folder: FolderItem): Promise<void> {
+  async detach(folder: FolderItem, dropPoint?: WindowDropPoint): Promise<void> {
     const existing = this.windows.get(folder.id)
     if (existing) {
       existing.show()
@@ -46,22 +51,30 @@ export class FolderWindowService {
 
     const workAreas = this.getWorkAreas()
     const first = workAreas[0] ?? { x: 0, y: 0, width: 1920, height: 1080 }
-    const bounds = ensureVisibleBounds(
-      folder.windowBounds ?? {
-        x: first.x + first.width - DEFAULT_WIDTH - 32,
-        y: first.y + 64,
-        width: DEFAULT_WIDTH,
-        height: DEFAULT_HEIGHT
-      },
-      workAreas
-    )
+    const bounds = dropPoint
+      ? windowBoundsFromDropPoint(
+          dropPoint,
+          folder.windowBounds?.width ?? DEFAULT_WIDTH,
+          folder.windowBounds?.height ?? DEFAULT_HEIGHT,
+          workAreas
+        )
+      : ensureVisibleBounds(
+          folder.windowBounds ?? {
+            x: first.x + first.width - DEFAULT_WIDTH - 32,
+            y: first.y + 64,
+            width: DEFAULT_WIDTH,
+            height: DEFAULT_HEIGHT
+          },
+          workAreas
+        )
     const window = this.factory.create(folder, bounds)
     this.windows.set(folder.id, window)
     this.bindWindow(folder.id, window)
-    await this.store.updateFolder(folder.id, {
+    const updated = await this.store.updateFolder(folder.id, {
       detached: true,
       windowBounds: bounds
     })
+    if (updated) this.onChanged(updated)
   }
 
   async attach(folderId: string): Promise<void> {
@@ -70,7 +83,8 @@ export class FolderWindowService {
       this.windows.delete(folderId)
       window.close()
     }
-    await this.store.updateFolder(folderId, { detached: false })
+    const updated = await this.store.updateFolder(folderId, { detached: false })
+    if (updated) this.onChanged(updated)
   }
 
   async restore(folders: FolderItem[]): Promise<void> {
@@ -99,9 +113,11 @@ export class FolderWindowService {
         folderId,
         setTimeout(() => {
           this.boundsTimers.delete(folderId)
-          void this.store.updateFolder(folderId, {
-            windowBounds: window.getBounds()
-          })
+          void this.store
+            .updateFolder(folderId, { windowBounds: window.getBounds() })
+            .then((folder) => {
+              if (folder) this.onChanged(folder)
+            })
         }, 250)
       )
     }
@@ -114,10 +130,14 @@ export class FolderWindowService {
       if (timer) clearTimeout(timer)
       this.boundsTimers.delete(folderId)
       if (!this.shuttingDown) {
-        void this.store.updateFolder(folderId, {
-          detached: false,
-          windowBounds: window.getBounds()
-        })
+        void this.store
+          .updateFolder(folderId, {
+            detached: false,
+            windowBounds: window.getBounds()
+          })
+          .then((folder) => {
+            if (folder) this.onChanged(folder)
+          })
       }
     })
   }

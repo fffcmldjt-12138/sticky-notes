@@ -10,6 +10,12 @@ import {
   getScheduleDueAt
 } from './taskSchedule'
 
+export interface ReminderPayload {
+  itemId: string
+  taskId: string
+  subtaskId?: string
+}
+
 interface ReminderStore {
   list(): Promise<StickyItem[]>
   updateTodoTask(
@@ -25,16 +31,32 @@ interface ReminderStore {
   ): Promise<TodoItem | null>
 }
 
+type ReminderNotify = (
+  title: string,
+  body: string,
+  payload: ReminderPayload
+) => void
+
 export class ReminderService {
   private timer: NodeJS.Timeout | null = null
+  private checkInFlight: Promise<void> | null = null
 
   constructor(
     private readonly store: ReminderStore,
-    private readonly notify: (title: string, body: string) => void,
+    private readonly notify: ReminderNotify,
     private readonly now: () => Date = () => new Date()
   ) {}
 
-  async check(): Promise<void> {
+  check(): Promise<void> {
+    if (this.checkInFlight) return this.checkInFlight
+    const check = this.runCheck().finally(() => {
+      if (this.checkInFlight === check) this.checkInFlight = null
+    })
+    this.checkInFlight = check
+    return check
+  }
+
+  private async runCheck(): Promise<void> {
     const current = this.now()
     const items = await this.store.list()
 
@@ -46,7 +68,8 @@ export class ReminderService {
           task.completed,
           task.schedule,
           current,
-          this.notify
+          this.notify,
+          { itemId: item.id, taskId: task.id }
         )
         if (taskPatch) {
           await this.store.updateTodoTask(item.id, task.id, taskPatch)
@@ -58,7 +81,8 @@ export class ReminderService {
             child.completed,
             child.schedule,
             current,
-            this.notify
+            this.notify,
+            { itemId: item.id, taskId: task.id, subtaskId: child.id }
           )
           if (childPatch) {
             await this.store.updateTodoSubtask(
@@ -89,7 +113,8 @@ function processSchedule(
   completed: boolean,
   schedule: TodoSchedule | null,
   current: Date,
-  notify: (title: string, body: string) => void
+  notify: ReminderNotify,
+  payload: ReminderPayload
 ): TodoTaskPatch | TodoSubtaskPatch | null {
   if (!schedule) return null
 
@@ -105,8 +130,9 @@ function processSchedule(
     notify(
       title,
       dueAt <= now
-        ? '截止时间已到'
-        : `截止提醒：距离时间还有 ${formatOffset(reminder.offsetMinutes)}`
+        ? '强提醒：截止时间已到'
+        : `强提醒：距离截止还有 ${formatOffset(reminder.offsetMinutes)}`,
+      payload
     )
     return { ...reminder, remindedAt: nowIso }
   })

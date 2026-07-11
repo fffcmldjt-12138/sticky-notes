@@ -94,13 +94,17 @@ const api: StickyApi = {
     hide: () => ipcRenderer.send(ipcChannels.windowHide),
     suspendAutoHide: (value) =>
       ipcRenderer.send(ipcChannels.windowSuspendAutoHide, value),
-    detach: (itemId) => ipcRenderer.invoke(ipcChannels.windowDetach, itemId),
+    detach: (itemId, options) =>
+      ipcRenderer.invoke(ipcChannels.windowDetach, itemId, options),
     attach: (itemId) => ipcRenderer.invoke(ipcChannels.windowAttach, itemId),
-    detachFolder: (folderId) =>
-      ipcRenderer.invoke(ipcChannels.windowDetachFolder, folderId),
+    detachFolder: (folderId, options) =>
+      ipcRenderer.invoke(ipcChannels.windowDetachFolder, folderId, options),
     attachFolder: (folderId) =>
       ipcRenderer.invoke(ipcChannels.windowAttachFolder, folderId),
-    openExternal: (url) => ipcRenderer.invoke(ipcChannels.windowOpenExternal, url)
+    openExternal: (url) => ipcRenderer.invoke(ipcChannels.windowOpenExternal, url),
+    startDragPreview: (payload) =>
+      ipcRenderer.send(ipcChannels.windowDragPreviewStart, payload),
+    stopDragPreview: () => ipcRenderer.send(ipcChannels.windowDragPreviewStop)
   },
   onOpenEditor: (callback: (type: NoteType) => void) => {
     const listener = (_event: Electron.IpcRendererEvent, type: NoteType): void =>
@@ -108,17 +112,47 @@ const api: StickyApi = {
     ipcRenderer.on(ipcChannels.openEditor, listener)
     return () => ipcRenderer.removeListener(ipcChannels.openEditor, listener)
   },
+  onOpenItem: (callback: (itemId: string) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, itemId: string): void =>
+      callback(itemId)
+    ipcRenderer.on(ipcChannels.openItem, listener)
+    return () => ipcRenderer.removeListener(ipcChannels.openItem, listener)
+  },
   onItemChanged: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, item: StickyItem): void =>
       callback(item)
     ipcRenderer.on(ipcChannels.itemChanged, listener)
     return () => ipcRenderer.removeListener(ipcChannels.itemChanged, listener)
   },
+  onFolderChanged: (callback) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      folder: Parameters<typeof callback>[0]
+    ): void => callback(folder)
+    ipcRenderer.on(ipcChannels.folderChanged, listener)
+    return () => ipcRenderer.removeListener(ipcChannels.folderChanged, listener)
+  },
+  onFolderDeleted: (callback) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      folderId: string
+    ): void => callback(folderId)
+    ipcRenderer.on(ipcChannels.folderDeleted, listener)
+    return () => ipcRenderer.removeListener(ipcChannels.folderDeleted, listener)
+  },
   onItemDeleted: (callback) => {
     const listener = (_event: Electron.IpcRendererEvent, itemId: string): void =>
       callback(itemId)
     ipcRenderer.on(ipcChannels.itemDeleted, listener)
     return () => ipcRenderer.removeListener(ipcChannels.itemDeleted, listener)
+  },
+  onReminderFired: (callback) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      payload: Parameters<typeof callback>[0]
+    ): void => callback(payload)
+    ipcRenderer.on(ipcChannels.reminderFired, listener)
+    return () => ipcRenderer.removeListener(ipcChannels.reminderFired, listener)
   }
 }
 

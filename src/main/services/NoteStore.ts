@@ -268,7 +268,12 @@ export class NoteStore {
       const item: NoteItem | TodoItem =
         type === 'note'
           ? { ...base, type, contentMarkdown: '', syncedToSiyuan: false }
-          : { ...base, type, tasks: [], panelExpanded: false }
+          : {
+              ...base,
+              type,
+              tasks: [createTodoTask()],
+              panelExpanded: false
+            }
 
       data.items.unshift(item)
       await this.file.write(data)
@@ -396,20 +401,23 @@ export class NoteStore {
   }
 
   async addTodoTask(todoId: string, contentMarkdown = ''): Promise<TodoTask | null> {
-    const task: TodoTask = {
-      id: `task_${randomUUID()}`,
-      contentMarkdown,
-      completed: false,
-      tags: [],
-      importance: 'normal',
-      urgency: 'normal',
-      children: [],
-      schedule: null
-    }
-    const updated = await this.changeTodo(todoId, (todo) => ({
-      ...todo,
-      tasks: [...todo.tasks, task]
-    }))
+    let task = createTodoTask(contentMarkdown)
+    const updated = await this.changeTodo(todoId, (todo) => {
+      const reusable = todo.tasks.find(isReusableBlankTask)
+      if (reusable) {
+        task = { ...reusable, contentMarkdown }
+        return {
+          ...todo,
+          tasks: todo.tasks.map((entry) =>
+            entry.id === reusable.id ? task : entry
+          )
+        }
+      }
+      return {
+        ...todo,
+        tasks: [...todo.tasks, task]
+      }
+    })
     return updated ? task : null
   }
 
@@ -569,8 +577,16 @@ export class NoteStore {
       }
     } catch (error) {
       const nodeError = error as NodeJS.ErrnoException
-      if (nodeError.code !== 'ENOENT') throw error
-      await this.file.write({ version: 4, items: [], folders: [] })
+      if (nodeError.code === 'ENOENT') {
+        await this.file.write({ version: 4, items: [], folders: [] })
+        return
+      }
+      if (error instanceof SyntaxError) {
+        await copyFile(this.filePath, `${this.filePath}.corrupt-${Date.now()}`)
+        await this.file.write({ version: 4, items: [], folders: [] })
+        return
+      }
+      throw error
     }
   }
 
@@ -602,6 +618,31 @@ function applySubtaskPatch(
     }
   }
   return updated
+}
+
+function createTodoTask(contentMarkdown = ''): TodoTask {
+  return {
+    id: `task_${randomUUID()}`,
+    contentMarkdown,
+    completed: false,
+    tags: [],
+    importance: 'normal',
+    urgency: 'normal',
+    children: [],
+    schedule: null
+  }
+}
+
+function isReusableBlankTask(task: TodoTask): boolean {
+  return (
+    !task.contentMarkdown.trim() &&
+    !task.completed &&
+    task.importance === 'normal' &&
+    task.urgency === 'normal' &&
+    task.children.length === 0 &&
+    !task.schedule &&
+    task.tags.length === 0
+  )
 }
 
 function scheduleRuleKey(schedule: TodoSchedule | null): string {

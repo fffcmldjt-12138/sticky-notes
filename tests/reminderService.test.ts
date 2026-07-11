@@ -39,6 +39,30 @@ const todo: TodoItem = {
 }
 
 describe('ReminderService', () => {
+  it('coalesces overlapping checks into one store scan', async () => {
+    let release!: (items: TodoItem[]) => void
+    const pendingItems = new Promise<TodoItem[]>((resolve) => {
+      release = resolve
+    })
+    const list = vi.fn().mockReturnValue(pendingItems)
+    const service = new ReminderService(
+      {
+        list,
+        updateTodoTask: vi.fn(),
+        updateTodoSubtask: vi.fn()
+      },
+      vi.fn()
+    )
+
+    const first = service.check()
+    const second = service.check()
+    expect(list).toHaveBeenCalledTimes(1)
+
+    release([])
+    await Promise.all([first, second])
+    expect(list).toHaveBeenCalledTimes(1)
+  })
+
   it('delivers each selected schedule reminder once', async () => {
     const updateTodoTask = vi.fn().mockResolvedValue(undefined)
     const notify = vi.fn()
@@ -56,7 +80,8 @@ describe('ReminderService', () => {
 
     expect(notify).toHaveBeenCalledWith(
       '提交作业',
-      '截止提醒：距离时间还有 1 天'
+      '强提醒：距离截止还有 1 天',
+      { itemId: 'todo_1', taskId: 'task_1' }
     )
     expect(updateTodoTask).toHaveBeenCalledWith('todo_1', 'task_1', {
       schedule: {
@@ -150,7 +175,11 @@ describe('ReminderService', () => {
 
     await service.check()
 
-    expect(notify).toHaveBeenCalledWith('上传附件', '截止时间已到')
+    expect(notify).toHaveBeenCalledWith(
+      '上传附件',
+      '强提醒：截止时间已到',
+      { itemId: 'todo_1', taskId: 'task_1', subtaskId: 'subtask_1' }
+    )
     expect(updateTodoSubtask).toHaveBeenCalledWith(
       'todo_1',
       'task_1',

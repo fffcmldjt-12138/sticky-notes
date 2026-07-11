@@ -35,7 +35,13 @@ export const ipcChannels = {
   windowDetachFolder: 'window:detach-folder',
   windowAttachFolder: 'window:attach-folder',
   windowOpenExternal: 'window:open-external',
+  windowDragPreviewStart: 'window:drag-preview-start',
+  windowDragPreviewStop: 'window:drag-preview-stop',
   openEditor: 'app:open-editor',
+  openItem: 'app:open-item',
+  reminderFired: 'app:reminder-fired',
   itemChanged: 'notes:item-changed',
+  folderChanged: 'folders:item-changed',
+  folderDeleted: 'folders:item-deleted',
   itemDeleted: 'notes:item-deleted'
 } as const

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
 import type {
   AppConfig,
   FolderItem,
@@ -6,28 +6,52 @@ import type {
   StickyItem,
   StickyItemPatch
 } from '../../shared/models'
+import type {
+  DetachWindowOptions,
+  ReminderAlertPayload
+} from '../../shared/electronApi'
 import { CreateMenu } from './components/CreateMenu'
 import { FolderDialog } from './components/FolderDialog'
 import { FolderContextMenu } from './components/FolderContextMenu'
 import { CardContextMenu, type CardAction } from './components/CardContextMenu'
-import { NoteEditor } from './components/NoteEditor'
 import { TitleDialog } from './components/TitleDialog'
 import { TodoEditor } from './components/TodoEditor'
-import { SettingsPanel } from './pages/SettingsPanel'
 import { StickyPanel } from './pages/StickyPanel'
-import { DetachedEditor } from './pages/DetachedEditor'
-import { DetachedFolder } from './pages/DetachedFolder'
 import { upsertItem } from './lib/itemList'
 import { getItemTags, mergeTags } from '../../shared/tags'
 import type { FolderTreeNode } from './lib/folderTree'
+
+const NoteEditor = lazy(() =>
+  import('./components/NoteEditor').then((module) => ({
+    default: module.NoteEditor
+  }))
+)
+const SettingsPanel = lazy(() =>
+  import('./pages/SettingsPanel').then((module) => ({
+    default: module.SettingsPanel
+  }))
+)
+const DetachedEditor = lazy(() =>
+  import('./pages/DetachedEditor').then((module) => ({
+    default: module.DetachedEditor
+  }))
+)
+const DetachedFolder = lazy(() =>
+  import('./pages/DetachedFolder').then((module) => ({
+    default: module.DetachedFolder
+  }))
+)
 
 export default function App(): React.JSX.Element {
   const params = new URLSearchParams(window.location.search)
   const mode = params.get('mode')
   const id = params.get('id')
-  if (mode === 'folder' && id) return <DetachedFolder folderId={id} />
-  if (mode === 'detached' && id) return <DetachedEditor itemId={id} />
-  return <PanelApp />
+  let content: React.JSX.Element = <PanelApp />
+  if (mode === 'folder' && id) content = <DetachedFolder folderId={id} />
+  if (mode === 'detached' && id) content = <DetachedEditor itemId={id} />
+  return <Suspense fallback={<div className="app-loading">正在加载...</div>}>
+    {content}
+  </Suspense>
 }
 
 function PanelApp(): React.JSX.Element {
@@ -47,6 +71,8 @@ function PanelApp(): React.JSX.Element {
     useState<FolderItem | null>(null)
   const [activeTag, setActiveTag] = useState<string | null>(null)
   const [treeDragActive, setTreeDragActive] = useState(false)
+  const [activeReminder, setActiveReminder] =
+    useState<ReminderAlertPayload | null>(null)
   const [contextMenu, setContextMenu] = useState<{
     item: StickyItem
     x: number
@@ -84,6 +110,32 @@ function PanelApp(): React.JSX.Element {
     }
   }, [])
 
+  useEffect(() => {
+    const removeChanged = window.stickyApi.onFolderChanged?.((changed) => {
+      setFolders((current) => {
+        const index = current.findIndex((folder) => folder.id === changed.id)
+        if (index < 0) return [...current, changed]
+        return current.map((folder) => folder.id === changed.id ? changed : folder)
+      })
+    })
+    const removeDeleted = window.stickyApi.onFolderDeleted?.((folderId) => {
+      setFolders((current) => current.filter((folder) => folder.id !== folderId))
+    })
+    return () => {
+      removeChanged?.()
+      removeDeleted?.()
+    }
+  }, [])
+
+  useEffect(() => {
+    const unsubscribe = window.stickyApi.onReminderFired?.((payload) => {
+      setActiveReminder(payload)
+      window.stickyApi.window.cancelCollapse()
+      window.stickyApi.window.expand()
+    })
+    return unsubscribe ?? (() => undefined)
+  }, [])
+
   const createItem = useCallback(async (
     type: NoteType,
     title?: string,
@@ -112,6 +164,14 @@ function PanelApp(): React.JSX.Element {
     [createItem]
   )
 
+  useEffect(
+    () => window.stickyApi.onOpenItem?.((itemId) => {
+      setSettingsOpen(false)
+      setSelectedId(itemId)
+    }) ?? (() => undefined),
+    []
+  )
+
   const selected = items.find((item) => item.id === selectedId) ?? null
   const allTags = mergeTags(...items.map(getItemTags))
   const visibleItems = activeTag
@@ -127,6 +187,7 @@ function PanelApp(): React.JSX.Element {
     contextMenu ||
     folderContextMenu
     || treeDragActive
+    || activeReminder
   )
   useEffect(() => {
     window.stickyApi.window.suspendAutoHide(suspendAutoHide)
@@ -177,6 +238,32 @@ function PanelApp(): React.JSX.Element {
       }}
       onMouseLeave={() => window.stickyApi.window.scheduleCollapse()}
     >
+      {activeReminder && (
+        <div className="reminder-alert reminder-alert-strong" role="alert">
+          <div>
+            <em>待办强提醒</em>
+            <strong>{activeReminder.title}</strong>
+            <span>{activeReminder.body}</span>
+          </div>
+          <div className="reminder-alert-actions">
+            {activeReminder.itemId && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedId(activeReminder.itemId ?? null)
+                  setSettingsOpen(false)
+                  setActiveReminder(null)
+                }}
+              >
+                查看
+              </button>
+            )}
+            <button type="button" onClick={() => setActiveReminder(null)}>
+              知道了
+            </button>
+          </div>
+        </div>
+      )}
       {selected?.type === 'note' && (
         <NoteEditor item={selected} onSave={(patch) => void save(selected.id, patch)} onBack={() => setSelectedId(null)} onDelete={() => void remove(selected)} />
       )}
@@ -341,7 +428,9 @@ function PanelApp(): React.JSX.Element {
             onContextMenu={(item, event) =>
               setContextMenu({ item, x: event.clientX, y: event.clientY })
             }
-            onDetach={(item) => void window.stickyApi.window.detach(item.id)}
+            onDetach={(item, options?: DetachWindowOptions) =>
+              void window.stickyApi.window.detach(item.id, options)
+            }
             onToggleFolder={(folder: FolderTreeNode) => {
               void window.stickyApi.folders
                 .update(folder.id, { collapsed: !folder.collapsed })
@@ -363,8 +452,8 @@ function PanelApp(): React.JSX.Element {
               setCreateTargetFolderId(folder.id)
               setCreateOpen(true)
             }}
-            onDetachFolder={(folder) => {
-              void window.stickyApi.window.detachFolder(folder.id)
+            onDetachFolder={(folder, options?: DetachWindowOptions) => {
+              void window.stickyApi.window.detachFolder(folder.id, options)
             }}
             onReorder={(parentFolderId, orderedNodes) => {
               void window.stickyApi.folders

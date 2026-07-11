@@ -15,6 +15,10 @@ import type {
   OrderedNodeRef,
   StickyItem
 } from '../../../shared/models'
+import type {
+  DetachWindowOptions,
+  DragPreviewPayload
+} from '../../../shared/electronApi'
 import {
   resolveTreeDrop,
   resolveTreeDragOutcome,
@@ -40,8 +44,8 @@ export function TreeDndContext({
   items: StickyItem[]
   folders: FolderItem[]
   onReorder(parentFolderId: string | null, nodes: OrderedNodeRef[]): void
-  onDetachItem(item: StickyItem): void
-  onDetachFolder(folder: FolderItem): void
+  onDetachItem(item: StickyItem, options?: DetachWindowOptions): void
+  onDetachFolder(folder: FolderItem, options?: DetachWindowOptions): void
   onDragStart?(): void
   onDragStateChange?(active: boolean): void
 }>): React.JSX.Element {
@@ -63,6 +67,7 @@ export function TreeDndContext({
     const data = event.active.data.current as ActiveTreeDrag | undefined
     if (!data) return
     setActive(data)
+    window.stickyApi?.window.startDragPreview?.(toDragPreviewPayload(data))
     onDragStart?.()
     onDragStateChange?.(true)
   }
@@ -70,6 +75,7 @@ export function TreeDndContext({
   function handleEnd(event: DragEndEvent): void {
     const data = event.active.data.current as ActiveTreeDrag | undefined
     setActive(null)
+    window.stickyApi?.window.stopDragPreview?.()
     onDragStateChange?.(false)
     if (!data) return
 
@@ -97,10 +103,10 @@ export function TreeDndContext({
     if (outcome === 'detach') {
       if (data.node.kind === 'item') {
         const item = itemById.get(data.node.id)
-        if (item) onDetachItem(item)
+        if (item) onDetachItem(item, { atCursor: true })
       } else {
         const folder = folderById.get(data.node.id)
-        if (folder) onDetachFolder(folder)
+        if (folder) onDetachFolder(folder, { atCursor: true })
       }
       return
     }
@@ -125,6 +131,7 @@ export function TreeDndContext({
       onDragStart={handleStart}
       onDragCancel={() => {
         setActive(null)
+        window.stickyApi?.window.stopDragPreview?.()
         onDragStateChange?.(false)
       }}
       onDragEnd={handleEnd}
@@ -135,4 +142,20 @@ export function TreeDndContext({
       </DragOverlay>
     </DndContext>
   )
+}
+
+export function toDragPreviewPayload(active: ActiveTreeDrag): DragPreviewPayload {
+  if (active.kind === 'folder') {
+    return {
+      kind: 'folder',
+      title: active.folder.title || '无标题文件夹'
+    }
+  }
+  return {
+    kind: 'item',
+    itemType: active.item.type,
+    title: active.item.title || '无标题',
+    headerColor: active.item.headerColor,
+    bodyTheme: active.item.bodyTheme
+  }
 }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { fireEvent, render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import type { TodoItem } from '../src/shared/models'
 import { TodoEditor } from '../src/renderer/src/components/TodoEditor'
@@ -98,5 +98,116 @@ describe('TodoEditor', () => {
     const { container } = renderEditor()
 
     expect(container.querySelector('.todo-subtask-row.completed')).toBeTruthy()
+  })
+
+  it('toggles a subtask from its checkbox', () => {
+    const onUpdateSubtask = vi.fn()
+    const { container } = renderEditor({ onUpdateSubtask })
+
+    fireEvent.click(
+      container.querySelector('.todo-subtask-row input[type="checkbox"]')!
+    )
+
+    expect(onUpdateSubtask).toHaveBeenCalledWith('task_1', 'subtask_1', {
+      completed: false
+    })
+  })
+
+  it('focuses the newest task input after a task is added', async () => {
+    const view = renderEditor()
+    const added: TodoItem = {
+      ...todo,
+      tasks: [
+        ...todo.tasks,
+        {
+          id: 'task_2',
+          contentMarkdown: '',
+          completed: false,
+          tags: [],
+          importance: 'normal',
+          urgency: 'normal',
+          children: [],
+          schedule: null
+        }
+      ]
+    }
+
+    view.rerender(
+      <TodoEditor
+        item={added}
+        onSave={vi.fn()}
+        onAddTask={vi.fn()}
+        onUpdateTask={vi.fn()}
+        onDeleteTask={vi.fn()}
+        onReorderTasks={vi.fn()}
+        onAddSubtask={vi.fn()}
+        onUpdateSubtask={vi.fn()}
+        onDeleteSubtask={vi.fn()}
+        onBack={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+
+    await waitFor(() => {
+      const taskInputs = view.container.querySelectorAll('.task-content-input')
+      expect(taskInputs[taskInputs.length - 1]).toHaveFocus()
+    })
+  })
+
+  it('focuses the first empty task when a new todo opens', async () => {
+    const fresh: TodoItem = {
+      ...todo,
+      tasks: [{
+        id: 'task_new',
+        contentMarkdown: '',
+        completed: false,
+        tags: [],
+        importance: 'normal',
+        urgency: 'normal',
+        children: [],
+        schedule: null
+      }]
+    }
+
+    const view = render(
+      <TodoEditor
+        item={fresh}
+        onSave={vi.fn()}
+        onAddTask={vi.fn()}
+        onUpdateTask={vi.fn()}
+        onDeleteTask={vi.fn()}
+        onReorderTasks={vi.fn()}
+        onAddSubtask={vi.fn()}
+        onUpdateSubtask={vi.fn()}
+        onDeleteSubtask={vi.fn()}
+        onBack={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+
+    await waitFor(() => {
+      expect(view.container.querySelector('.task-content-input')).toHaveFocus()
+    })
+  })
+
+  it('asks for one blank task when an older empty todo is opened', () => {
+    const onAddTask = vi.fn()
+    render(
+      <TodoEditor
+        item={{ ...todo, tasks: [] }}
+        onSave={vi.fn()}
+        onAddTask={onAddTask}
+        onUpdateTask={vi.fn()}
+        onDeleteTask={vi.fn()}
+        onReorderTasks={vi.fn()}
+        onAddSubtask={vi.fn()}
+        onUpdateSubtask={vi.fn()}
+        onDeleteSubtask={vi.fn()}
+        onBack={vi.fn()}
+        onDelete={vi.fn()}
+      />
+    )
+
+    expect(onAddTask).toHaveBeenCalledOnce()
   })
 })

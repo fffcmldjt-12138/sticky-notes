@@ -33,7 +33,7 @@ export class WindowService {
         preload: join(__dirname, '../preload/index.mjs'),
         contextIsolation: true,
         nodeIntegration: false,
-        sandbox: false
+        sandbox: true
       }
     })
 
@@ -107,6 +107,11 @@ export class WindowService {
   sendOpenEditor(type: 'note' | 'todo'): void {
     this.show()
     this.window?.webContents.send('app:open-editor', type)
+  }
+
+  sendOpenItem(itemId: string): void {
+    this.show()
+    this.window?.webContents.send('app:open-item', itemId)
   }
 
   quit(): void {

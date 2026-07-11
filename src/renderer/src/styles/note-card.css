@@ -82,6 +82,19 @@
 
 .editor { height: 100%; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 .editor-header { height: 62px; padding: 12px; display: grid; grid-template-columns: 34px 1fr 34px; gap: 8px; align-items: center; }
+.detached-editor .editor-header {
+  height: 48px;
+  padding: 7px 8px 7px 12px;
+}
+.detached-editor .editor-header-title {
+  text-align: left;
+  font-size: 15px;
+}
+.detached-editor .icon-button {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+}
 .editor-header-title { min-width: 0; overflow: hidden; text-align: center; text-overflow: ellipsis; white-space: nowrap; font-weight: 750; user-select: none; }
 .editor-toolbar { padding: 12px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid rgba(127,127,127,.18); }
 .editor-identity-toolbar { position: relative; display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 8px; }
@@ -107,7 +120,15 @@
 .segmented button.active { background: white; color: #252a32; box-shadow: 0 2px 6px rgba(0,0,0,.08); }
 .segmented.small button { padding: 5px 8px; font-size: 12px; }
 .markdown-editor-shell { flex: 1; min-height: 0; margin: 12px; display: flex; flex-direction: column; border: 1px solid rgba(127,127,127,.22); border-radius: 12px; background: rgba(127,127,127,.08); overflow: hidden; }
-.markdown-toolbar { flex: 0 0 auto; padding: 7px; display: flex; gap: 4px; overflow-x: auto; border-bottom: 1px solid rgba(127,127,127,.18); background: rgba(255,255,255,.62); }
+.markdown-toolbar { flex: 0 0 auto; padding: 7px; display: flex; gap: 8px; overflow-x: auto; overscroll-behavior-x: contain; border-bottom: 1px solid rgba(127,127,127,.18); background: rgba(255,255,255,.62); }
+.markdown-toolbar-group {
+  flex: 0 0 auto;
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 9px;
+  background: rgba(127,127,127,.1);
+}
 .markdown-toolbar button { min-width: 30px; padding: 5px 7px; border-radius: 6px; background: transparent; color: #343a45; font-size: 12px; white-space: nowrap; }
 .markdown-toolbar button:hover, .markdown-toolbar button.active { background: #e1e7f0; color: #225bb7; }
 .markdown-editor-shell > div:has(.tiptap) { flex: 1; min-height: 0; overflow: hidden; }
@@ -120,14 +141,44 @@
 .markdown-syntax-hint { flex: 0 0 auto; padding: 6px 10px; border-top: 1px solid rgba(127,127,127,.15); color: #858d99; font-size: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .markdown-editor-shell.compact { margin: 0; }
 .markdown-editor-shell.compact .markdown-toolbar { display: none; }
-.markdown-editor-shell.compact .tiptap { min-height: 44px; padding: 8px; }
-.markdown-editor-shell.compact .markdown-syntax-hint { padding: 4px 8px; font-size: 9px; }
+.detached-editor .markdown-editor-shell {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.markdown-editor-shell.compact .tiptap { min-height: 44px; padding: 12px; }
+.markdown-editor-shell.compact .markdown-syntax-hint { display: none; }
 .save-status { padding: 0 14px 12px; font-size: 11px; color: #89909b; text-align: right; }
 .todo-controls { padding: 12px; display: grid; gap: 10px; border-bottom: 1px solid rgba(127,127,127,.18); }
 .todo-controls label { font-size: 13px; }
 .reminder-field { display: grid; gap: 5px; }
 .reminder-field input { width: 100%; padding: 8px; border: 1px solid rgba(127,127,127,.25); border-radius: 8px; background: rgba(255,255,255,.8); }
 .todo-task-list { flex: 1; min-height: 0; overflow: auto; padding: 12px; display: grid; align-content: start; gap: 10px; }
+.detached-editor .todo-task-list {
+  padding: 10px;
+  gap: 8px;
+}
+.detached-editor .todo-task-row {
+  padding: 8px;
+  grid-template-columns: 22px minmax(0, 1fr) 28px;
+}
+.detached-editor .todo-task-row > .task-drag-handle,
+.detached-editor .task-setting-buttons {
+  display: none;
+}
+.detached-editor .task-complete-checkbox {
+  grid-column: 1;
+}
+.detached-editor .task-content-input {
+  grid-column: 2;
+}
+.detached-editor .task-delete-button {
+  grid-column: 3;
+}
+.detached-editor .add-task-button {
+  padding: 8px 10px;
+  border-radius: 9px;
+}
 .todo-task-row {
   position: relative;
   padding: 10px;
@@ -140,8 +191,16 @@
   border-radius: 12px;
   background: rgba(255,255,255,.06);
 }
-.todo-task-row.deadline-approaching { border-color: #d49a32; box-shadow: inset 3px 0 #d49a32; }
-.todo-task-row.deadline-overdue { border-color: #c85d5d; box-shadow: inset 3px 0 #c85d5d; }
+.todo-task-row.deadline-approaching {
+  border-color: #d28a1f;
+  background: linear-gradient(90deg, rgba(210,138,31,.14), rgba(255,255,255,.06) 38%);
+  box-shadow: inset 4px 0 #d28a1f, 0 0 0 2px rgba(210,138,31,.08);
+}
+.todo-task-row.deadline-overdue {
+  border-color: #d64545;
+  background: linear-gradient(90deg, rgba(214,69,69,.16), rgba(255,255,255,.06) 40%);
+  box-shadow: inset 4px 0 #d64545, 0 0 0 2px rgba(214,69,69,.1);
+}
 .todo-task-row.dragging { opacity: .55; box-shadow: 0 10px 30px rgba(0,0,0,.2); }
 .todo-task-row.completed .task-content-input,
 .todo-subtask-row.completed .task-content-input {
@@ -338,9 +397,9 @@
   color: #edf0f5;
 }
 .deadline-presets { display: flex; gap: 5px; flex-wrap: wrap; }
-.deadline-presets button, .custom-deadline-reminder button { padding: 6px 8px; border-radius: 7px; background: rgba(127,127,127,.12); color: inherit; font-size: 10px; }
+.deadline-presets button, .custom-deadline-reminder button { padding: 6px 8px; border-radius: 999px; background: rgba(127,127,127,.12); color: inherit; font-size: 10px; white-space: nowrap; }
 .deadline-presets button.active { background: #5b8def; color: white; }
-.custom-deadline-reminder { display: grid; grid-template-columns: 60px 72px auto; gap: 5px; }
+.custom-deadline-reminder { display: grid; grid-template-columns: 60px 72px minmax(0, 1fr); gap: 5px; }
 .custom-deadline-reminder input, .custom-deadline-reminder select { min-width: 0; padding: 6px; border: 1px solid rgba(127,127,127,.2); border-radius: 6px; background: rgba(255,255,255,.7); }
 .task-inline-tags { grid-column: 3 / 5; display: flex; gap: 5px; flex-wrap: wrap; }
 .task-inline-tags span { padding: 2px 6px; border-radius: 999px; background: rgba(91,141,239,.12); color: #3565ad; font-size: 9px; }
@@ -362,6 +421,7 @@
 }
 .todo-subtask-row .subtask-settings {
   grid-column: 2 / 4;
+  grid-row: 2;
   display: flex;
   gap: 6px;
   flex-wrap: wrap;
@@ -375,9 +435,13 @@
   grid-row: 1;
 }
 .todo-subtask-row > input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+  grid-column: 1;
+  grid-row: 1;
+  width: 22px;
+  height: 22px;
   margin: 0;
+  justify-self: center;
   accent-color: #5b8def;
+  cursor: pointer;
 }
 .todo-subtask-row .task-content-input { height: 32px; }

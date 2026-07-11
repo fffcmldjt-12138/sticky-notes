@@ -59,5 +59,8 @@ export class RecycleService {
 function itemMarkdown(item: StickyItem): string[] {
   return item.type === 'note'
     ? [item.contentMarkdown]
-    : item.tasks.map((task) => task.contentMarkdown)
+    : item.tasks.flatMap((task) => [
+        task.contentMarkdown,
+        ...task.children.map((child) => child.contentMarkdown)
+      ])
 }

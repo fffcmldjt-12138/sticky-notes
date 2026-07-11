@@ -1,4 +1,5 @@
 import type { FolderItem, OrderedNodeRef, StickyItem } from '../../../shared/models'
+import type { DetachWindowOptions } from '../../../shared/electronApi'
 import { FolderCard } from '../components/FolderCard'
 import { NoteCard } from '../components/NoteCard'
 import { TreeDndContext } from '../components/TreeDndContext'
@@ -28,14 +29,14 @@ export function StickyPanel({
   onToggleTodo(item: StickyItem, taskId: string, completed: boolean): void
   onToggleTodoExpanded(item: StickyItem, expanded: boolean): void
   onContextMenu(item: StickyItem, event: React.MouseEvent<HTMLElement>): void
-  onDetach(item: StickyItem): void
+  onDetach(item: StickyItem, options?: DetachWindowOptions): void
   onToggleFolder(folder: FolderTreeNode): void
   onFolderContextMenu(
     folder: FolderTreeNode,
     event: React.MouseEvent<HTMLElement>
   ): void
   onCreateInFolder(folder: FolderTreeNode): void
-  onDetachFolder(folder: FolderItem): void
+  onDetachFolder(folder: FolderItem, options?: DetachWindowOptions): void
   onReorder(parentFolderId: string | null, orderedNodes: OrderedNodeRef[]): void
   onBeginDrag?(): void
   onDragStateChange?(active: boolean): void

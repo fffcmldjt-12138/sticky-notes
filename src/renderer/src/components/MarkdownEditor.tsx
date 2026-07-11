@@ -32,6 +32,16 @@ interface MarkdownCopyEditor {
   }
 }
 
+interface MarkdownCutEditor extends MarkdownCopyEditor {
+  chain(): {
+    focus(): {
+      deleteSelection(): {
+        run(): void
+      }
+    }
+  }
+}
+
 interface MarkdownClipboardEvent {
   clipboardData: {
     setData(type: string, value: string): void
@@ -50,6 +60,15 @@ export function writeMarkdownSelection(
   const markdown = editor.markdown.serialize({ type: 'doc', content })
   event.clipboardData.setData('text/plain', markdown)
   event.preventDefault()
+  return true
+}
+
+export function cutMarkdownSelection(
+  editor: MarkdownCutEditor,
+  event: MarkdownClipboardEvent
+): boolean {
+  if (!writeMarkdownSelection(editor, event)) return false
+  editor.chain().focus().deleteSelection().run()
   return true
 }
 
@@ -118,6 +137,12 @@ export function MarkdownEditor({
           return currentEditor
             ? writeMarkdownSelection(currentEditor, event)
             : false
+        },
+        cut: (_view, event) => {
+          const currentEditor = editorRef.current
+          return currentEditor
+            ? cutMarkdownSelection(currentEditor, event)
+            : false
         }
       },
       handlePaste: (_view, event) => {
@@ -171,18 +196,20 @@ export function MarkdownEditor({
 
   return (
     <div className={`markdown-editor-shell ${compact ? 'compact' : ''}`}>
-      <MarkdownToolbar
-        editor={editor}
-        onInsertImage={() => {
-          void window.stickyApi.assets.selectImage().then((asset) => {
-            if (!asset) return
-            editor.chain().focus().setImage({
-              src: asset.url,
-              alt: asset.fileName
-            }).run()
-          })
-        }}
-      />
+      {!compact && (
+        <MarkdownToolbar
+          editor={editor}
+          onInsertImage={() => {
+            void window.stickyApi.assets.selectImage().then((asset) => {
+              if (!asset) return
+              editor.chain().focus().setImage({
+                src: asset.url,
+                alt: asset.fileName
+              }).run()
+            })
+          }}
+        />
+      )}
       <EditorContent editor={editor} />
       <div className="markdown-syntax-hint">
         # 标题 · **粗体** · *斜体* · - 列表 · &gt; 引用 · `代码`

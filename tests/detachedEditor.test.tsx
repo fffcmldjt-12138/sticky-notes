@@ -51,7 +51,12 @@ describe('detached editor controls', () => {
     expect(container.querySelector('.editor-header')).toHaveClass('detached-header')
     expect(container.querySelector('.editor-header input')).not.toBeInTheDocument()
     expect(container.querySelector('.editor-header')).toHaveTextContent('Note')
-    expect(screen.getByLabelText('标题')).toHaveValue('Note')
+    expect(screen.queryByLabelText('标题')).not.toBeInTheDocument()
+    expect(container.querySelector('.editor')).toHaveClass('detached-editor')
+    expect(container.querySelector('.editor-identity-toolbar')).not
+      .toBeInTheDocument()
+    expect(container.querySelector('.tag-editor')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'H1' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '返回' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '删除' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '关闭' }))
@@ -75,5 +80,7 @@ describe('detached editor controls', () => {
 
     expect(screen.getByRole('button', { name: '关闭' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '删除' })).not.toBeInTheDocument()
+    expect(screen.queryByLabelText('标题')).not.toBeInTheDocument()
+    expect(screen.queryByText('添加标签')).not.toBeInTheDocument()
   })
 })

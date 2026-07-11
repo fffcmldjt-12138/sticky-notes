@@ -96,4 +96,23 @@ describe('RecycleService', () => {
       `${new Date('2026-06-15T12:00:00.000Z').getTime()}--${asset.fileName}`
     ])
   })
+
+  it('keeps images referenced by todo subtasks', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'sticky-subtask-assets-'))
+    store = new NoteStore(directory)
+    const assets = new AssetService(directory)
+    recycle = new RecycleService(store, () => new Date(), assets)
+    const asset = await assets.importBuffer(Buffer.from('child'), 'image/png')
+    const todo = await store.create('todo')
+    const task = todo.type === 'todo' ? todo.tasks[0] : null
+    const child = await store.addTodoSubtask(
+      todo.id,
+      task!.id,
+      `![](${asset.url})`
+    )
+    expect(child).not.toBeNull()
+
+    expect(await recycle.cleanUnusedImages()).toBe(0)
+    expect(await readdir(join(directory, 'assets'))).toEqual([asset.fileName])
+  })
 })

@@ -15,6 +15,27 @@ import type {
   TodoTaskPatch
 } from './models'
 
+export interface ReminderAlertPayload {
+  itemId?: string
+  taskId?: string
+  subtaskId?: string
+  title: string
+  body: string
+  createdAt: string
+}
+
+export interface DragPreviewPayload {
+  kind: 'item' | 'folder'
+  itemType?: NoteType
+  title: string
+  headerColor?: string
+  bodyTheme?: 'light' | 'dark'
+}
+
+export interface DetachWindowOptions {
+  atCursor?: boolean
+}
+
 export interface StickyApi {
   notes: {
     list(): Promise<StickyItem[]>
@@ -82,13 +103,19 @@ export interface StickyApi {
     cancelCollapse(): void
     hide(): void
     suspendAutoHide(suspended: boolean): void
-    detach(itemId: string): Promise<void>
+    detach(itemId: string, options?: DetachWindowOptions): Promise<void>
     attach(itemId: string): Promise<void>
-    detachFolder(folderId: string): Promise<void>
+    detachFolder(folderId: string, options?: DetachWindowOptions): Promise<void>
     attachFolder(folderId: string): Promise<void>
     openExternal(url: string): Promise<boolean>
+    startDragPreview?(payload: DragPreviewPayload): void
+    stopDragPreview?(): void
   }
   onOpenEditor(callback: (type: NoteType) => void): () => void
+  onOpenItem?(callback: (itemId: string) => void): () => void
   onItemChanged(callback: (item: StickyItem) => void): () => void
+  onFolderChanged?(callback: (folder: FolderItem) => void): () => void
+  onFolderDeleted?(callback: (folderId: string) => void): () => void
   onItemDeleted(callback: (itemId: string) => void): () => void
+  onReminderFired?(callback: (payload: ReminderAlertPayload) => void): () => void
 }
