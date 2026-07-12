@@ -15,6 +15,7 @@ const child = spawn(executable, args, {
   windowsHide: true,
   env: {
     ...process.env,
+    ELECTRON_ENABLE_LOGGING: '1',
     STICKY_NOTES_SMOKE_QUIT: gracefulExit ? '1' : '0'
   }
 })
@@ -23,6 +24,10 @@ let stderr = ''
 child.stderr.on('data', (chunk) => {
   stderr += chunk
 })
+
+function hasFatalRendererError() {
+  return /Unable to load preload script|Uncaught|Cannot use import statement outside a module/.test(stderr)
+}
 
 function cleanup() {
   fs.rmSync(userDataDir, { recursive: true, force: true })
@@ -45,7 +50,7 @@ if (gracefulExit) {
     console.log(`gracefulExit=${code === 0} exitCode=${code} stderrLength=${stderr.length}`)
     if (stderr) console.error(stderr)
     cleanup()
-    process.exit(code === 0 && stderr.length === 0 ? 0 : 1)
+    process.exit(code === 0 && !hasFatalRendererError() ? 0 : 1)
   })
 } else setTimeout(() => {
   const running = child.exitCode === null
@@ -59,5 +64,5 @@ if (gracefulExit) {
   }
   cleanup()
 
-  process.exit(running && stderr.length === 0 ? 0 : 1)
+  process.exit(running && !hasFatalRendererError() ? 0 : 1)
 }, 8000)

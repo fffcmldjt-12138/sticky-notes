@@ -85,7 +85,7 @@ if (!hasLock) {
               preload: join(__dirname, '../preload/index.mjs'),
               contextIsolation: true,
               nodeIntegration: false,
-              sandbox: true
+              sandbox: false
             }
           })
           const query = `mode=detached&id=${encodeURIComponent(item.id)}`
@@ -120,7 +120,7 @@ if (!hasLock) {
               preload: join(__dirname, '../preload/index.mjs'),
               contextIsolation: true,
               nodeIntegration: false,
-              sandbox: true
+              sandbox: false
             }
           })
           const query = `mode=folder&id=${encodeURIComponent(folder.id)}`
