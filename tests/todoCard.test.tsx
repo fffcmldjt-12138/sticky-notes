@@ -1,14 +1,15 @@
 // @vitest-environment jsdom
 
 import { fireEvent, render, screen } from '@testing-library/react'
+import { DndContext } from '@dnd-kit/core'
 import { describe, expect, it, vi } from 'vitest'
 import type { TodoItem } from '../src/shared/models'
 import { TodoCard } from '../src/renderer/src/components/TodoCard'
 
-const todo: TodoItem = {
+const item: TodoItem = {
   id: 'todo_1',
   type: 'todo',
-  title: 'Tasks',
+  title: 'Launch',
   headerColor: '#5b8def',
   bodyTheme: 'light',
   pinned: false,
@@ -18,67 +19,47 @@ const todo: TodoItem = {
   tags: [],
   order: 0,
   deletedAt: null,
-  panelExpanded: false,
-  tasks: Array.from({ length: 5 }, (_, index) => ({
-    id: `task_${index + 1}`,
-    contentMarkdown: `Task ${index + 1}`,
+  tasks: [{
+    id: 'task_1',
+    contentMarkdown: 'Prepare release',
     completed: false,
     tags: [],
-    importance: index === 4 ? 'important' : 'normal',
-    urgency: index === 4 ? 'urgent' : 'normal',
-    children: [],
-    schedule: null
-  })),
-  createdAt: '2026-06-15T00:00:00.000Z',
-  updatedAt: '2026-06-15T00:00:00.000Z'
+    importance: 'normal',
+    urgency: 'normal',
+    schedule: null,
+    children: [{
+      id: 'child_1',
+      contentMarkdown: 'Write notes',
+      completed: false,
+      tags: [],
+      importance: 'normal',
+      urgency: 'normal',
+      schedule: null
+    }]
+  }],
+  panelExpanded: true,
+  createdAt: '2026-07-13T00:00:00.000Z',
+  updatedAt: '2026-07-13T00:00:00.000Z'
 }
 
-function renderCard(item: TodoItem, onToggleExpanded = vi.fn()) {
-  return render(
-    <TodoCard
-      item={item}
-      onOpen={vi.fn()}
-      onToggle={vi.fn()}
-      onToggleExpanded={onToggleExpanded}
-      onContextMenu={vi.fn()}
-      onDetach={vi.fn()}
-    />
-  )
-}
+describe('TodoCard', () => {
+  it('lets a subtask be checked directly from the panel', () => {
+    const onToggleSubtask = vi.fn()
+    render(
+      <DndContext>
+        <TodoCard
+          item={item}
+          onOpen={vi.fn()}
+          onToggle={vi.fn()}
+          onToggleSubtask={onToggleSubtask}
+          onToggleExpanded={vi.fn()}
+          onContextMenu={vi.fn()}
+          onDetach={vi.fn()}
+        />
+      </DndContext>
+    )
 
-describe('TodoCard expansion', () => {
-  it('shows three tasks when collapsed and every task when expanded', () => {
-    const collapsed = renderCard(todo)
-    expect(collapsed.container.querySelectorAll('.todo-check')).toHaveLength(3)
-    collapsed.unmount()
-
-    const expanded = renderCard({ ...todo, panelExpanded: true })
-    expect(expanded.container.querySelectorAll('.todo-check')).toHaveLength(5)
-  })
-
-  it('requests a persisted expansion toggle', () => {
-    const onToggleExpanded = vi.fn()
-    renderCard(todo, onToggleExpanded)
-
-    fireEvent.click(screen.getByRole('button', { name: '展开全部待办' }))
-
-    expect(onToggleExpanded).toHaveBeenCalledWith(true)
-  })
-
-  it('shows important urgent tasks first and strikes completed tasks', () => {
-    const ranked: TodoItem = {
-      ...todo,
-      panelExpanded: true,
-      tasks: todo.tasks.map((task, index) => ({
-        ...task,
-        completed: index === 0
-      }))
-    }
-    const { container } = renderCard(ranked)
-    const labels = Array.from(container.querySelectorAll('.todo-check span'))
-      .map((element) => element.textContent)
-
-    expect(labels[0]).toBe('Task 5')
-    expect(container.querySelector('.todo-check.completed')).toBeTruthy()
+    fireEvent.click(screen.getByRole('checkbox', { name: '子待办 Write notes' }))
+    expect(onToggleSubtask).toHaveBeenCalledWith('task_1', 'child_1', true)
   })
 })

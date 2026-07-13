@@ -38,6 +38,15 @@ export function MarkdownToolbar({
         {button('H2', '二级标题：## ', editor.isActive('heading', { level: 2 }), () =>
           editor.chain().focus().toggleHeading({ level: 2 }).run()
         )}
+        {button('H3', '三级标题：### ', editor.isActive('heading', { level: 3 }), () =>
+          editor.chain().focus().toggleHeading({ level: 3 }).run()
+        )}
+        {button('H4', '四级标题：#### ', editor.isActive('heading', { level: 4 }), () =>
+          editor.chain().focus().toggleHeading({ level: 4 }).run()
+        )}
+        {button('H5', '五级标题：##### ', editor.isActive('heading', { level: 5 }), () =>
+          editor.chain().focus().toggleHeading({ level: 5 }).run()
+        )}
         {button('B', '粗体：**文字**', editor.isActive('bold'), () =>
           editor.chain().focus().toggleBold().run()
         )}

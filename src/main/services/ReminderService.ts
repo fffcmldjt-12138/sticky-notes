@@ -14,7 +14,10 @@ export interface ReminderPayload {
   itemId: string
   taskId: string
   subtaskId?: string
+  reminderId: string
 }
+
+type ReminderTarget = Omit<ReminderPayload, 'reminderId'>
 
 interface ReminderStore {
   list(): Promise<StickyItem[]>
@@ -114,7 +117,7 @@ function processSchedule(
   schedule: TodoSchedule | null,
   current: Date,
   notify: ReminderNotify,
-  payload: ReminderPayload
+  payload: ReminderTarget
 ): TodoTaskPatch | TodoSubtaskPatch | null {
   if (!schedule) return null
 
@@ -123,7 +126,9 @@ function processSchedule(
   const dueAt = new Date(getScheduleDueAt(schedule)).getTime()
   let changed = false
   const reminders = schedule.reminders.map((reminder) => {
-    const triggerAt = dueAt - reminder.offsetMinutes * 60_000
+    const triggerAt = reminder.snoozedUntil
+      ? new Date(reminder.snoozedUntil).getTime()
+      : dueAt - reminder.offsetMinutes * 60_000
     if (completed || reminder.remindedAt || triggerAt > now) return reminder
 
     changed = true
@@ -132,12 +137,18 @@ function processSchedule(
       dueAt <= now
         ? '强提醒：截止时间已到'
         : `强提醒：距离截止还有 ${formatOffset(reminder.offsetMinutes)}`,
-      payload
+      { ...payload, reminderId: reminder.id }
     )
-    return { ...reminder, remindedAt: nowIso }
+    return { ...reminder, remindedAt: nowIso, snoozedUntil: null }
   })
 
-  if (dueAt <= now) {
+  const hasPendingSnooze = reminders.some((reminder) =>
+    !reminder.remindedAt &&
+    Boolean(reminder.snoozedUntil) &&
+    new Date(reminder.snoozedUntil!).getTime() > now
+  )
+
+  if (dueAt <= now && !hasPendingSnooze) {
     const next = advanceRecurringSchedulePast(
       { ...schedule, reminders },
       current

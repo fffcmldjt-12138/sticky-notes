@@ -12,6 +12,7 @@ export function StickyPanel({
   folders,
   onOpen,
   onToggleTodo,
+  onToggleTodoSubtask,
   onToggleTodoExpanded,
   onContextMenu,
   onDetach,
@@ -27,6 +28,12 @@ export function StickyPanel({
   folders: FolderItem[]
   onOpen(item: StickyItem): void
   onToggleTodo(item: StickyItem, taskId: string, completed: boolean): void
+  onToggleTodoSubtask(
+    item: StickyItem,
+    taskId: string,
+    subtaskId: string,
+    completed: boolean
+  ): void
   onToggleTodoExpanded(item: StickyItem, expanded: boolean): void
   onContextMenu(item: StickyItem, event: React.MouseEvent<HTMLElement>): void
   onDetach(item: StickyItem, options?: DetachWindowOptions): void
@@ -83,6 +90,9 @@ export function StickyPanel({
               onOpen={() => onOpen(entry.item)}
               onToggle={(taskId, completed) =>
                 onToggleTodo(entry.item, taskId, completed)
+              }
+              onToggleSubtask={(taskId, subtaskId, completed) =>
+                onToggleTodoSubtask(entry.item, taskId, subtaskId, completed)
               }
               onToggleExpanded={(expanded) =>
                 onToggleTodoExpanded(entry.item, expanded)

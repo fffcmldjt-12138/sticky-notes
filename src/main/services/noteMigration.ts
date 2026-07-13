@@ -225,7 +225,9 @@ function normalizeReminder(value: unknown): TaskReminder {
       ? Number(reminder.offsetMinutes)
       : 0,
     remindedAt:
-      typeof reminder.remindedAt === 'string' ? reminder.remindedAt : null
+      typeof reminder.remindedAt === 'string' ? reminder.remindedAt : null,
+    snoozedUntil:
+      typeof reminder.snoozedUntil === 'string' ? reminder.snoozedUntil : null
   }
 }
 

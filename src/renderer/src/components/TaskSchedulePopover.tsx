@@ -40,6 +40,7 @@ export function TaskSchedulePopover({
   const [customUnit, setCustomUnit] =
     useState<'minutes' | 'hours' | 'days'>('hours')
   const [error, setError] = useState('')
+  const [reminderFeedback, setReminderFeedback] = useState('')
 
   function togglePreset(offsetMinutes: number): void {
     setReminders((current) =>
@@ -77,13 +78,18 @@ export function TaskSchedulePopover({
 
   function addCustomReminder(): void {
     const amount = Number(customAmount)
-    if (!Number.isFinite(amount) || amount <= 0) return
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setReminderFeedback('请输入大于 0 的提前时间')
+      return
+    }
     const factor =
       customUnit === 'days' ? 1440 : customUnit === 'hours' ? 60 : 1
     const offsetMinutes = Math.round(amount * factor)
     if (reminders.some((reminder) => reminder.offsetMinutes === offsetMinutes)) {
+      setReminderFeedback('这个提前提醒已经添加')
       return
     }
+    setReminderFeedback('')
     setReminders((current) => [...current, {
       id: `custom-${offsetMinutes}`,
       offsetMinutes,
@@ -175,6 +181,35 @@ export function TaskSchedulePopover({
           </select>
           <button type="button" onClick={addCustomReminder}>添加提前提醒</button>
         </div>
+        {reminders.length > 0 && (
+          <div className="selected-reminders" aria-label="已添加提醒">
+            {[...reminders]
+              .sort((left, right) => left.offsetMinutes - right.offsetMinutes)
+              .map((reminder) => {
+                const label = formatReminderOffset(reminder.offsetMinutes)
+                return (
+                  <span className="selected-reminder-chip" key={reminder.id}>
+                    {label}
+                    <button
+                      type="button"
+                      aria-label={`删除${label}`}
+                      onClick={() => {
+                        setReminders((current) =>
+                          current.filter((entry) => entry.id !== reminder.id)
+                        )
+                        setReminderFeedback('')
+                      }}
+                    >
+                      ×
+                    </button>
+                  </span>
+                )
+              })}
+          </div>
+        )}
+        {reminderFeedback && (
+          <p className="reminder-feedback" role="status">{reminderFeedback}</p>
+        )}
       </section>
       <section className="schedule-section">
         <strong>重复</strong>
@@ -220,4 +255,11 @@ function toLocalInput(value?: string | null): string {
   const date = new Date(value)
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
   return local.toISOString().slice(0, 16)
+}
+
+function formatReminderOffset(minutes: number): string {
+  if (minutes === 0) return '当天'
+  if (minutes % 1440 === 0) return `提前 ${minutes / 1440} 天`
+  if (minutes % 60 === 0) return `提前 ${minutes / 60} 小时`
+  return `提前 ${minutes} 分钟`
 }

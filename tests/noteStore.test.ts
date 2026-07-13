@@ -94,6 +94,54 @@ describe('NoteStore', () => {
     expect(deleted?.tasks[0].children).toEqual([])
   })
 
+  it('completes a parent only when every subtask is complete', async () => {
+    const todo = await store.create('todo')
+    const task = todo.type === 'todo' ? todo.tasks[0] : null
+    const first = await store.addTodoSubtask(todo.id, task!.id, 'First')
+    const second = await store.addTodoSubtask(todo.id, task!.id, 'Second')
+
+    const partlyDone = await store.updateTodoSubtask(
+      todo.id,
+      task!.id,
+      first!.id,
+      { completed: true }
+    )
+    expect(partlyDone?.tasks[0].completed).toBe(false)
+
+    const allDone = await store.updateTodoSubtask(
+      todo.id,
+      task!.id,
+      second!.id,
+      { completed: true }
+    )
+    expect(allDone?.tasks[0].completed).toBe(true)
+
+    const reopened = await store.updateTodoSubtask(
+      todo.id,
+      task!.id,
+      first!.id,
+      { completed: false }
+    )
+    expect(reopened?.tasks[0].completed).toBe(false)
+  })
+
+  it('applies a parent completion toggle to all subtasks', async () => {
+    const todo = await store.create('todo')
+    const task = todo.type === 'todo' ? todo.tasks[0] : null
+    await store.addTodoSubtask(todo.id, task!.id, 'First')
+    await store.addTodoSubtask(todo.id, task!.id, 'Second')
+
+    const completed = await store.updateTodoTask(todo.id, task!.id, {
+      completed: true
+    })
+    expect(completed?.tasks[0].children.every((child) => child.completed)).toBe(true)
+
+    const reopened = await store.updateTodoTask(todo.id, task!.id, {
+      completed: false
+    })
+    expect(reopened?.tasks[0].children.every((child) => !child.completed)).toBe(true)
+  })
+
   it('keeps delivered reminder state but resets it when schedule rules change', async () => {
     const todo = await store.create('todo')
     const task = await store.addTodoTask(todo.id, 'Scheduled')
@@ -128,6 +176,31 @@ describe('NoteStore', () => {
       }
     })
     expect(changed?.tasks[0].schedule?.reminders[0].remindedAt).toBeNull()
+  })
+
+  it('persists snooze on the exact task reminder', async () => {
+    const todo = await store.create('todo')
+    const task = todo.type === 'todo' ? todo.tasks[0] : null
+    await store.updateTodoTask(todo.id, task!.id, {
+      schedule: {
+        mode: 'point',
+        startAt: '2026-07-13T12:00:00.000Z',
+        endAt: null,
+        repeat: 'none',
+        reminders: [{ id: 'at-time', offsetMinutes: 0, remindedAt: 'sent' }]
+      }
+    })
+
+    const updated = await store.snoozeReminder(
+      { itemId: todo.id, taskId: task!.id, reminderId: 'at-time' },
+      new Date('2026-07-13T10:10:00.000Z')
+    )
+
+    expect(updated?.tasks[0].schedule?.reminders[0]).toMatchObject({
+      id: 'at-time',
+      remindedAt: null,
+      snoozedUntil: '2026-07-13T10:10:00.000Z'
+    })
   })
 
   it('serializes concurrent updates without losing either change', async () => {

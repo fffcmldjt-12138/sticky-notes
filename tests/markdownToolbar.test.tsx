@@ -1,14 +1,15 @@
 // @vitest-environment jsdom
 
-import { render } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { MarkdownToolbar } from '../src/renderer/src/components/MarkdownToolbar'
 
 function fakeEditor() {
+  const toggleHeading = vi.fn(() => chain)
   const chain = {
     focus: () => chain,
     setParagraph: () => chain,
-    toggleHeading: () => chain,
+    toggleHeading,
     toggleBold: () => chain,
     toggleItalic: () => chain,
     toggleStrike: () => chain,
@@ -29,7 +30,8 @@ function fakeEditor() {
   return {
     chain: () => chain,
     isActive: () => false,
-    getAttributes: () => ({})
+    getAttributes: () => ({}),
+    toggleHeading
   }
 }
 
@@ -44,5 +46,20 @@ describe('MarkdownToolbar', () => {
     expect(container.querySelector('[aria-label="列表和引用"]')).toBeInTheDocument()
     expect(container.querySelector('[aria-label="插入内容"]')).toBeInTheDocument()
     expect(container.querySelector('[aria-label="历史操作"]')).toBeInTheDocument()
+  })
+
+  it.each([
+    ['H3', 3],
+    ['H4', 4],
+    ['H5', 5]
+  ])('applies %s heading formatting', (label, level) => {
+    const editor = fakeEditor()
+    render(
+      <MarkdownToolbar editor={editor as never} onInsertImage={vi.fn()} />
+    )
+
+    fireEvent.mouseDown(screen.getByRole('button', { name: label }))
+
+    expect(editor.toggleHeading).toHaveBeenCalledWith({ level })
   })
 })

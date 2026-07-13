@@ -8,6 +8,7 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
+  type DragMoveEvent,
   type DragStartEvent
 } from '@dnd-kit/core'
 import type {
@@ -50,6 +51,7 @@ export function TreeDndContext({
   onDragStateChange?(active: boolean): void
 }>): React.JSX.Element {
   const [active, setActive] = useState<ActiveTreeDrag | null>(null)
+  const [outside, setOutside] = useState(false)
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor)
@@ -67,6 +69,7 @@ export function TreeDndContext({
     const data = event.active.data.current as ActiveTreeDrag | undefined
     if (!data) return
     setActive(data)
+    setOutside(false)
     window.stickyApi?.window.startDragPreview?.(toDragPreviewPayload(data))
     onDragStart?.()
     onDragStateChange?.(true)
@@ -75,6 +78,7 @@ export function TreeDndContext({
   function handleEnd(event: DragEndEvent): void {
     const data = event.active.data.current as ActiveTreeDrag | undefined
     setActive(null)
+    setOutside(false)
     window.stickyApi?.window.stopDragPreview?.()
     onDragStateChange?.(false)
     if (!data) return
@@ -124,24 +128,57 @@ export function TreeDndContext({
     }
   }
 
+  function handleMove(event: DragMoveEvent): void {
+    const start = pointerStart(event.activatorEvent)
+    if (!start) return
+    setOutside(pointOutsideViewport(
+      { x: start.x + event.delta.x, y: start.y + event.delta.y },
+      { width: window.innerWidth, height: window.innerHeight }
+    ))
+  }
+
+  const visual = treeDragVisualState(Boolean(active), outside)
+
   return (
     <DndContext
       sensors={sensors}
       collisionDetection={closestCenter}
       onDragStart={handleStart}
+      onDragMove={handleMove}
       onDragCancel={() => {
         setActive(null)
+        setOutside(false)
         window.stickyApi?.window.stopDragPreview?.()
         onDragStateChange?.(false)
       }}
       onDragEnd={handleEnd}
     >
-      {children}
+      <div className={visual.className}>{children}</div>
       <DragOverlay dropAnimation={null}>
-        {active ? <TreeDragOverlay active={active} /> : null}
+        {active && visual.showOverlay ? <TreeDragOverlay active={active} /> : null}
       </DragOverlay>
     </DndContext>
   )
+}
+
+function pointerStart(event: Event): { x: number; y: number } | null {
+  if (event instanceof MouseEvent) {
+    return { x: event.clientX, y: event.clientY }
+  }
+  if (event instanceof TouchEvent && event.touches[0]) {
+    return { x: event.touches[0].clientX, y: event.touches[0].clientY }
+  }
+  return null
+}
+
+export function treeDragVisualState(
+  active: boolean,
+  outside: boolean
+): { className: string; showOverlay: boolean } {
+  return {
+    className: outside ? 'tree-dnd-surface outside-drag' : 'tree-dnd-surface',
+    showOverlay: active && !outside
+  }
 }
 
 export function toDragPreviewPayload(active: ActiveTreeDrag): DragPreviewPayload {

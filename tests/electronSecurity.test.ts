@@ -8,7 +8,12 @@ describe('Electron preload compatibility', () => {
       readFile('src/main/main.ts', 'utf8')
     ])
 
-    expect(sources.join('\n')).not.toContain('sandbox: true')
-    expect(sources.join('\n').match(/sandbox: false/g)).toHaveLength(3)
+    const source = sources.join('\n')
+    const esmPreloads = source.match(/preload: join\(__dirname, '\.\.\/preload\/index\.mjs'\)/g) ?? []
+    const unsandboxedWindows = source.match(/sandbox: false/g) ?? []
+
+    expect(source).not.toContain('sandbox: true')
+    expect(esmPreloads.length).toBeGreaterThan(0)
+    expect(unsandboxedWindows).toHaveLength(esmPreloads.length)
   })
 })

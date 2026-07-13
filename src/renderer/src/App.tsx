@@ -17,6 +17,7 @@ import { CardContextMenu, type CardAction } from './components/CardContextMenu'
 import { TitleDialog } from './components/TitleDialog'
 import { TodoEditor } from './components/TodoEditor'
 import { StickyPanel } from './pages/StickyPanel'
+import { ReminderWindow } from './pages/ReminderWindow'
 import { upsertItem } from './lib/itemList'
 import { getItemTags, mergeTags } from '../../shared/tags'
 import type { FolderTreeNode } from './lib/folderTree'
@@ -46,12 +47,30 @@ export default function App(): React.JSX.Element {
   const params = new URLSearchParams(window.location.search)
   const mode = params.get('mode')
   const id = params.get('id')
+  if (mode === 'reminder') {
+    const payload = parseReminderPayload(params.get('payload'))
+    return payload
+      ? <ReminderWindow payload={payload} />
+      : <div className="detached-error">提醒内容无法读取</div>
+  }
   let content: React.JSX.Element = <PanelApp />
   if (mode === 'folder' && id) content = <DetachedFolder folderId={id} />
   if (mode === 'detached' && id) content = <DetachedEditor itemId={id} />
   return <Suspense fallback={<div className="app-loading">正在加载...</div>}>
     {content}
   </Suspense>
+}
+
+function parseReminderPayload(value: string | null): ReminderAlertPayload | null {
+  if (!value) return null
+  try {
+    const payload = JSON.parse(value) as ReminderAlertPayload
+    return typeof payload.title === 'string' && typeof payload.body === 'string'
+      ? payload
+      : null
+  } catch {
+    return null
+  }
 }
 
 function PanelApp(): React.JSX.Element {
@@ -414,6 +433,20 @@ function PanelApp(): React.JSX.Element {
               const updated = await window.stickyApi.notes.updateTodoTask(
                 item.id,
                 taskId,
+                { completed }
+              )
+              if (updated) {
+                setItems((current) =>
+                  current.map((entry) => entry.id === updated.id ? updated : entry)
+                )
+              }
+            }}
+            onToggleTodoSubtask={async (item, taskId, subtaskId, completed) => {
+              if (item.type !== 'todo') return
+              const updated = await window.stickyApi.notes.updateTodoSubtask(
+                item.id,
+                taskId,
+                subtaskId,
                 { completed }
               )
               if (updated) {

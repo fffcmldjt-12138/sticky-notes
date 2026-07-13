@@ -7,6 +7,7 @@ export function TodoCard({
   item,
   onOpen,
   onToggle,
+  onToggleSubtask,
   onToggleExpanded,
   onContextMenu,
   onDetach
@@ -14,6 +15,7 @@ export function TodoCard({
   item: TodoItem
   onOpen(): void
   onToggle(taskId: string, completed: boolean): void
+  onToggleSubtask(taskId: string, subtaskId: string, completed: boolean): void
   onToggleExpanded(expanded: boolean): void
   onContextMenu(event: React.MouseEvent<HTMLElement>): void
   onDetach(): void
@@ -51,12 +53,20 @@ export function TodoCard({
             {task.children.length > 0 && (
               <div className="todo-subtasks-preview">
                 {task.children.map((child) => (
-                  <small
+                  <label
                     key={child.id}
                     className={child.completed ? 'completed' : ''}
                   >
-                    {child.contentMarkdown || '空子待办'}
-                  </small>
+                    <input
+                      type="checkbox"
+                      aria-label={`子待办 ${child.contentMarkdown || '空子待办'}`}
+                      checked={child.completed}
+                      onChange={(event) =>
+                        onToggleSubtask(task.id, child.id, event.target.checked)
+                      }
+                    />
+                    <small>{child.contentMarkdown || '空子待办'}</small>
+                  </label>
                 ))}
               </div>
             )}

@@ -435,12 +435,19 @@ export class NoteStore {
           scheduleRuleKey(patch.schedule ?? null) !==
             scheduleRuleKey(task.schedule)
         const updated = { ...task, ...patch }
+        if (Object.hasOwn(patch, 'completed') && task.children.length > 0) {
+          updated.children = task.children.map((child) => ({
+            ...child,
+            completed: Boolean(patch.completed)
+          }))
+        }
         if (scheduleRulesChanged && updated.schedule) {
           updated.schedule = {
             ...updated.schedule,
             reminders: updated.schedule.reminders.map((reminder) => ({
               ...reminder,
-              remindedAt: null
+              remindedAt: null,
+              snoozedUntil: null
             }))
           }
         }
@@ -491,14 +498,7 @@ export class NoteStore {
       ...todo,
       tasks: todo.tasks.map((task) =>
         task.id === taskId
-          ? {
-              ...task,
-              children: task.children.map((child) =>
-                child.id === subtaskId
-                  ? applySubtaskPatch(child, patch)
-                  : child
-              )
-            }
+          ? updateTaskSubtask(task, subtaskId, patch)
           : task
       )
     }))
@@ -519,6 +519,48 @@ export class NoteStore {
             }
           : task
       )
+    }))
+  }
+
+  async snoozeReminder(
+    target: {
+      itemId: string
+      taskId: string
+      subtaskId?: string
+      reminderId: string
+    },
+    snoozedUntil: Date
+  ): Promise<TodoItem | null> {
+    return this.changeTodo(target.itemId, (todo) => ({
+      ...todo,
+      tasks: todo.tasks.map((task) => {
+        if (task.id !== target.taskId) return task
+        if (target.subtaskId) {
+          return {
+            ...task,
+            children: task.children.map((child) =>
+              child.id === target.subtaskId
+                ? {
+                    ...child,
+                    schedule: snoozeSchedule(
+                      child.schedule,
+                      target.reminderId,
+                      snoozedUntil
+                    )
+                  }
+                : child
+            )
+          }
+        }
+        return {
+          ...task,
+          schedule: snoozeSchedule(
+            task.schedule,
+            target.reminderId,
+            snoozedUntil
+          )
+        }
+      })
     }))
   }
 
@@ -613,11 +655,47 @@ function applySubtaskPatch(
       ...updated.schedule,
       reminders: updated.schedule.reminders.map((reminder) => ({
         ...reminder,
-        remindedAt: null
+        remindedAt: null,
+        snoozedUntil: null
       }))
     }
   }
   return updated
+}
+
+function updateTaskSubtask(
+  task: TodoTask,
+  subtaskId: string,
+  patch: TodoSubtaskPatch
+): TodoTask {
+  const children = task.children.map((child) =>
+    child.id === subtaskId ? applySubtaskPatch(child, patch) : child
+  )
+  return {
+    ...task,
+    children,
+    completed: children.length > 0 && children.every((child) => child.completed)
+  }
+}
+
+function snoozeSchedule(
+  schedule: TodoSchedule | null,
+  reminderId: string,
+  snoozedUntil: Date
+): TodoSchedule | null {
+  if (!schedule) return null
+  return {
+    ...schedule,
+    reminders: schedule.reminders.map((reminder) =>
+      reminder.id === reminderId
+        ? {
+            ...reminder,
+            remindedAt: null,
+            snoozedUntil: snoozedUntil.toISOString()
+          }
+        : reminder
+    )
+  }
 }
 
 function createTodoTask(contentMarkdown = ''): TodoTask {

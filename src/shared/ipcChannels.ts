@@ -40,6 +40,7 @@ export const ipcChannels = {
   openEditor: 'app:open-editor',
   openItem: 'app:open-item',
   reminderFired: 'app:reminder-fired',
+  reminderWindowAction: 'reminder-window:action',
   itemChanged: 'notes:item-changed',
   folderChanged: 'folders:item-changed',
   folderDeleted: 'folders:item-deleted',

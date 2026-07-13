@@ -19,10 +19,16 @@ export interface ReminderAlertPayload {
   itemId?: string
   taskId?: string
   subtaskId?: string
+  reminderId?: string
   title: string
   body: string
   createdAt: string
 }
+
+export type ReminderWindowAction =
+  | { type: 'acknowledge' }
+  | { type: 'open' }
+  | { type: 'snooze'; minutes: 5 | 10 | 30 }
 
 export interface DragPreviewPayload {
   kind: 'item' | 'folder'
@@ -96,6 +102,9 @@ export interface StickyApi {
     restoreFolder(id: string): Promise<boolean>
     empty(): Promise<number>
     cleanUnusedImages(): Promise<number>
+  }
+  reminder: {
+    respond(action: ReminderWindowAction): Promise<void>
   }
   window: {
     expand(): void

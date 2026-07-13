@@ -46,6 +46,7 @@ export interface TaskReminder {
   id: string
   offsetMinutes: number
   remindedAt: string | null
+  snoozedUntil?: string | null
 }
 
 export interface TodoSchedule {

@@ -81,7 +81,7 @@ describe('ReminderService', () => {
     expect(notify).toHaveBeenCalledWith(
       '提交作业',
       '强提醒：距离截止还有 1 天',
-      { itemId: 'todo_1', taskId: 'task_1' }
+      { itemId: 'todo_1', taskId: 'task_1', reminderId: 'one-day' }
     )
     expect(updateTodoTask).toHaveBeenCalledWith('todo_1', 'task_1', {
       schedule: {
@@ -89,7 +89,8 @@ describe('ReminderService', () => {
         reminders: [{
           id: 'one-day',
           offsetMinutes: 1440,
-          remindedAt: '2026-06-19T12:00:00.000Z'
+          remindedAt: '2026-06-19T12:00:00.000Z',
+          snoozedUntil: null
         }]
       }
     })
@@ -178,7 +179,12 @@ describe('ReminderService', () => {
     expect(notify).toHaveBeenCalledWith(
       '上传附件',
       '强提醒：截止时间已到',
-      { itemId: 'todo_1', taskId: 'task_1', subtaskId: 'subtask_1' }
+      {
+        itemId: 'todo_1',
+        taskId: 'task_1',
+        subtaskId: 'subtask_1',
+        reminderId: 'at-time'
+      }
     )
     expect(updateTodoSubtask).toHaveBeenCalledWith(
       'todo_1',
@@ -186,5 +192,96 @@ describe('ReminderService', () => {
       'subtask_1',
       { schedule: expect.any(Object) }
     )
+  })
+
+  it('delivers a persisted snooze only when its absolute time arrives', async () => {
+    const snoozed: TodoItem = {
+      ...todo,
+      tasks: [{
+        ...todo.tasks[0],
+        schedule: {
+          ...todo.tasks[0].schedule!,
+          reminders: [{
+            id: 'one-day',
+            offsetMinutes: 1440,
+            remindedAt: null,
+            snoozedUntil: '2026-06-19T12:10:00.000Z'
+          }]
+        }
+      }]
+    }
+    const notify = vi.fn()
+    const updateTodoTask = vi.fn().mockResolvedValue(undefined)
+    const store = {
+      list: vi.fn().mockResolvedValue([snoozed]),
+      updateTodoTask,
+      updateTodoSubtask: vi.fn()
+    }
+    const early = new ReminderService(
+      store,
+      notify,
+      () => new Date('2026-06-19T12:09:00.000Z')
+    )
+    await early.check()
+    expect(notify).not.toHaveBeenCalled()
+
+    const due = new ReminderService(
+      store,
+      notify,
+      () => new Date('2026-06-19T12:10:00.000Z')
+    )
+    await due.check()
+    expect(notify).toHaveBeenCalledWith(
+      '提交作业',
+      '强提醒：距离截止还有 1 天',
+      { itemId: 'todo_1', taskId: 'task_1', reminderId: 'one-day' }
+    )
+    expect(updateTodoTask).toHaveBeenLastCalledWith(
+      'todo_1',
+      'task_1',
+      {
+        schedule: expect.objectContaining({
+          reminders: [expect.objectContaining({
+            remindedAt: '2026-06-19T12:10:00.000Z',
+            snoozedUntil: null
+          })]
+        })
+      }
+    )
+  })
+
+  it('does not advance a recurring schedule while a snoozed reminder is pending', async () => {
+    const snoozedRecurring: TodoItem = {
+      ...todo,
+      tasks: [{
+        ...todo.tasks[0],
+        schedule: {
+          ...todo.tasks[0].schedule!,
+          repeat: 'daily',
+          reminders: [{
+            id: 'at-time',
+            offsetMinutes: 0,
+            remindedAt: null,
+            snoozedUntil: '2026-06-20T12:10:00.000Z'
+          }]
+        }
+      }]
+    }
+    const notify = vi.fn()
+    const updateTodoTask = vi.fn().mockResolvedValue(undefined)
+    const service = new ReminderService(
+      {
+        list: vi.fn().mockResolvedValue([snoozedRecurring]),
+        updateTodoTask,
+        updateTodoSubtask: vi.fn()
+      },
+      notify,
+      () => new Date('2026-06-20T12:05:00.000Z')
+    )
+
+    await service.check()
+
+    expect(notify).not.toHaveBeenCalled()
+    expect(updateTodoTask).not.toHaveBeenCalled()
   })
 })

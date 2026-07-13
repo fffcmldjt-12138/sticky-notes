@@ -13,6 +13,7 @@ import { registerConfigIpc } from './ipc/configIpc'
 import { registerAssetIpc } from './ipc/assetIpc'
 import { registerFolderIpc } from './ipc/folderIpc'
 import { registerNoteIpc } from './ipc/noteIpc'
+import { registerReminderIpc } from './ipc/reminderIpc'
 import { registerRecycleIpc } from './ipc/recycleIpc'
 import { registerWindowIpc } from './ipc/windowIpc'
 import { ipcChannels } from '../shared/ipcChannels'
@@ -31,6 +32,10 @@ import { NoteStore } from './services/NoteStore'
 import { DragPreviewWindowService } from './services/DragPreviewWindowService'
 import { ReminderService } from './services/ReminderService'
 import { ReminderPresentationService } from './services/ReminderPresentationService'
+import {
+  ReminderWindowService,
+  type ReminderWindowHandle
+} from './services/ReminderWindowService'
 import { RecycleService } from './services/RecycleService'
 import { TrayService } from './services/TrayService'
 import { WindowService } from './services/WindowService'
@@ -139,10 +144,92 @@ if (!hasLock) {
       (folder) => broadcast(ipcChannels.folderChanged, folder)
     )
     const tray = new TrayService(windows, config, autoLaunch)
+    const reminderWindows = new ReminderWindowService(
+      {
+        create: (payload): ReminderWindowHandle => {
+          const window = new BrowserWindow({
+            width: 460,
+            height: 320,
+            minWidth: 420,
+            minHeight: 300,
+            frame: false,
+            resizable: false,
+            show: false,
+            alwaysOnTop: true,
+            skipTaskbar: false,
+            backgroundColor: '#ffffff',
+            webPreferences: {
+              preload: join(__dirname, '../preload/index.mjs'),
+              contextIsolation: true,
+              nodeIntegration: false,
+              sandbox: false
+            }
+          })
+          const payloadJson = JSON.stringify(payload)
+          if (is.dev && process.env.ELECTRON_RENDERER_URL) {
+            const query = new URLSearchParams({
+              mode: 'reminder',
+              payload: payloadJson
+            })
+            void window.loadURL(`${process.env.ELECTRON_RENDERER_URL}?${query}`)
+          } else {
+            void window.loadFile(join(__dirname, '../renderer/index.html'), {
+              query: { mode: 'reminder', payload: payloadJson }
+            })
+          }
+          window.center()
+          window.setAlwaysOnTop(true, 'screen-saver')
+          let ready = false
+          const whenReady = (operation: () => void): void => {
+            if (ready) {
+              operation()
+              return
+            }
+            window.once('ready-to-show', () => {
+              ready = true
+              operation()
+            })
+          }
+          return {
+            show: () => whenReady(() => window.show()),
+            focus: () => whenReady(() => window.focus()),
+            flashFrame: (flag) => whenReady(() => window.flashFrame(flag)),
+            close: () => window.close(),
+            isDestroyed: () => window.isDestroyed(),
+            on: (_event, listener) => window.on('closed', listener)
+          }
+        }
+      },
+      async (payload, action) => {
+        if (action.type === 'open' && payload.itemId) {
+          windows.sendOpenItem(payload.itemId)
+          return
+        }
+        if (
+          action.type === 'snooze' &&
+          payload.itemId &&
+          payload.taskId &&
+          payload.reminderId
+        ) {
+          const updated = await notes.snoozeReminder(
+            {
+              itemId: payload.itemId,
+              taskId: payload.taskId,
+              subtaskId: payload.subtaskId,
+              reminderId: payload.reminderId
+            },
+            new Date(Date.now() + action.minutes * 60_000)
+          )
+          if (updated) broadcast(ipcChannels.itemChanged, updated)
+        }
+      }
+    )
     const reminderPresentation = new ReminderPresentationService(
       (title, body) => new Notification({ title, body }),
       windows,
-      (payload) => broadcast(ipcChannels.reminderFired, payload)
+      (payload) => broadcast(ipcChannels.reminderFired, payload),
+      () => new Date(),
+      reminderWindows
     )
     const reminder = new ReminderService(notes, (title, body, payload) =>
       reminderPresentation.present(title, body, payload)
@@ -176,6 +263,7 @@ if (!hasLock) {
       deleted: (folderId) => broadcast(ipcChannels.folderDeleted, folderId)
     })
     registerRecycleIpc(recycle)
+    registerReminderIpc(reminderWindows)
     registerWindowIpc(windows, detachedWindows, folderWindows, notes, dragPreview)
     registerConfigIpc(config, autoLaunch, windows, tray)
     reminder.start()
@@ -189,6 +277,7 @@ if (!hasLock) {
     app.on('second-instance', () => windows.show())
     app.on('before-quit', () => {
       reminder.stop()
+      reminderWindows.closeAll()
       dragPreview.stop()
       detachedWindows.beginShutdown()
       folderWindows.beginShutdown()

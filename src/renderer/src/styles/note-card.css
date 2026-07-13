@@ -52,14 +52,26 @@
 .todo-check { display: flex; align-items: flex-start; gap: 8px; }
 .todo-check input { margin-top: 3px; accent-color: #5b8def; }
 .todo-check.completed > div > span,
-.todo-subtasks-preview small.completed {
+.todo-subtasks-preview label.completed small {
   text-decoration: line-through;
   opacity: .55;
 }
 .todo-subtasks-preview {
-  margin-top: 3px;
+  margin-top: 5px;
   display: grid;
-  gap: 2px;
+  gap: 4px;
+}
+.todo-subtasks-preview label {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 14px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+}
+.todo-subtasks-preview input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
 }
 .todo-subtasks-preview small {
   color: #7a8492;
@@ -445,3 +457,33 @@
   cursor: pointer;
 }
 .todo-subtask-row .task-content-input { height: 32px; }
+.selected-reminders {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.selected-reminder-chip {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 6px 4px 8px;
+  border: 1px solid rgba(91,141,239,.28);
+  border-radius: 7px;
+  background: rgba(91,141,239,.1);
+  color: inherit;
+  font-size: 11px;
+}
+.selected-reminder-chip button {
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+}
+.reminder-feedback {
+  margin: 0;
+  color: #b4232f;
+  font-size: 11px;
+}

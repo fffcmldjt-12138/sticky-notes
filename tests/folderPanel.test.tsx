@@ -49,6 +49,7 @@ function renderPanel(overrides: {
       folders={[folder]}
       onOpen={vi.fn()}
       onToggleTodo={vi.fn()}
+      onToggleTodoSubtask={vi.fn()}
       onToggleTodoExpanded={vi.fn()}
       onContextMenu={overrides.onContextMenu ?? vi.fn()}
       onDetach={overrides.onDetach ?? vi.fn()}

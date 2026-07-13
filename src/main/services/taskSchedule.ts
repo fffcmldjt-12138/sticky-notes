@@ -18,7 +18,8 @@ export function advanceRecurringSchedule(
     endAt: end?.toISOString() ?? null,
     reminders: schedule.reminders.map((reminder) => ({
       ...reminder,
-      remindedAt: null
+      remindedAt: null,
+      snoozedUntil: null
     }))
   }
 }

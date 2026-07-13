@@ -87,6 +87,10 @@ const api: StickyApi = {
     cleanUnusedImages: () =>
       ipcRenderer.invoke(ipcChannels.recycleCleanUnusedImages)
   },
+  reminder: {
+    respond: (action) =>
+      ipcRenderer.invoke(ipcChannels.reminderWindowAction, action)
+  },
   window: {
     expand: () => ipcRenderer.send(ipcChannels.windowExpand),
     scheduleCollapse: () => ipcRenderer.send(ipcChannels.windowScheduleCollapse),

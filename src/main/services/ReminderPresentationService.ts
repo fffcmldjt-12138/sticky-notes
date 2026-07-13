@@ -11,6 +11,10 @@ interface ReminderWindowController {
   sendOpenItem(itemId: string): void
 }
 
+interface StrongReminderController {
+  enqueue(payload: ReminderAlertPayload): void
+}
+
 type NotificationFactory = (title: string, body: string) => ReminderNotification
 
 export class ReminderPresentationService {
@@ -18,7 +22,8 @@ export class ReminderPresentationService {
     private readonly createNotification: NotificationFactory,
     private readonly windows: ReminderWindowController,
     private readonly broadcast: (payload: ReminderAlertPayload) => void,
-    private readonly now: () => Date = () => new Date()
+    private readonly now: () => Date = () => new Date(),
+    private readonly strongWindows?: StrongReminderController
   ) {}
 
   present(title: string, body: string, payload: ReminderPayload): void {
@@ -32,6 +37,7 @@ export class ReminderPresentationService {
     notification.on('click', () => this.windows.sendOpenItem(payload.itemId))
     this.windows.show()
     this.broadcast(alert)
+    this.strongWindows?.enqueue(alert)
     notification.show()
   }
 }

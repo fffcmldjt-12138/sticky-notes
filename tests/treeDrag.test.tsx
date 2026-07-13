@@ -3,7 +3,10 @@ import type { OrderedNodeRef } from '../src/shared/models'
 import type { NoteItem } from '../src/shared/models'
 import { render, screen } from '@testing-library/react'
 import { TreeDragOverlay } from '../src/renderer/src/components/TreeDragOverlay'
-import { toDragPreviewPayload } from '../src/renderer/src/components/TreeDndContext'
+import {
+  toDragPreviewPayload,
+  treeDragVisualState
+} from '../src/renderer/src/components/TreeDndContext'
 import {
   resolveTreeDragOutcome,
   pointOutsideViewport,
@@ -137,6 +140,17 @@ describe('resolveTreeDrop', () => {
       title: '视觉预览',
       headerColor: '#f2c94c',
       bodyTheme: 'light'
+    })
+  })
+
+  it('suppresses internal drag feedback after the pointer leaves the panel', () => {
+    expect(treeDragVisualState(true, false)).toEqual({
+      className: 'tree-dnd-surface',
+      showOverlay: true
+    })
+    expect(treeDragVisualState(true, true)).toEqual({
+      className: 'tree-dnd-surface outside-drag',
+      showOverlay: false
     })
   })
 })

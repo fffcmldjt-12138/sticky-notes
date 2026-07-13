@@ -94,4 +94,47 @@ describe('TaskSchedulePopover', () => {
       reminders: [expect.objectContaining({ offsetMinutes: 2880 })]
     }))
   })
+
+  it('shows custom reminders as removable chips with duplicate feedback', () => {
+    render(
+      <TaskSchedulePopover
+        value={null}
+        anchor={document.body}
+        bodyTheme="light"
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+
+    fireEvent.change(screen.getByLabelText('自定义提前数值'), {
+      target: { value: '2' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: '添加提前提醒' }))
+    expect(screen.getByText('提前 2 小时')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '添加提前提醒' }))
+    expect(screen.getByText('这个提前提醒已经添加')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '删除提前 2 小时' }))
+    expect(screen.queryByText('提前 2 小时')).not.toBeInTheDocument()
+  })
+
+  it('explains why an invalid custom reminder was not added', () => {
+    render(
+      <TaskSchedulePopover
+        value={null}
+        anchor={document.body}
+        bodyTheme="light"
+        onSave={vi.fn()}
+        onClose={vi.fn()}
+      />
+    )
+
+    fireEvent.change(screen.getByLabelText('自定义提前数值'), {
+      target: { value: '0' }
+    })
+    fireEvent.click(screen.getByRole('button', { name: '添加提前提醒' }))
+
+    expect(screen.getByText('请输入大于 0 的提前时间')).toBeInTheDocument()
+  })
 })

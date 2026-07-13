@@ -411,3 +411,76 @@
   padding: 12px;
   overflow-y: auto;
 }
+.strong-reminder-window {
+  height: 100vh;
+  padding: 20px;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  gap: 16px;
+  background: #fff;
+  color: #20252d;
+  border: 3px solid #d9303e;
+}
+.strong-reminder-window header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.strong-reminder-window header div { display: grid; gap: 2px; }
+.strong-reminder-window header strong { color: #b4232f; font-size: 18px; }
+.strong-reminder-window header small { color: #6f7782; }
+.strong-reminder-mark {
+  width: 38px;
+  height: 38px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #d9303e;
+  color: #fff;
+  font-size: 24px;
+  font-weight: 900;
+}
+.strong-reminder-window section h1 {
+  margin: 0 0 8px;
+  font-size: 24px;
+  overflow-wrap: anywhere;
+}
+.strong-reminder-window section p { margin: 0; color: #6f7782; }
+.strong-reminder-snooze {
+  display: grid;
+  grid-template-columns: auto repeat(3, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+.strong-reminder-snooze span { font-size: 12px; color: #6f7782; }
+.strong-reminder-snooze button,
+.strong-reminder-window footer button {
+  min-height: 36px;
+  border: 1px solid #d8dde5;
+  border-radius: 7px;
+  background: #f5f7fa;
+}
+.strong-reminder-window footer {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 10px;
+}
+.strong-reminder-window footer .primary-button {
+  border-color: #20252d;
+  background: #20252d;
+  color: #fff;
+}
+.tree-dnd-surface { display: contents; }
+.tree-dnd-surface.outside-drag .mixed-drop-marker {
+  min-height: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  opacity: 0 !important;
+  transition: none !important;
+}
+.tree-dnd-surface.outside-drag .sticky-card,
+.tree-dnd-surface.outside-drag .folder-card {
+  transition: none !important;
+}
