@@ -1,0 +1,234 @@
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  writeFile
+} from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { basename, join } from 'node:path'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { BackupService } from '../src/main/services/BackupService'
+
+interface NotesValue {
+  kind: 'notes'
+  value: number
+}
+
+interface ConfigValue {
+  kind: 'config'
+  theme: string
+}
+
+function validateNotes(value: unknown): NotesValue {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('kind' in value) ||
+    value.kind !== 'notes' ||
+    !('value' in value) ||
+    typeof value.value !== 'number'
+  ) {
+    throw new Error('invalid notes')
+  }
+  return value as NotesValue
+}
+
+function validateConfig(value: unknown): ConfigValue {
+  if (
+    typeof value !== 'object' ||
+    value === null ||
+    !('kind' in value) ||
+    value.kind !== 'config' ||
+    !('theme' in value) ||
+    typeof value.theme !== 'string'
+  ) {
+    throw new Error('invalid config')
+  }
+  return value as ConfigValue
+}
+
+describe('BackupService', () => {
+  let directory: string
+  let now: Date
+  let backups: BackupService
+
+  beforeEach(async () => {
+    directory = await mkdtemp(join(tmpdir(), 'sticky-backups-'))
+    now = new Date(2026, 6, 14, 10, 0, 0, 0)
+    backups = new BackupService(
+      directory,
+      { notes: validateNotes, config: validateConfig },
+      () => new Date(now)
+    )
+  })
+
+  afterEach(async () => {
+    await rm(directory, { recursive: true, force: true })
+  })
+
+  it('retains the newest 20 notes change snapshots', async () => {
+    for (let value = 0; value < 21; value += 1) {
+      await backups.recordChange('notes', { kind: 'notes', value })
+    }
+
+    const files = await readdir(join(directory, 'notes', 'change'))
+    expect(files).toHaveLength(20)
+    const values = await Promise.all(
+      files.map(async (file) =>
+        JSON.parse(
+          await readFile(join(directory, 'notes', 'change', file), 'utf8')
+        )
+      )
+    )
+    expect(values.map((value) => value.value).sort((a, b) => a - b)).toEqual(
+      Array.from({ length: 20 }, (_, index) => index + 1)
+    )
+  })
+
+  it('retains the newest five config change snapshots', async () => {
+    for (let value = 0; value < 6; value += 1) {
+      await backups.recordChange('config', {
+        kind: 'config',
+        theme: String(value)
+      })
+    }
+
+    expect(await readdir(join(directory, 'config', 'change'))).toHaveLength(5)
+    await expect(
+      readdir(join(directory, 'config', 'daily'))
+    ).rejects.toMatchObject({ code: 'ENOENT' })
+  })
+
+  it('creates one notes daily per local day and retains a 30-day window', async () => {
+    const firstDay = new Date(2026, 5, 1, 23, 59, 0, 0)
+    for (let day = 0; day < 31; day += 1) {
+      now = new Date(
+        firstDay.getFullYear(),
+        firstDay.getMonth(),
+        firstDay.getDate() + day,
+        23,
+        59
+      )
+      await Promise.all([
+        backups.recordDaily('notes', { kind: 'notes', value: day }),
+        backups.recordDaily('notes', { kind: 'notes', value: day + 100 })
+      ])
+    }
+
+    const files = await readdir(join(directory, 'notes', 'daily'))
+    expect(files).toHaveLength(30)
+    expect(files.some((file) => file.startsWith('2026-06-01T'))).toBe(false)
+    expect(files.filter((file) => file.startsWith('2026-07-01T'))).toHaveLength(1)
+  })
+
+  it('keeps protected snapshots at exactly 168 hours and removes them after', async () => {
+    const first = new Date(now)
+    await backups.recordProtected('notes', { kind: 'notes', value: 1 })
+
+    now = new Date(first.getTime() + 168 * 60 * 60 * 1000)
+    await backups.recordProtected('notes', { kind: 'notes', value: 2 })
+    expect(await readdir(join(directory, 'notes', 'protected'))).toHaveLength(2)
+
+    now = new Date(first.getTime() + 168 * 60 * 60 * 1000 + 1)
+    await backups.recordProtected('notes', { kind: 'notes', value: 3 })
+    expect(await readdir(join(directory, 'notes', 'protected'))).toHaveLength(2)
+  })
+
+  it('skips a newer corrupt or domain-invalid backup for an older valid one', async () => {
+    const changeDirectory = join(directory, 'notes', 'change')
+    const dailyDirectory = join(directory, 'notes', 'daily')
+    await mkdir(changeDirectory, { recursive: true })
+    await mkdir(dailyDirectory, { recursive: true })
+    await writeFile(
+      join(dailyDirectory, '2026-07-14T09-00-00-000.json'),
+      JSON.stringify({ kind: 'notes', value: 7 })
+    )
+    await writeFile(
+      join(changeDirectory, '2026-07-14T10-00-00-000.json'),
+      JSON.stringify({ kind: 'config', theme: 'dark' })
+    )
+    await writeFile(
+      join(changeDirectory, '2026-07-14T11-00-00-000.json'),
+      '{broken'
+    )
+
+    const recovered = await backups.findNewestValid('notes')
+
+    expect(recovered?.value).toEqual({ kind: 'notes', value: 7 })
+    expect(recovered?.entry.kind).toBe('daily')
+  })
+
+  it('ignores protected, temp, corrupt suffixes, illegal dates, and directories', async () => {
+    const changeDirectory = join(directory, 'notes', 'change')
+    const dailyDirectory = join(directory, 'notes', 'daily')
+    const protectedDirectory = join(directory, 'notes', 'protected')
+    await Promise.all([
+      mkdir(changeDirectory, { recursive: true }),
+      mkdir(dailyDirectory, { recursive: true }),
+      mkdir(protectedDirectory, { recursive: true })
+    ])
+    await writeFile(
+      join(changeDirectory, '2026-07-13T10-00-00-000.json'),
+      JSON.stringify({ kind: 'notes', value: 4 })
+    )
+    await writeFile(
+      join(dailyDirectory, '2026-07-14T11-00-00-000.json.tmp'),
+      JSON.stringify({ kind: 'notes', value: 9 })
+    )
+    await writeFile(
+      join(dailyDirectory, '2026-07-14T12-00-00-000.json.corrupt'),
+      JSON.stringify({ kind: 'notes', value: 10 })
+    )
+    await writeFile(
+      join(dailyDirectory, '2026-02-30T12-00-00-000.json'),
+      JSON.stringify({ kind: 'notes', value: 11 })
+    )
+    await mkdir(join(dailyDirectory, '2026-07-14T13-00-00-000.json'))
+    await writeFile(
+      join(protectedDirectory, '2026-07-14T14-00-00-000.json'),
+      JSON.stringify({ kind: 'notes', value: 12 })
+    )
+
+    const recovered = await backups.findNewestValid('notes')
+
+    expect(recovered?.value).toEqual({ kind: 'notes', value: 4 })
+    expect(basename(recovered?.entry.path ?? '')).toBe(
+      '2026-07-13T10-00-00-000.json'
+    )
+  })
+
+  it('serializes concurrent naming so every change filename is unique', async () => {
+    await Promise.all(
+      Array.from({ length: 20 }, (_, value) =>
+        backups.recordChange('notes', { kind: 'notes', value })
+      )
+    )
+
+    const files = await readdir(join(directory, 'notes', 'change'))
+    expect(new Set(files).size).toBe(20)
+  })
+
+  it('advances one logical millisecond when a filename already exists', async () => {
+    const changeDirectory = join(directory, 'notes', 'change')
+    await mkdir(changeDirectory, { recursive: true })
+    await writeFile(
+      join(changeDirectory, '2026-07-14T10-00-00-000.json'),
+      JSON.stringify({ kind: 'notes', value: 1 })
+    )
+
+    const entry = await backups.recordChange('notes', {
+      kind: 'notes',
+      value: 2
+    })
+
+    expect(basename(entry.path)).toBe('2026-07-14T10-00-00-001.json')
+  })
+
+  it('rejects a snapshot that fails the source validator', async () => {
+    await expect(
+      backups.recordProtected('notes', { kind: 'config', theme: 'dark' })
+    ).rejects.toThrow('invalid notes')
+  })
+})

@@ -1,4 +1,11 @@
-import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
+import {
+  mkdtemp,
+  readFile,
+  readdir,
+  rename,
+  rm,
+  writeFile
+} from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -8,6 +15,7 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs/promises')>()
   return {
     ...actual,
+    rename: vi.fn(actual.rename),
     rm: vi.fn(actual.rm)
   }
 })
@@ -42,6 +50,7 @@ describe('SafeJsonStore', () => {
   afterEach(async () => {
     await rm(directory, { recursive: true, force: true })
     vi.mocked(rm).mockClear()
+    vi.mocked(rename).mockClear()
   })
 
   it('serializes overlapping writes in invocation order', async () => {
@@ -259,19 +268,68 @@ describe('SafeJsonStore', () => {
     expect(await store.read()).toEqual({ value: 5 })
   })
 
-  it('cleans up its temporary file when replacement preparation fails', async () => {
+  it('reports backup failures without preventing the formal write', async () => {
+    const diagnostic = vi.fn(async () => {
+      throw new Error('diagnostic failed')
+    })
     const store = new SafeJsonStore(
       filePath,
       () => ({ value: 0 }),
       validateStoredValue,
       async () => {
-        throw new Error('backup failed')
+        throw new Error('change backup failed')
+      },
+      async () => {
+        throw new Error('daily backup failed')
+      },
+      diagnostic
+    )
+    await writeFile(filePath, '{"value":1}', 'utf8')
+
+    await expect(store.write({ value: 6 })).resolves.toBeUndefined()
+    expect(JSON.parse(await readFile(filePath, 'utf8'))).toEqual({ value: 6 })
+    expect(diagnostic).toHaveBeenCalledTimes(2)
+    expect(await readdir(directory)).toEqual(['data.json'])
+  })
+
+  it('snapshots the old value before rename and the new value after rename', async () => {
+    const snapshots: Array<{ phase: string; value: StoredValue }> = []
+    const store = new SafeJsonStore(
+      filePath,
+      () => ({ value: 0 }),
+      validateStoredValue,
+      async (_currentPath, value) => {
+        snapshots.push({ phase: 'change', value })
+      },
+      async (_currentPath, value) => {
+        snapshots.push({ phase: 'daily', value })
       }
     )
     await writeFile(filePath, '{"value":1}', 'utf8')
 
-    await expect(store.write({ value: 6 })).rejects.toThrow('backup failed')
-    expect(await readdir(directory)).toEqual(['data.json'])
+    await store.write({ value: 2 })
+
+    expect(snapshots).toEqual([
+      { phase: 'change', value: { value: 1 } },
+      { phase: 'daily', value: { value: 2 } }
+    ])
+  })
+
+  it('does not create a daily snapshot when the formal rename fails', async () => {
+    const afterReplace = vi.fn()
+    const store = new SafeJsonStore(
+      filePath,
+      () => ({ value: 0 }),
+      validateStoredValue,
+      undefined,
+      afterReplace
+    )
+    await writeFile(filePath, '{"value":1}', 'utf8')
+    vi.mocked(rename).mockRejectedValueOnce(new Error('rename failed'))
+
+    await expect(store.write({ value: 2 })).rejects.toThrow('rename failed')
+    expect(afterReplace).not.toHaveBeenCalled()
+    expect(JSON.parse(await readFile(filePath, 'utf8'))).toEqual({ value: 1 })
   })
 
   it('preserves the primary error when temporary cleanup also fails', async () => {
@@ -280,12 +338,10 @@ describe('SafeJsonStore', () => {
     const store = new SafeJsonStore(
       filePath,
       () => ({ value: 0 }),
-      validateStoredValue,
-      async () => {
-        throw primaryError
-      }
+      validateStoredValue
     )
     await writeFile(filePath, '{"value":1}', 'utf8')
+    vi.mocked(rename).mockRejectedValueOnce(primaryError)
     vi.mocked(rm).mockRejectedValueOnce(cleanupError)
 
     await expect(store.write({ value: 6 })).rejects.toBe(primaryError)

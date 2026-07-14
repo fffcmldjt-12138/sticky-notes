@@ -2,6 +2,12 @@ import { randomUUID } from 'node:crypto'
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 
+export type BackupPhase = 'beforeReplace' | 'afterReplace'
+export type BackupDiagnostic = (
+  error: unknown,
+  phase: BackupPhase
+) => void | Promise<void>
+
 export class SafeJsonStore<T> {
   private operationQueue: Promise<void> = Promise.resolve()
 
@@ -13,7 +19,12 @@ export class SafeJsonStore<T> {
     private readonly beforeReplace?: (
       currentPath: string,
       currentValue: T
-    ) => Promise<void>
+    ) => Promise<void>,
+    private readonly afterReplace?: (
+      currentPath: string,
+      newValue: T
+    ) => Promise<void>,
+    private readonly diagnostic?: BackupDiagnostic
   ) {}
 
   read(): Promise<T> {
@@ -69,10 +80,15 @@ export class SafeJsonStore<T> {
       const currentContents = await this.readFileIfExists()
       if (currentContents !== undefined) {
         const currentValue = this.validate(JSON.parse(currentContents))
-        await this.beforeReplace?.(this.filePath, currentValue)
+        await this.runBackup(
+          'beforeReplace',
+          this.beforeReplace,
+          currentValue
+        )
       }
 
       await rename(temporaryPath, this.filePath)
+      await this.runBackup('afterReplace', this.afterReplace, validatedValue)
       return validatedValue
     } catch (error) {
       hasPrimaryError = true
@@ -84,6 +100,25 @@ export class SafeJsonStore<T> {
         if (!hasPrimaryError) {
           throw cleanupError
         }
+      }
+    }
+  }
+
+  private async runBackup(
+    phase: BackupPhase,
+    backup: ((currentPath: string, value: T) => Promise<void>) | undefined,
+    value: T
+  ): Promise<void> {
+    if (!backup) {
+      return
+    }
+    try {
+      await backup(this.filePath, value)
+    } catch (error) {
+      try {
+        await this.diagnostic?.(error, phase)
+      } catch {
+        // Diagnostics must never change persistence behavior.
       }
     }
   }
