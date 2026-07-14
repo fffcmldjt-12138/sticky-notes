@@ -6,6 +6,7 @@ import {
 } from '../src/main/services/FolderWindowService'
 
 const folder: FolderItem = {
+  revision: 1,
   id: 'folder_1',
   title: 'Project',
   parentFolderId: null,

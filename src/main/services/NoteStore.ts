@@ -30,7 +30,7 @@ export class NoteStore {
   constructor(userDataPath: string) {
     this.filePath = join(userDataPath, 'notes.json')
     this.file = new JsonFileStore(this.filePath, () => ({
-      version: 4,
+      version: 5,
       items: [],
       folders: []
     }))
@@ -59,6 +59,7 @@ export class NoteStore {
       const now = new Date().toISOString()
       const folder: FolderItem = {
         id: `folder_${randomUUID()}`,
+        revision: 1,
         title: title.trim() || '新建文件夹',
         parentFolderId,
         order: nextSiblingOrder(data, parentFolderId),
@@ -250,6 +251,7 @@ export class NoteStore {
       const now = new Date().toISOString()
       const base = {
         id: `${type}_${randomUUID()}`,
+        revision: 1,
         title: title?.trim() || (type === 'note' ? '新建笔记' : '新建待办'),
         headerColor: type === 'note'
           ? ('#f2c94c' as const)
@@ -611,7 +613,7 @@ export class NoteStore {
       if (raw.version === 1 || raw.version === 2 || raw.version === 3) {
         await copyFile(this.filePath, `${this.filePath}.backup-${Date.now()}`)
         await this.file.write(migrateNotesFile(raw))
-      } else if (raw.version === 4) {
+      } else if (raw.version === 4 || raw.version === 5) {
         const normalized = migrateNotesFile(raw)
         await this.file.write(normalized)
       } else {
@@ -620,12 +622,12 @@ export class NoteStore {
     } catch (error) {
       const nodeError = error as NodeJS.ErrnoException
       if (nodeError.code === 'ENOENT') {
-        await this.file.write({ version: 4, items: [], folders: [] })
+        await this.file.write({ version: 5, items: [], folders: [] })
         return
       }
       if (error instanceof SyntaxError) {
         await copyFile(this.filePath, `${this.filePath}.corrupt-${Date.now()}`)
-        await this.file.write({ version: 4, items: [], folders: [] })
+        await this.file.write({ version: 5, items: [], folders: [] })
         return
       }
       throw error

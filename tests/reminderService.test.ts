@@ -3,6 +3,7 @@ import type { TodoItem } from '../src/shared/models'
 import { ReminderService } from '../src/main/services/ReminderService'
 
 const todo: TodoItem = {
+  revision: 1,
   id: 'todo_1',
   type: 'todo',
   title: '作业',

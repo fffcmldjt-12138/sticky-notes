@@ -8,6 +8,7 @@ import {
 } from '../src/main/services/DetachedWindowService'
 
 const item: NoteItem = {
+  revision: 1,
   id: 'note_1',
   type: 'note',
   title: 'Detached',

@@ -30,13 +30,15 @@ function normalizeBodyTheme(value: unknown): BodyTheme {
 export function migrateNotesFile(value: unknown): NotesFile {
   if (!value || typeof value !== 'object') throw new Error('Invalid notes file')
   const source = value as { version?: number; items?: unknown[]; folders?: unknown[] }
-  if (source.version === 4) return normalizeVersion4(source)
+  if (source.version === 5 || source.version === 4) {
+    return normalizeCurrentVersion(source)
+  }
   if (source.version === 3) return migrateVersion3(source)
   if (source.version === 2) return migrateVersion2(source)
   if (source.version !== 1) throw new Error(`Unsupported notes version: ${source.version}`)
 
   return {
-    version: 4,
+    version: 5,
     folders: [],
     items: (source.items ?? []).map(migrateVersion1Item)
   }
@@ -55,6 +57,7 @@ function migrateVersion1Item(value: unknown, index: number): StickyItem {
   const item = value as Record<string, unknown>
   const base = {
     id: String(item.id),
+    revision: normalizeRevision(item.revision),
     title: String(item.title ?? ''),
     headerColor: normalizeColor(item.headerColor),
     bodyTheme: normalizeBodyTheme(item.bodyTheme),
@@ -100,12 +103,13 @@ function migrateVersion1Item(value: unknown, index: number): StickyItem {
 
 function migrateVersion2(source: { items?: unknown[] }): NotesFile {
   return {
-    version: 4,
+    version: 5,
     folders: [],
     items: (source.items ?? []).map((value, index) => {
       const item = value as StickyItem
       const normalized = {
         ...item,
+        revision: normalizeRevision(item.revision),
         headerColor: normalizeColor(item.headerColor),
         bodyTheme: normalizeBodyTheme(item.bodyTheme),
         detached: Boolean(item.detached),
@@ -120,18 +124,19 @@ function migrateVersion2(source: { items?: unknown[] }): NotesFile {
 function migrateVersion3(
   source: { items?: unknown[]; folders?: unknown[] }
 ): NotesFile {
-  return normalizeVersion4(source)
+  return normalizeCurrentVersion(source)
 }
 
-function normalizeVersion4(
+function normalizeCurrentVersion(
   source: { items?: unknown[]; folders?: unknown[] }
 ): NotesFile {
   return {
-    version: 4,
+    version: 5,
     folders: (source.folders ?? []).map((value, index) => {
       const folder = value as NotesFile['folders'][number]
       return {
         ...folder,
+        revision: normalizeRevision(folder.revision),
         parentFolderId: folder.parentFolderId ?? null,
         order: Number.isFinite(folder.order) ? folder.order : index,
         collapsed: Boolean(folder.collapsed),
@@ -144,6 +149,7 @@ function normalizeVersion4(
       const item = value as StickyItem
       const normalized = {
         ...item,
+        revision: normalizeRevision(item.revision),
         headerColor: normalizeColor(item.headerColor),
         bodyTheme: normalizeBodyTheme(item.bodyTheme),
         detached: Boolean(item.detached),
@@ -156,6 +162,10 @@ function normalizeVersion4(
       return normalizeTodoTasks(normalized)
     })
   }
+}
+
+function normalizeRevision(value: unknown): number {
+  return Number.isInteger(value) && Number(value) > 0 ? Number(value) : 1
 }
 
 function normalizeTodoTasks(item: StickyItem): StickyItem {

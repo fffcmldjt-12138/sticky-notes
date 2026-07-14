@@ -3,6 +3,7 @@ import type { FolderItem, NoteItem, TodoItem } from '../src/shared/models'
 import { buildFolderTree } from '../src/renderer/src/lib/folderTree'
 
 const baseFolder = {
+  revision: 1,
   order: 0,
   collapsed: false,
   detached: false,
@@ -19,6 +20,7 @@ const folders: FolderItem[] = [
 ]
 
 const note: NoteItem = {
+  revision: 1,
   id: 'note_1',
   type: 'note',
   title: 'Nested note',

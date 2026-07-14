@@ -3,6 +3,7 @@ import type { NoteItem } from '../src/shared/models'
 import { upsertItem } from '../src/renderer/src/lib/itemList'
 
 const note: NoteItem = {
+  revision: 1,
   id: 'note_1',
   type: 'note',
   title: 'New note',

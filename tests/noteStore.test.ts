@@ -13,10 +13,10 @@ describe('NoteStore', () => {
     store = new NoteStore(directory)
   })
 
-  it('creates an empty version 4 file on first load', async () => {
+  it('creates an empty version 5 file on first load', async () => {
     expect(await store.list()).toEqual([])
     expect(JSON.parse(await readFile(join(directory, 'notes.json'), 'utf8'))).toEqual({
-      version: 4,
+      version: 5,
       items: [],
       folders: []
     })
@@ -28,6 +28,7 @@ describe('NoteStore', () => {
 
     expect(note.type).toBe('note')
     expect(note).toMatchObject({
+      revision: 1,
       parentFolderId: null,
       tags: [],
       order: 0,
@@ -35,6 +36,7 @@ describe('NoteStore', () => {
     })
     expect(todo).toMatchObject({
       type: 'todo',
+      revision: 1,
       tasks: [
         expect.objectContaining({
           contentMarkdown: '',
@@ -50,6 +52,12 @@ describe('NoteStore', () => {
       order: 1,
       deletedAt: null
     })
+  })
+
+  it('creates folders with an initial revision', async () => {
+    const folder = await store.createFolder('Folder')
+
+    expect(folder.revision).toBe(1)
   })
 
   it('creates todo tasks with advanced defaults', async () => {
@@ -247,12 +255,12 @@ describe('NoteStore', () => {
     expect(files.some((file) => file.startsWith('notes.json.backup-'))).toBe(true)
   })
 
-  it('preserves malformed notes and recovers with an empty version 4 file', async () => {
+  it('preserves malformed notes and recovers with an empty version 5 file', async () => {
     await writeFile(join(directory, 'notes.json'), '{broken json', 'utf8')
 
     expect(await store.list()).toEqual([])
     expect(JSON.parse(await readFile(join(directory, 'notes.json'), 'utf8'))).toEqual({
-      version: 4,
+      version: 5,
       items: [],
       folders: []
     })

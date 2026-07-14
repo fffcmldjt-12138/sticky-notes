@@ -17,6 +17,7 @@ export interface AssetReference {
 
 export interface BaseItem {
   id: string
+  revision: number
   type: NoteType
   title: string
   headerColor: HeaderColor
@@ -103,6 +104,7 @@ export interface OrderedNodeRef {
 
 export interface FolderItem {
   id: string
+  revision: number
   title: string
   parentFolderId: string | null
   order: number
@@ -128,7 +130,7 @@ export type FolderPatch = Partial<
 >
 
 export interface NotesFile {
-  version: 4
+  version: 5
   items: StickyItem[]
   folders: FolderItem[]
 }

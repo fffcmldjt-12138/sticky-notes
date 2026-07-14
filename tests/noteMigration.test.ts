@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { migrateNotesFile } from '../src/main/services/noteMigration'
 
 describe('migrateNotesFile', () => {
-  it('migrates version 1 notes and todos to version 4 without data loss', () => {
+  it('migrates version 1 notes and todos to version 5 without data loss', () => {
     const result = migrateNotesFile({
       version: 1,
       items: [
@@ -36,11 +36,12 @@ describe('migrateNotesFile', () => {
     })
 
     expect(result).toMatchObject({
-      version: 4,
+      version: 5,
       folders: [],
       items: [
         {
           id: 'note_1',
+          revision: 1,
           headerColor: '#f2c94c',
           detached: false,
           windowBounds: null,
@@ -51,6 +52,7 @@ describe('migrateNotesFile', () => {
         },
         {
           id: 'todo_1',
+          revision: 1,
           headerColor: '#5b8def',
           detached: false,
           windowBounds: null,
@@ -83,7 +85,28 @@ describe('migrateNotesFile', () => {
     })
   })
 
-  it('migrates version 2 items to version 4 organization fields', () => {
+  it('preserves a valid revision while migrating version 1 items', () => {
+    const result = migrateNotesFile({
+      version: 1,
+      items: [{
+        id: 'note_1',
+        revision: 7,
+        type: 'note',
+        title: 'Legacy note',
+        contentMarkdown: 'Text',
+        headerColor: 'yellow',
+        bodyTheme: 'light',
+        pinned: false,
+        syncedToSiyuan: false,
+        createdAt: '2026-06-14T09:00:00.000Z',
+        updatedAt: '2026-06-14T09:00:00.000Z'
+      }]
+    })
+
+    expect(result.items[0].revision).toBe(7)
+  })
+
+  it('migrates version 2 items to version 5 organization fields', () => {
     const result = migrateNotesFile({
       version: 2,
       items: [
@@ -105,11 +128,12 @@ describe('migrateNotesFile', () => {
     })
 
     expect(result).toEqual({
-      version: 4,
+      version: 5,
       folders: [],
       items: [
         expect.objectContaining({
           id: 'note_2',
+          revision: 1,
           contentMarkdown: 'Text',
           parentFolderId: null,
           tags: [],
@@ -157,6 +181,7 @@ describe('migrateNotesFile', () => {
 
     expect(result.items[0]).toMatchObject({
       type: 'todo',
+      revision: 1,
       panelExpanded: false,
       tasks: [{
         tags: [],
@@ -195,9 +220,91 @@ describe('migrateNotesFile', () => {
     })
 
     expect(result.folders[0]).toMatchObject({
+      revision: 1,
       detached: false,
       windowBounds: null
     })
+  })
+
+  it('migrates version 4 entities to revisioned version 5', () => {
+    const result = migrateNotesFile({
+      version: 4,
+      folders: [{
+        id: 'folder_4',
+        title: 'Folder',
+        parentFolderId: null,
+        order: 0,
+        collapsed: false,
+        detached: false,
+        windowBounds: null,
+        deletedAt: null,
+        createdAt: '2026-07-14T09:00:00.000Z',
+        updatedAt: '2026-07-14T09:00:00.000Z'
+      }],
+      items: [{
+        id: 'note_4',
+        type: 'note',
+        title: 'Version 4 note',
+        contentMarkdown: 'Text',
+        headerColor: '#f2c94c',
+        bodyTheme: 'light',
+        pinned: false,
+        detached: false,
+        windowBounds: null,
+        parentFolderId: null,
+        tags: [],
+        order: 0,
+        deletedAt: null,
+        createdAt: '2026-07-14T09:00:00.000Z',
+        updatedAt: '2026-07-14T09:00:00.000Z',
+        syncedToSiyuan: false
+      }]
+    })
+
+    expect(result.version).toBe(5)
+    expect(result.items[0].revision).toBe(1)
+    expect(result.folders[0].revision).toBe(1)
+  })
+
+  it('preserves valid revisions and replaces invalid revisions', () => {
+    const result = migrateNotesFile({
+      version: 4,
+      folders: [{
+        id: 'folder_4',
+        title: 'Folder',
+        revision: 0,
+        parentFolderId: null,
+        order: 0,
+        collapsed: false,
+        detached: false,
+        windowBounds: null,
+        deletedAt: null,
+        createdAt: '2026-07-14T09:00:00.000Z',
+        updatedAt: '2026-07-14T09:00:00.000Z'
+      }],
+      items: [{
+        id: 'note_4',
+        type: 'note',
+        title: 'Version 4 note',
+        revision: 7,
+        contentMarkdown: 'Text',
+        headerColor: '#f2c94c',
+        bodyTheme: 'light',
+        pinned: false,
+        detached: false,
+        windowBounds: null,
+        parentFolderId: null,
+        tags: [],
+        order: 0,
+        deletedAt: null,
+        createdAt: '2026-07-14T09:00:00.000Z',
+        updatedAt: '2026-07-14T09:00:00.000Z',
+        syncedToSiyuan: false
+      }]
+    })
+
+    expect(result.items[0].revision).toBe(7)
+    expect(result.folders[0].revision).toBe(1)
   })
 
   it('falls back to yellow for invalid legacy colors', () => {
