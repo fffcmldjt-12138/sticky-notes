@@ -97,6 +97,76 @@ describe('SafeJsonStore', () => {
     expect(JSON.parse(await readFile(filePath, 'utf8'))).toEqual({ value: 3 })
   })
 
+  it('propagates an ENOENT-coded validation error while reading', async () => {
+    const validationError = Object.assign(new Error('validation failed'), {
+      code: 'ENOENT'
+    })
+    let defaultCalls = 0
+    const store = new SafeJsonStore(
+      filePath,
+      () => {
+        defaultCalls += 1
+        return { value: 0 }
+      },
+      (value) => {
+        const storedValue = validateStoredValue(value)
+        if (storedValue.value === 1) {
+          throw validationError
+        }
+        return storedValue
+      }
+    )
+    await writeFile(filePath, '{"value":1}', 'utf8')
+
+    await expect(store.read()).rejects.toBe(validationError)
+    expect(defaultCalls).toBe(0)
+    expect(await readFile(filePath, 'utf8')).toBe('{"value":1}')
+  })
+
+  it('propagates an ENOENT-coded validation error from an existing file', async () => {
+    const validationError = Object.assign(new Error('validation failed'), {
+      code: 'ENOENT'
+    })
+    let beforeReplaceCalls = 0
+    const store = new SafeJsonStore(
+      filePath,
+      () => ({ value: 0 }),
+      (value) => {
+        const storedValue = validateStoredValue(value)
+        if (storedValue.value === 1) {
+          throw validationError
+        }
+        return storedValue
+      },
+      async () => {
+        beforeReplaceCalls += 1
+      }
+    )
+    await writeFile(filePath, '{"value":1}', 'utf8')
+
+    await expect(store.write({ value: 2 })).rejects.toBe(validationError)
+    expect(beforeReplaceCalls).toBe(0)
+    expect(await readFile(filePath, 'utf8')).toBe('{"value":1}')
+    expect(await readdir(directory)).toEqual(['data.json'])
+  })
+
+  it('does not call beforeReplace when the formal file is missing', async () => {
+    let beforeReplaceCalls = 0
+    const store = new SafeJsonStore(
+      filePath,
+      () => ({ value: 0 }),
+      validateStoredValue,
+      async () => {
+        beforeReplaceCalls += 1
+      }
+    )
+
+    await store.write({ value: 4 })
+
+    expect(beforeReplaceCalls).toBe(0)
+    expect(await readdir(directory)).toEqual(['data.json'])
+  })
+
   it('waits for queued writes before reading', async () => {
     let releaseReplace: (() => void) | undefined
     const replaceBlocked = new Promise<void>((resolve) => {

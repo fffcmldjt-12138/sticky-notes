@@ -19,17 +19,14 @@ export class SafeJsonStore<T> {
     await this.writeQueue
     await mkdir(dirname(this.filePath), { recursive: true })
 
-    try {
-      return this.validate(JSON.parse(await readFile(this.filePath, 'utf8')))
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        throw error
-      }
-
+    const contents = await this.readFileIfExists()
+    if (contents === undefined) {
       const initial = this.createDefault()
       await this.write(initial)
       return initial
     }
+
+    return this.validate(JSON.parse(contents))
   }
 
   write(value: T): Promise<void> {
@@ -55,26 +52,26 @@ export class SafeJsonStore<T> {
 
       this.validate(JSON.parse(await readFile(temporaryPath, 'utf8')))
 
-      let currentExists = false
-      let currentValue!: T
-      try {
-        currentValue = this.validate(
-          JSON.parse(await readFile(this.filePath, 'utf8'))
-        )
-        currentExists = true
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') {
-          throw error
-        }
-      }
-
-      if (currentExists) {
+      const currentContents = await this.readFileIfExists()
+      if (currentContents !== undefined) {
+        const currentValue = this.validate(JSON.parse(currentContents))
         await this.beforeReplace?.(this.filePath, currentValue)
       }
 
       await rename(temporaryPath, this.filePath)
     } finally {
       await rm(temporaryPath, { force: true })
+    }
+  }
+
+  private async readFileIfExists(): Promise<string | undefined> {
+    try {
+      return await readFile(this.filePath, 'utf8')
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return undefined
+      }
+      throw error
     }
   }
 }
