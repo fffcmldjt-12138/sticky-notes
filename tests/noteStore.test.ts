@@ -1,8 +1,15 @@
 import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { NotesFile } from '../src/shared/models'
+import { BackupService } from '../src/main/services/BackupService'
 import { NoteStore } from '../src/main/services/NoteStore'
+import { UnsupportedDataVersionError } from '../src/main/services/storageErrors'
+import {
+  validateAppConfig,
+  validateNotesFile
+} from '../src/main/services/storageValidators'
 
 describe('NoteStore', () => {
   let directory: string
@@ -195,7 +202,11 @@ describe('NoteStore', () => {
         startAt: '2026-07-13T12:00:00.000Z',
         endAt: null,
         repeat: 'none',
-        reminders: [{ id: 'at-time', offsetMinutes: 0, remindedAt: 'sent' }]
+        reminders: [{
+          id: 'at-time',
+          offsetMinutes: 0,
+          remindedAt: '2026-07-13T09:00:00.000Z'
+        }]
       }
     })
 
@@ -256,24 +267,28 @@ describe('NoteStore', () => {
   })
 
   it('backs up a version 4 notes file before migrating to version 5', async () => {
+    const original = JSON.stringify({ version: 4, items: [], folders: [] })
     await writeFile(
       join(directory, 'notes.json'),
-      JSON.stringify({ version: 4, items: [], folders: [] }),
+      original,
       'utf8'
     )
 
     await store.list()
 
     const files = await readdir(directory)
-    expect(files.some((file) => file.startsWith('notes.json.backup-'))).toBe(true)
+    const backup = files.find((file) => file.startsWith('notes.json.backup-'))
+    expect(backup).toBeDefined()
+    expect(await readFile(join(directory, backup!), 'utf8')).toBe(original)
     expect(JSON.parse(await readFile(join(directory, 'notes.json'), 'utf8')).version)
       .toBe(5)
   })
 
   it('does not back up an already migrated version 5 file on startup', async () => {
+    const original = JSON.stringify({ version: 5, items: [], folders: [] })
     await writeFile(
       join(directory, 'notes.json'),
-      JSON.stringify({ version: 5, items: [], folders: [] }),
+      original,
       'utf8'
     )
 
@@ -282,17 +297,14 @@ describe('NoteStore', () => {
 
     const files = await readdir(directory)
     expect(files.some((file) => file.startsWith('notes.json.backup-'))).toBe(false)
+    expect(await readFile(join(directory, 'notes.json'), 'utf8')).toBe(original)
   })
 
-  it('preserves malformed notes and recovers with an empty version 5 file', async () => {
+  it('does not replace malformed notes with an empty version 5 file', async () => {
     await writeFile(join(directory, 'notes.json'), '{broken json', 'utf8')
 
-    expect(await store.list()).toEqual([])
-    expect(JSON.parse(await readFile(join(directory, 'notes.json'), 'utf8'))).toEqual({
-      version: 5,
-      items: [],
-      folders: []
-    })
+    await expect(store.list()).rejects.toMatchObject({ code: 'DATA_UNAVAILABLE' })
+    expect(await readFile(join(directory, 'notes.json'), 'utf8')).toBe('{broken json')
     const files = await readdir(directory)
     const backup = files.find((file) => file.startsWith('notes.json.corrupt-'))
     expect(backup).toBeDefined()
@@ -303,7 +315,67 @@ describe('NoteStore', () => {
     const future = JSON.stringify({ version: 99, items: [{ id: 'future' }] })
     await writeFile(join(directory, 'notes.json'), future, 'utf8')
 
-    await expect(store.list()).rejects.toThrow('Unsupported notes version: 99')
+    await expect(store.list()).rejects.toBeInstanceOf(UnsupportedDataVersionError)
     expect(await readFile(join(directory, 'notes.json'), 'utf8')).toBe(future)
+  })
+
+  it('returns a detached snapshot after earlier mutations', async () => {
+    const pendingNote = store.create('note', 'Queued')
+    const pendingSnapshot = store.getSnapshot()
+    const [note, snapshot] = await Promise.all([pendingNote, pendingSnapshot])
+    snapshot.items[0].title = 'Mutated outside the store'
+
+    expect(snapshot.items[0].id).toBe(note.id)
+    expect((await store.getSnapshot()).items[0].title).toBe('Queued')
+  })
+
+  it('clones replacement input before queueing and does not deadlock', async () => {
+    await store.create('note', 'Original')
+    const replacement: NotesFile = { version: 5, items: [], folders: [] }
+
+    const pending = store.replaceSnapshot(replacement, 'restore')
+    replacement.items.push((await store.getSnapshot()).items[0])
+
+    await expect(pending).resolves.toBeUndefined()
+    expect(await store.getSnapshot()).toEqual({
+      version: 5,
+      items: [],
+      folders: []
+    })
+  })
+
+  it('rejects an invalid replacement without writing', async () => {
+    await store.create('note', 'Keep me')
+    const before = await readFile(join(directory, 'notes.json'), 'utf8')
+
+    await expect(
+      store.replaceSnapshot(
+        { version: 5, items: [{ id: 'broken' }], folders: [] } as never,
+        'import'
+      )
+    ).rejects.toThrow()
+
+    expect(await readFile(join(directory, 'notes.json'), 'utf8')).toBe(before)
+  })
+
+  it('fails closed when a protected replacement backup cannot be created', async () => {
+    const backups = new BackupService(join(directory, 'backups'), {
+      notes: validateNotesFile,
+      config: validateAppConfig
+    })
+    const protectedStore = new NoteStore(directory, backups)
+    await protectedStore.create('note', 'Keep me')
+    const before = await readFile(join(directory, 'notes.json'), 'utf8')
+    vi.spyOn(backups, 'recordProtected').mockRejectedValueOnce(
+      new Error('protected backup failed')
+    )
+
+    await expect(
+      protectedStore.replaceSnapshot(
+        { version: 5, items: [], folders: [] },
+        'restore'
+      )
+    ).rejects.toThrow('protected backup failed')
+    expect(await readFile(join(directory, 'notes.json'), 'utf8')).toBe(before)
   })
 })

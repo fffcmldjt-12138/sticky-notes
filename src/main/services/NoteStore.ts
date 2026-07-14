@@ -1,5 +1,6 @@
+import { constants } from 'node:fs'
 import { copyFile, readFile } from 'node:fs/promises'
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import type {
   FolderItem,
@@ -18,28 +19,62 @@ import type {
   TodoTask,
   TodoTaskPatch
 } from '../../shared/models'
-import { JsonFileStore } from './JsonFileStore'
+import { BackupService } from './BackupService'
+import { SafeJsonStore } from './SafeJsonStore'
 import { migrateNotesFile } from './noteMigration'
+import {
+  DataUnavailableError,
+  UnsupportedDataVersionError
+} from './storageErrors'
+import { validateAppConfig, validateNotesFile } from './storageValidators'
 
 export class NoteStore {
   private readonly filePath: string
-  private readonly file: JsonFileStore<NotesFile>
+  private readonly file: SafeJsonStore<NotesFile>
+  private readonly backups: BackupService
   private mutationQueue: Promise<void> = Promise.resolve()
   private initialized: Promise<void> | null = null
 
-  constructor(userDataPath: string) {
+  constructor(userDataPath: string, backups?: BackupService) {
     this.filePath = join(userDataPath, 'notes.json')
-    this.file = new JsonFileStore(this.filePath, () => ({
-      version: 5,
-      items: [],
-      folders: []
-    }))
+    this.backups = backups ?? new BackupService(join(userDataPath, 'backups'), {
+      notes: validateNotesFile,
+      config: validateAppConfig
+    })
+    this.file = new SafeJsonStore(
+      this.filePath,
+      createDefaultNotes,
+      validateNotesFile,
+      (path, value) => this.backups.beforeReplace('notes', path, value),
+      (path, value) => this.backups.afterReplace('notes', path, value),
+      (error, phase) => console.error(`notes ${phase} backup failed`, error)
+    )
   }
 
   async list(): Promise<StickyItem[]> {
     await this.ensureInitialized()
     await this.mutationQueue
     return (await this.file.read()).items.filter((item) => !item.deletedAt)
+  }
+
+  async getSnapshot(): Promise<NotesFile> {
+    await this.ensureInitialized()
+    return this.mutate(async () => structuredClone(await this.file.read()))
+  }
+
+  async replaceSnapshot(
+    value: NotesFile,
+    _reason: 'restore' | 'import'
+  ): Promise<void> {
+    const candidate = structuredClone(value)
+    validateNotesFile(candidate)
+    await this.ensureInitialized()
+    return this.mutate(async () => {
+      const current = validateNotesFile(await this.file.read())
+      await this.backups.recordProtected('notes', current)
+      validateNotesFile(candidate)
+      await this.file.write(candidate)
+    })
   }
 
   async listFolders(): Promise<FolderItem[]> {
@@ -606,37 +641,68 @@ export class NoteStore {
   }
 
   private async initialize(): Promise<void> {
+    let contents: Buffer
     try {
-      const raw = JSON.parse(await readFile(this.filePath, 'utf8')) as {
-        version?: number
-      }
-      if (
-        raw.version === 1 ||
-        raw.version === 2 ||
-        raw.version === 3 ||
-        raw.version === 4
-      ) {
-        await copyFile(this.filePath, `${this.filePath}.backup-${Date.now()}`)
-        await this.file.write(migrateNotesFile(raw))
-      } else if (raw.version === 5) {
-        const normalized = migrateNotesFile(raw)
-        await this.file.write(normalized)
-      } else {
-        throw new Error(`Unsupported notes version: ${raw.version}`)
-      }
+      contents = await readFile(this.filePath)
     } catch (error) {
-      const nodeError = error as NodeJS.ErrnoException
-      if (nodeError.code === 'ENOENT') {
-        await this.file.write({ version: 5, items: [], folders: [] })
+      if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
+        await this.file.read()
         return
       }
-      if (error instanceof SyntaxError) {
-        await copyFile(this.filePath, `${this.filePath}.corrupt-${Date.now()}`)
-        await this.file.write({ version: 5, items: [], folders: [] })
-        return
-      }
-      throw error
+      throw new DataUnavailableError('notes', error)
     }
+
+    let raw: unknown
+    try {
+      raw = JSON.parse(contents.toString('utf8')) as unknown
+    } catch (error) {
+      await this.recover(contents, error)
+      return
+    }
+
+    const version = persistedVersion(raw)
+    if (Number.isSafeInteger(version) && Number(version) > 5) {
+      throw new UnsupportedDataVersionError('notes', version)
+    }
+    if (version === 5) {
+      try {
+        validateNotesFile(raw)
+      } catch (error) {
+        await this.recover(contents, error)
+      }
+      return
+    }
+    if (version === 1 || version === 2 || version === 3 || version === 4) {
+      let migrated: NotesFile
+      try {
+        migrated = validateNotesFile(migrateNotesFile(raw))
+      } catch (error) {
+        await this.recover(contents, error)
+        return
+      }
+      const backupPath = `${this.filePath}.backup-${Date.now()}-${randomUUID()}`
+      await copyFile(this.filePath, backupPath, constants.COPYFILE_EXCL)
+      await this.file.replaceInvalid(migrated, backupPath)
+      validateNotesFile(await this.file.read())
+      return
+    }
+    await this.recover(
+      contents,
+      new Error(`Invalid notes version: ${String(version)}`)
+    )
+  }
+
+  private async recover(contents: Buffer, cause: unknown): Promise<void> {
+    const corruptPath = corruptCopyPath(this.filePath, contents)
+    const backup = await this.backups.findNewestValid('notes')
+    if (!backup) {
+      await preserveCorruptCopy(this.filePath, corruptPath)
+      throw new DataUnavailableError('notes', cause)
+    }
+
+    const candidate = validateNotesFile(backup.value)
+    await this.file.replaceInvalid(candidate, corruptPath)
+    validateNotesFile(await this.file.read())
   }
 
   private mutate<T>(operation: () => Promise<T>): Promise<T> {
@@ -646,6 +712,32 @@ export class NoteStore {
       () => undefined
     )
     return result
+  }
+}
+
+function createDefaultNotes(): NotesFile {
+  return { version: 5, items: [], folders: [] }
+}
+
+function persistedVersion(value: unknown): unknown {
+  return value && typeof value === 'object' && 'version' in value
+    ? value.version
+    : undefined
+}
+
+function corruptCopyPath(filePath: string, contents: Buffer): string {
+  const digest = createHash('sha256').update(contents).digest('hex')
+  return `${filePath}.corrupt-${digest}`
+}
+
+async function preserveCorruptCopy(
+  filePath: string,
+  corruptPath: string
+): Promise<void> {
+  try {
+    await copyFile(filePath, corruptPath, constants.COPYFILE_EXCL)
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
   }
 }
 

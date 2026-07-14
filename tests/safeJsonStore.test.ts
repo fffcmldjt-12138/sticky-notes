@@ -360,4 +360,63 @@ describe('SafeJsonStore', () => {
     expect(JSON.parse(await readFile(filePath, 'utf8'))).toEqual({ value: 7 })
     expect(await readdir(directory)).toEqual(['data.json'])
   })
+
+  it('moves an invalid formal file aside before safely restoring a candidate', async () => {
+    const preservedPath = join(directory, 'data.json.corrupt-hash')
+    const store = new SafeJsonStore(
+      filePath,
+      () => ({ value: 0 }),
+      validateStoredValue
+    )
+    await writeFile(filePath, '{broken', 'utf8')
+
+    await store.replaceInvalid({ value: 8 }, preservedPath)
+
+    expect(await readFile(preservedPath, 'utf8')).toBe('{broken')
+    expect(await store.read()).toEqual({ value: 8 })
+  })
+
+  it('rolls the invalid formal file back when recovery replacement fails', async () => {
+    const preservedPath = join(directory, 'data.json.corrupt-hash')
+    const store = new SafeJsonStore(
+      filePath,
+      () => ({ value: 0 }),
+      validateStoredValue
+    )
+    await writeFile(filePath, '{broken', 'utf8')
+    const actualFs = await vi.importActual<typeof import('node:fs/promises')>(
+      'node:fs/promises'
+    )
+    vi.mocked(rename)
+      .mockImplementationOnce(actualFs.rename)
+      .mockRejectedValueOnce(new Error('replacement failed'))
+
+    await expect(
+      store.replaceInvalid({ value: 8 }, preservedPath)
+    ).rejects.toThrow('replacement failed')
+
+    expect(await readFile(filePath, 'utf8')).toBe('{broken')
+    await expect(readFile(preservedPath, 'utf8')).rejects.toMatchObject({
+      code: 'ENOENT'
+    })
+  })
+
+  it('validates a recovery candidate before moving the invalid formal file', async () => {
+    const preservedPath = join(directory, 'data.json.corrupt-hash')
+    const store = new SafeJsonStore(
+      filePath,
+      () => ({ value: 0 }),
+      validateStoredValue
+    )
+    await writeFile(filePath, '{broken', 'utf8')
+
+    await expect(
+      store.replaceInvalid({ value: -1 }, preservedPath)
+    ).rejects.toThrow('invalid')
+
+    expect(await readFile(filePath, 'utf8')).toBe('{broken')
+    await expect(readFile(preservedPath, 'utf8')).rejects.toMatchObject({
+      code: 'ENOENT'
+    })
+  })
 })

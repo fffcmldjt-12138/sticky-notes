@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 
 export type BackupPhase = 'beforeReplace' | 'afterReplace'
@@ -35,6 +35,10 @@ export class SafeJsonStore<T> {
     return this.enqueue(async () => {
       await this.writeNow(value)
     })
+  }
+
+  replaceInvalid(value: T, preservedPath: string): Promise<void> {
+    return this.enqueue(() => this.replaceInvalidNow(value, preservedPath))
   }
 
   private enqueue<TResult>(operation: () => Promise<TResult>): Promise<TResult> {
@@ -104,6 +108,56 @@ export class SafeJsonStore<T> {
     }
   }
 
+  private async replaceInvalidNow(value: T, preservedPath: string): Promise<void> {
+    const directory = dirname(this.filePath)
+    await mkdir(directory, { recursive: true })
+    const temporaryPath = join(
+      directory,
+      `.${basename(this.filePath)}.${process.pid}.${randomUUID()}.tmp`
+    )
+    const stagingPath = join(
+      directory,
+      `.${basename(this.filePath)}.${process.pid}.${randomUUID()}.recovery`
+    )
+    let movedPath: string | undefined
+    let replacementSucceeded = false
+
+    try {
+      await writeFile(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, {
+        encoding: 'utf8',
+        flag: 'wx',
+        flush: true
+      })
+      this.validate(JSON.parse(await readFile(temporaryPath, 'utf8')))
+
+      const preserveAlreadyExists = await pathExists(preservedPath)
+      movedPath = preserveAlreadyExists ? stagingPath : preservedPath
+      await rename(this.filePath, movedPath)
+      try {
+        await rename(temporaryPath, this.filePath)
+        replacementSucceeded = true
+      } catch (error) {
+        try {
+          await rename(movedPath, this.filePath)
+          movedPath = undefined
+        } catch {
+          // Preserve the replacement error; the moved original remains recoverable.
+        }
+        throw error
+      }
+
+      if (preserveAlreadyExists) {
+        await rm(movedPath, { force: true })
+        movedPath = undefined
+      }
+    } finally {
+      await rm(temporaryPath, { force: true }).catch(() => undefined)
+      if (!replacementSucceeded && movedPath && await pathExists(this.filePath)) {
+        await rm(movedPath, { force: true }).catch(() => undefined)
+      }
+    }
+  }
+
   private async runBackup(
     phase: BackupPhase,
     backup: ((currentPath: string, value: T) => Promise<void>) | undefined,
@@ -132,5 +186,15 @@ export class SafeJsonStore<T> {
       }
       throw error
     }
+  }
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await stat(path)
+    return true
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
+    throw error
   }
 }

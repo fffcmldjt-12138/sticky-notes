@@ -19,6 +19,7 @@ import { registerWindowIpc } from './ipc/windowIpc'
 import { ipcChannels } from '../shared/ipcChannels'
 import { AutoLaunchService } from './services/AutoLaunchService'
 import { AssetService } from './services/AssetService'
+import { BackupService } from './services/BackupService'
 import { ConfigStore } from './services/ConfigStore'
 import {
   DetachedWindowService,
@@ -39,6 +40,11 @@ import {
 import { RecycleService } from './services/RecycleService'
 import { TrayService } from './services/TrayService'
 import { WindowService } from './services/WindowService'
+import { DataUnavailableError } from './services/storageErrors'
+import {
+  validateAppConfig,
+  validateNotesFile
+} from './services/storageValidators'
 
 const hasLock = app.requestSingleInstanceLock()
 protocol.registerSchemesAsPrivileged([{
@@ -57,9 +63,13 @@ if (!hasLock) {
     electronApp.setAppUserModelId('com.stickynotes.desktop')
 
     const userData = app.getPath('userData')
-    const notes = new NoteStore(userData)
+    const backups = new BackupService(join(userData, 'backups'), {
+      notes: validateNotesFile,
+      config: validateAppConfig
+    })
+    const notes = new NoteStore(userData, backups)
     const assets = new AssetService(userData)
-    const config = new ConfigStore(userData)
+    const config = new ConfigStore(userData, backups)
     const autoLaunch = new AutoLaunchService()
     const windows = new WindowService()
     const dragPreview = new DragPreviewWindowService(
@@ -236,7 +246,19 @@ if (!hasLock) {
     )
     const recycle = new RecycleService(notes, () => new Date(), assets)
 
-    const currentConfig = await config.get()
+    let currentConfig
+    try {
+      const warmed = await Promise.all([notes.getSnapshot(), config.get()])
+      currentConfig = warmed[1]
+    } catch (error) {
+      if (error instanceof DataUnavailableError) {
+        console.error(
+          `Startup blocked because ${error.source} data is unavailable`,
+          error
+        )
+      }
+      throw error
+    }
     await recycle.purgeExpired()
     protocol.handle('asset', (request) => {
       const filePath = assets.resolveUrl(request.url)
