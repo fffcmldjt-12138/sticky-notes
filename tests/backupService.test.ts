@@ -123,6 +123,31 @@ describe('BackupService', () => {
     expect(files.filter((file) => file.startsWith('2026-07-01T'))).toHaveLength(1)
   })
 
+  it('creates a daily when same-day files are corrupt or domain-invalid', async () => {
+    const dailyDirectory = join(directory, 'notes', 'daily')
+    await mkdir(dailyDirectory, { recursive: true })
+    await writeFile(
+      join(dailyDirectory, '2026-07-14T10-00-00-000.json'),
+      '{broken'
+    )
+    await writeFile(
+      join(dailyDirectory, '2026-07-14T10-00-00-001.json'),
+      JSON.stringify({ kind: 'config', theme: 'dark' })
+    )
+
+    const entry = await backups.recordDaily('notes', {
+      kind: 'notes',
+      value: 8
+    })
+
+    expect(entry).not.toBeNull()
+    expect(await readdir(dailyDirectory)).toHaveLength(3)
+    expect(JSON.parse(await readFile(entry?.path ?? '', 'utf8'))).toEqual({
+      kind: 'notes',
+      value: 8
+    })
+  })
+
   it('keeps protected snapshots at exactly 168 hours and removes them after', async () => {
     const first = new Date(now)
     await backups.recordProtected('notes', { kind: 'notes', value: 1 })
@@ -158,6 +183,91 @@ describe('BackupService', () => {
 
     expect(recovered?.value).toEqual({ kind: 'notes', value: 7 })
     expect(recovered?.entry.kind).toBe('daily')
+  })
+
+  it('counts only domain-valid change snapshots toward source retention', async () => {
+    const fixtures = [
+      {
+        source: 'notes' as const,
+        limit: 20,
+        valid: (value: number) => ({ kind: 'notes' as const, value }),
+        invalid: { kind: 'config', theme: 'dark' }
+      },
+      {
+        source: 'config' as const,
+        limit: 5,
+        valid: (value: number) => ({
+          kind: 'config' as const,
+          theme: String(value)
+        }),
+        invalid: { kind: 'notes', value: 99 }
+      }
+    ]
+
+    for (const fixture of fixtures) {
+      const changeDirectory = join(directory, fixture.source, 'change')
+      await mkdir(changeDirectory, { recursive: true })
+      for (let value = 0; value < fixture.limit; value += 1) {
+        await writeFile(
+          join(
+            changeDirectory,
+            `2026-07-13T10-00-00-${String(value).padStart(3, '0')}.json`
+          ),
+          JSON.stringify(fixture.valid(value))
+        )
+      }
+      const corruptName = '2026-07-13T11-00-00-000.json'
+      const invalidName = '2026-07-13T11-00-00-001.json'
+      await writeFile(join(changeDirectory, corruptName), '{broken')
+      await writeFile(
+        join(changeDirectory, invalidName),
+        JSON.stringify(fixture.invalid)
+      )
+
+      await backups.recordChange(
+        fixture.source,
+        fixture.valid(fixture.limit)
+      )
+
+      const files = await readdir(changeDirectory)
+      const validValues = await Promise.all(
+        files.map(async (file) => {
+          try {
+            const parsed = JSON.parse(
+              await readFile(join(changeDirectory, file), 'utf8')
+            )
+            return fixture.source === 'notes'
+              ? validateNotes(parsed)
+              : validateConfig(parsed)
+          } catch {
+            return null
+          }
+        })
+      )
+      expect(validValues.filter(Boolean)).toHaveLength(fixture.limit)
+      expect(files).toContain(corruptName)
+      expect(files).toContain(invalidName)
+    }
+  })
+
+  it('does not recover config from a config daily directory', async () => {
+    const changeDirectory = join(directory, 'config', 'change')
+    const dailyDirectory = join(directory, 'config', 'daily')
+    await mkdir(changeDirectory, { recursive: true })
+    await mkdir(dailyDirectory, { recursive: true })
+    await writeFile(
+      join(changeDirectory, '2026-07-14T09-00-00-000.json'),
+      JSON.stringify({ kind: 'config', theme: 'light' })
+    )
+    await writeFile(
+      join(dailyDirectory, '2026-07-14T10-00-00-000.json'),
+      JSON.stringify({ kind: 'config', theme: 'dark' })
+    )
+
+    const recovered = await backups.findNewestValid('config')
+
+    expect(recovered?.value).toEqual({ kind: 'config', theme: 'light' })
+    expect(recovered?.entry.kind).toBe('change')
   })
 
   it('ignores protected, temp, corrupt suffixes, illegal dates, and directories', async () => {

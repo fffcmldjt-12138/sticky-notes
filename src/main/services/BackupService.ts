@@ -60,9 +60,16 @@ export class BackupService {
       const directory = this.kindPath(source, 'daily')
       await mkdir(directory, { recursive: true })
       const files = await this.listParsedFiles(directory)
-      const alreadyRecorded = files.some(({ epoch }) =>
+      const sameDayFiles = files.filter(({ epoch }) =>
         isSameLocalDate(new Date(epoch), current)
       )
+      const alreadyRecorded = (
+        await Promise.all(
+          sameDayFiles.map(({ name }) =>
+            this.isValidSnapshot(source, join(directory, name))
+          )
+        )
+      ).some(Boolean)
       const entry = alreadyRecorded
         ? null
         : await this.writeSnapshot(source, 'daily', value, current)
@@ -106,9 +113,11 @@ export class BackupService {
 
   findNewestValid(source: BackupSource): Promise<ValidBackup | null> {
     return this.enqueue(async () => {
+      const kinds: Array<'change' | 'daily'> =
+        source === 'notes' ? ['change', 'daily'] : ['change']
       const candidates = (
         await Promise.all(
-          (['change', 'daily'] as const).map(async (kind) =>
+          kinds.map(async (kind) =>
             (await this.listParsedFiles(this.kindPath(source, kind))).map(
               (file) => ({ ...file, kind })
             )
@@ -205,11 +214,29 @@ export class BackupService {
     const files = (await this.listParsedFiles(directory)).sort(
       (left, right) => right.epoch - left.epoch
     )
+    const validity = await Promise.all(
+      files.map(({ name }) =>
+        this.isValidSnapshot(source, join(directory, name))
+      )
+    )
+    const validFiles = files.filter((_file, index) => validity[index])
     await Promise.all(
-      files.slice(limit).map(({ name }) =>
+      validFiles.slice(limit).map(({ name }) =>
         rm(join(directory, name), { force: true })
       )
     )
+  }
+
+  private async isValidSnapshot(
+    source: BackupSource,
+    path: string
+  ): Promise<boolean> {
+    try {
+      this.validators[source](JSON.parse(await readFile(path, 'utf8')))
+      return true
+    } catch {
+      return false
+    }
   }
 
   private async retainDailyWindow(
