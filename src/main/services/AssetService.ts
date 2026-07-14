@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
+import { lstat, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
-import type { AssetReference } from '../../shared/models'
+import type { AssetReference, NotesFile } from '../../shared/models'
 
 const imageTypes = new Map([
   ['image/png', '.png'],
@@ -9,6 +9,8 @@ const imageTypes = new Map([
   ['image/gif', '.gif'],
   ['image/webp', '.webp']
 ])
+const canonicalAssetPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\.(?:png|jpe?g|gif|webp)$/
 
 export class AssetService {
   private readonly assetDirectory: string
@@ -56,6 +58,51 @@ export class AssetService {
     } catch {
       return null
     }
+  }
+
+  isCanonicalFileName(fileName: string): boolean {
+    return canonicalAssetPattern.test(fileName)
+  }
+
+  collectReferencedFileNames(notes: NotesFile): Set<string> {
+    const markdownValues: string[] = []
+    for (const item of notes.items) {
+      if (item.type === 'note') {
+        markdownValues.push(item.contentMarkdown)
+        continue
+      }
+      for (const task of item.tasks) {
+        markdownValues.push(task.contentMarkdown)
+        markdownValues.push(...task.children.map((child) => child.contentMarkdown))
+      }
+    }
+    return extractAssetFileNames(markdownValues, (name) =>
+      this.isCanonicalFileName(name)
+    )
+  }
+
+  async listLiveAssets(): Promise<Array<{
+    fileName: string
+    path: string
+    size: number
+    mimeType: string
+  }>> {
+    await mkdir(this.assetDirectory, { recursive: true })
+    const entries = await readdir(this.assetDirectory, { withFileTypes: true })
+    const assets = []
+    for (const entry of entries) {
+      if (!entry.isFile() || !this.isCanonicalFileName(entry.name)) continue
+      const path = join(this.assetDirectory, entry.name)
+      const metadata = await lstat(path)
+      if (!metadata.isFile()) throw new Error(`Asset is not a regular file: ${entry.name}`)
+      assets.push({
+        fileName: entry.name,
+        path,
+        size: metadata.size,
+        mimeType: mimeTypeForFileName(entry.name)
+      })
+    }
+    return assets.sort((left, right) => left.fileName.localeCompare(right.fileName))
   }
 
   async cleanUnused(markdownValues: string[], now = Date.now()): Promise<number> {
@@ -112,13 +159,51 @@ export class AssetService {
   }
 }
 
-function extractAssetFileNames(markdownValues: string[]): Set<string> {
+export function mimeTypeForFileName(fileName: string): string {
+  const extension = extname(fileName).toLowerCase()
+  if (extension === '.png') return 'image/png'
+  if (extension === '.jpg' || extension === '.jpeg') return 'image/jpeg'
+  if (extension === '.gif') return 'image/gif'
+  if (extension === '.webp') return 'image/webp'
+  throw new Error(`Unsupported asset filename: ${fileName}`)
+}
+
+export function matchesImageMagic(bytes: Uint8Array, mimeType: string): boolean {
+  const buffer = Buffer.from(bytes)
+  if (mimeType === 'image/png') {
+    return buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  }
+  if (mimeType === 'image/jpeg') {
+    return buffer.length >= 3 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff
+  }
+  if (mimeType === 'image/gif') {
+    const signature = buffer.subarray(0, 6).toString('ascii')
+    return signature === 'GIF87a' || signature === 'GIF89a'
+  }
+  if (mimeType === 'image/webp') {
+    return buffer.length >= 12 &&
+      buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+      buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+  }
+  return false
+}
+
+function extractAssetFileNames(
+  markdownValues: string[],
+  accept: (fileName: string) => boolean = () => true
+): Set<string> {
   const fileNames = new Set<string>()
   const pattern = /asset:\/\/local\/([^\s)"'>]+)/g
   for (const markdown of markdownValues) {
     for (const match of markdown.matchAll(pattern)) {
-      const decoded = decodeURIComponent(match[1])
-      if (decoded && basename(decoded) === decoded) fileNames.add(decoded)
+      try {
+        const decoded = decodeURIComponent(match[1])
+        if (decoded && basename(decoded) === decoded && accept(decoded)) {
+          fileNames.add(decoded)
+        }
+      } catch {
+        // Malformed user-authored URLs are ignored rather than crashing cleanup.
+      }
     }
   }
   return fileNames

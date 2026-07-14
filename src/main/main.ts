@@ -29,6 +29,7 @@ import {
   FolderWindowService,
   type FolderWindowHandle
 } from './services/FolderWindowService'
+import { ImportTransactionService } from './services/ImportTransactionService'
 import { NoteStore } from './services/NoteStore'
 import { DragPreviewWindowService } from './services/DragPreviewWindowService'
 import { ReminderService } from './services/ReminderService'
@@ -69,6 +70,7 @@ if (!hasLock) {
     })
     const notes = new NoteStore(userData, backups)
     const assets = new AssetService(userData)
+    const importTransaction = new ImportTransactionService(userData, notes, assets)
     const config = new ConfigStore(userData, backups)
     const autoLaunch = new AutoLaunchService()
     const windows = new WindowService()
@@ -246,6 +248,8 @@ if (!hasLock) {
     )
     const recycle = new RecycleService(notes, () => new Date(), assets)
 
+    await importTransaction.recoverInterruptedImport()
+    await importTransaction.cleanupStaleState()
     let currentConfig
     try {
       const warmed = await Promise.all([notes.getSnapshot(), config.get()])

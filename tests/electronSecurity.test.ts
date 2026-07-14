@@ -24,4 +24,16 @@ describe('Electron preload compatibility', () => {
       /app\.whenReady\(\)[\s\S]*\.catch\(\(error\) => \{[\s\S]*console\.error\([\s\S]*app\.exit\(1\)/
     )
   })
+
+  it('recovers interrupted imports before notes and config warmup', async () => {
+    const source = await readFile('src/main/main.ts', 'utf8')
+    const recovery = source.indexOf('recoverInterruptedImport()')
+    const cleanup = source.indexOf('cleanupStaleState()')
+    const warmup = source.indexOf('Promise.all([notes.getSnapshot(), config.get()])')
+
+    expect(recovery).toBeGreaterThan(0)
+    expect(cleanup).toBeGreaterThan(recovery)
+    expect(warmup).toBeGreaterThan(cleanup)
+    expect(source).toContain('new ImportTransactionService(userData, notes, assets)')
+  })
 })

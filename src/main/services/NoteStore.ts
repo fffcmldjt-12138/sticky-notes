@@ -81,6 +81,16 @@ export class NoteStore {
     })
   }
 
+  async restoreImportRollbackSnapshot(value: NotesFile): Promise<void> {
+    const candidate = structuredClone(value)
+    validateNotesFile(candidate)
+    await this.ensureInitialized()
+    return this.mutate(async () => {
+      validateNotesFile(candidate)
+      await this.file.write(candidate)
+    })
+  }
+
   async listFolders(): Promise<FolderItem[]> {
     await this.ensureInitialized()
     await this.mutationQueue

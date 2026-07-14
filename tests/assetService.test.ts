@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { AssetService } from '../src/main/services/AssetService'
+import type { NotesFile } from '../src/shared/models'
 
 describe('AssetService', () => {
   let directory: string
@@ -56,4 +57,79 @@ describe('AssetService', () => {
     expect(await service.restoreReferenced([`![image](${asset.url})`])).toBe(1)
     await expect(access(join(directory, 'assets', asset.fileName))).resolves.toBeUndefined()
   })
+
+  it('returns null instead of throwing for malformed percent encoding', () => {
+    expect(service.resolveUrl('asset://local/%E0%A4%A')).toBeNull()
+  })
+
+  it('collects canonical references from notes, tasks, and subtasks', () => {
+    const first = '01234567-89ab-4cde-8fab-0123456789ab.png'
+    const second = '11234567-89ab-4cde-8fab-0123456789ab.jpg'
+    const third = '21234567-89ab-4cde-8fab-0123456789ab.webp'
+    const notes = {
+      version: 5,
+      folders: [],
+      items: [
+        {
+          ...baseItem('note-1'),
+          type: 'note',
+          contentMarkdown: `![one](asset://local/${first}) bad asset://local/%E0%A4%A`,
+          syncedToSiyuan: false
+        },
+        {
+          ...baseItem('todo-1'),
+          type: 'todo',
+          panelExpanded: false,
+          tasks: [{
+            id: 'task-1',
+            contentMarkdown: `![two](asset://local/${second})`,
+            completed: false,
+            tags: [],
+            importance: 'normal',
+            urgency: 'normal',
+            schedule: null,
+            children: [{
+              id: 'subtask-1',
+              contentMarkdown: `![three](asset://local/${third})`,
+              completed: false,
+              importance: 'normal',
+              urgency: 'normal',
+              tags: [],
+              schedule: null
+            }]
+          }]
+        }
+      ]
+    } satisfies NotesFile
+
+    expect(service.collectReferencedFileNames(notes)).toEqual(
+      new Set([first, second, third])
+    )
+  })
+
+  it('recognizes only canonical UUID image filenames', () => {
+    expect(service.isCanonicalFileName('01234567-89ab-4cde-8fab-0123456789ab.jpeg')).toBe(true)
+    expect(service.isCanonicalFileName('01234567-89ab-4cde-8fab-0123456789AB.PNG')).toBe(false)
+    expect(service.isCanonicalFileName('../01234567-89ab-4cde-8fab-0123456789ab.png')).toBe(false)
+  })
 })
+
+function baseItem(id: string) {
+  const now = '2026-07-14T00:00:00.000Z'
+  return {
+    id,
+    revision: 1,
+    title: id,
+    headerColor: '#f2c94c' as const,
+    bodyTheme: 'light' as const,
+    pinned: false,
+    detached: false,
+    windowBounds: null,
+    parentFolderId: null,
+    tags: [],
+    order: 0,
+    deletedAt: null,
+    createdAt: now,
+    updatedAt: now
+  }
+}
