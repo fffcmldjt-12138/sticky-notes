@@ -14,12 +14,33 @@ describe('ConfigStore', () => {
       version: 1,
       autoLaunch: false,
       panelPosition: 'right',
-      alwaysOnTop: true
+      alwaysOnTop: true,
+      siyuan: {
+        endpoint: 'http://127.0.0.1:6806',
+        inboxNotebookId: null
+      }
     })
 
     expect(await store.update({ autoLaunch: true })).toMatchObject({
       autoLaunch: true,
       alwaysOnTop: true
+    })
+  })
+
+  it('persists the SiYuan endpoint and detected inbox notebook', async () => {
+    const directory = await mkdtemp(join(tmpdir(), 'sticky-config-'))
+    const store = new ConfigStore(directory)
+
+    await expect(store.update({
+      siyuan: {
+        endpoint: 'http://localhost:6806',
+        inboxNotebookId: 'inbox'
+      }
+    })).resolves.toMatchObject({
+      siyuan: {
+        endpoint: 'http://localhost:6806',
+        inboxNotebookId: 'inbox'
+      }
     })
   })
 

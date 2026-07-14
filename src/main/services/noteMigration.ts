@@ -30,21 +30,27 @@ function normalizeBodyTheme(value: unknown): BodyTheme {
 export function migrateNotesFile(value: unknown): NotesFile {
   if (!value || typeof value !== 'object') throw new Error('Invalid notes file')
   const source = value as { version?: number; items?: unknown[]; folders?: unknown[] }
+  if (source.version === 6) {
+    if (!Array.isArray(source.items) || !Array.isArray(source.folders)) {
+      throw new Error('Invalid notes file collections')
+    }
+    return normalizeCurrentVersion(source, false)
+  }
   if (source.version === 5) {
     if (!Array.isArray(source.items) || !Array.isArray(source.folders)) {
       throw new Error('Invalid notes file collections')
     }
-    return normalizeCurrentVersion(source)
+    return normalizeCurrentVersion(source, true)
   }
   if (source.version === 4) {
-    return normalizeCurrentVersion(source)
+    return normalizeCurrentVersion(source, true)
   }
   if (source.version === 3) return migrateVersion3(source)
   if (source.version === 2) return migrateVersion2(source)
   if (source.version !== 1) throw new Error(`Unsupported notes version: ${source.version}`)
 
   return {
-    version: 5,
+    version: 6,
     folders: [],
     items: (source.items ?? []).map(migrateVersion1Item)
   }
@@ -103,41 +109,26 @@ function migrateVersion1Item(value: unknown, index: number): StickyItem {
     ...base,
     type: 'note',
     contentMarkdown: String(item.contentMarkdown ?? ''),
-    syncedToSiyuan: false
+    siyuanDelivery: null
   }
 }
 
 function migrateVersion2(source: { items?: unknown[] }): NotesFile {
-  return {
-    version: 5,
-    folders: [],
-    items: (source.items ?? []).map((value, index) => {
-      const item = value as StickyItem
-      const normalized = {
-        ...item,
-        revision: normalizeRevision(item.revision),
-        headerColor: normalizeColor(item.headerColor),
-        bodyTheme: normalizeBodyTheme(item.bodyTheme),
-        detached: Boolean(item.detached),
-        windowBounds: item.windowBounds ?? null,
-        ...organizationFields(index)
-      }
-      return normalizeTodoTasks(normalized)
-    })
-  }
+  return normalizeCurrentVersion({ items: source.items, folders: [] }, true)
 }
 
 function migrateVersion3(
   source: { items?: unknown[]; folders?: unknown[] }
 ): NotesFile {
-  return normalizeCurrentVersion(source)
+  return normalizeCurrentVersion(source, true)
 }
 
 function normalizeCurrentVersion(
-  source: { items?: unknown[]; folders?: unknown[] }
+  source: { items?: unknown[]; folders?: unknown[] },
+  migrateLegacyDelivery: boolean
 ): NotesFile {
   return {
-    version: 5,
+    version: 6,
     folders: (source.folders ?? []).map((value, index) => {
       const folder = value as NotesFile['folders'][number]
       return {
@@ -152,7 +143,7 @@ function normalizeCurrentVersion(
       }
     }),
     items: (source.items ?? []).map((value, index) => {
-      const item = value as StickyItem
+      const item = value as StickyItem & { syncedToSiyuan?: unknown }
       const normalized = {
         ...item,
         revision: normalizeRevision(item.revision),
@@ -164,6 +155,15 @@ function normalizeCurrentVersion(
         tags: Array.isArray(item.tags) ? item.tags : [],
         order: Number.isFinite(item.order) ? item.order : index,
         deletedAt: item.deletedAt ?? null
+      }
+      if (normalized.type === 'note') {
+        const { syncedToSiyuan: _legacySync, ...note } = normalized
+        return {
+          ...note,
+          siyuanDelivery: migrateLegacyDelivery
+            ? null
+            : note.siyuanDelivery ?? null
+        }
       }
       return normalizeTodoTasks(normalized)
     })

@@ -6,6 +6,7 @@ import {
   net,
   Notification,
   protocol,
+  safeStorage,
   screen
 } from 'electron'
 import { electronApp, is } from '@electron-toolkit/utils'
@@ -18,6 +19,7 @@ import { registerReminderIpc } from './ipc/reminderIpc'
 import { registerRecycleIpc } from './ipc/recycleIpc'
 import { registerWindowIpc } from './ipc/windowIpc'
 import { registerUndoIpc } from './ipc/undoIpc'
+import { registerSiyuanIpc } from './ipc/siyuanIpc'
 import { ipcChannels } from '../shared/ipcChannels'
 import { AutoLaunchService } from './services/AutoLaunchService'
 import { AssetService } from './services/AssetService'
@@ -45,6 +47,8 @@ import {
 import { RecycleService } from './services/RecycleService'
 import { TrayService } from './services/TrayService'
 import { WindowService } from './services/WindowService'
+import { SiyuanCredentialStore } from './services/SiyuanCredentialStore'
+import { SiyuanService } from './services/SiyuanService'
 import { DataUnavailableError } from './services/storageErrors'
 import {
   validateAppConfig,
@@ -75,11 +79,18 @@ if (!hasLock) {
     const notes = new NoteStore(userData, backups)
     const undo = new UndoService()
     const assets = new AssetService(userData)
+    const siyuanCredentials = new SiyuanCredentialStore(userData, safeStorage)
     const importTransaction = new ImportTransactionService(userData, notes, assets)
     const archives = new DataArchiveService(userData, notes, assets, {
       transaction: importTransaction
     })
     const config = new ConfigStore(userData, backups)
+    const siyuan = new SiyuanService({
+      config,
+      credentials: siyuanCredentials,
+      notes,
+      assets
+    })
     const autoLaunch = new AutoLaunchService()
     const windows = new WindowService()
     const dragPreview = new DragPreviewWindowService(
@@ -293,6 +304,9 @@ if (!hasLock) {
       }
     }, undo)
     registerAssetIpc(assets)
+    registerSiyuanIpc(siyuan, {
+      changed: (item) => broadcast(ipcChannels.itemChanged, item)
+    })
     registerFolderIpc(notes, {
       beforeDelete: (folderId) => folderWindows.closeForDelete(folderId),
       changed: (folder) => broadcast(ipcChannels.folderChanged, folder),

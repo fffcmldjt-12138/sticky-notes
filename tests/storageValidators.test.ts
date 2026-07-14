@@ -21,7 +21,7 @@ const note = {
   createdAt: '2026-07-14T00:00:00.000Z',
   updatedAt: '2026-07-14T00:00:00.000Z',
   contentMarkdown: 'text',
-  syncedToSiyuan: false
+  siyuanDelivery: null
 }
 
 const todo = {
@@ -60,7 +60,7 @@ const todo = {
   panelExpanded: true
 }
 delete (todo as Partial<typeof note>).contentMarkdown
-delete (todo as Partial<typeof note>).syncedToSiyuan
+delete (todo as Partial<typeof note>).siyuanDelivery
 
 function folder(id: string, parentFolderId: string | null) {
   return {
@@ -79,25 +79,42 @@ function folder(id: string, parentFolderId: string | null) {
 }
 
 describe('storage validators', () => {
-  it('validates and returns a complete notes v5 tree without rewriting it', () => {
-    const value = { version: 5, items: [note, todo], folders: [] }
+  it('validates a version 6 note with SiYuan delivery metadata', () => {
+    const delivered = {
+      ...note,
+      siyuanDelivery: {
+        notebookId: '20260621024107-2h2l4qe',
+        documentId: '20260714120000-abcdefg',
+        sentAt: '2026-07-14T12:00:00.000Z',
+        contentFingerprint: 'f1:1234'
+      }
+    }
+    expect(validateNotesFile({
+      version: 6,
+      items: [delivered],
+      folders: []
+    })).toBeDefined()
+  })
+
+  it('validates and returns a complete notes v6 tree without rewriting it', () => {
+    const value = { version: 6, items: [note, todo], folders: [] }
     expect(validateNotesFile(value)).toBe(value)
   })
 
   it.each([
-    ['duplicate IDs', { version: 5, items: [note, { ...note }], folders: [] }],
-    ['unsafe revision', { version: 5, items: [{ ...note, revision: 0 }], folders: [] }],
-    ['invalid enum', { version: 5, items: [{ ...note, bodyTheme: 'sepia' }], folders: [] }],
-    ['invalid date', { version: 5, items: [{ ...note, createdAt: 'soon' }], folders: [] }],
-    ['invalid window', { version: 5, items: [{ ...note, windowBounds: { x: 0, y: 0, width: -1, height: 20 } }], folders: [] }],
-    ['invalid task schedule', { version: 5, items: [{ ...todo, tasks: [{ ...todo.tasks[0], schedule: { ...todo.tasks[0].schedule, mode: 'later' } }] }], folders: [] }]
+    ['duplicate IDs', { version: 6, items: [note, { ...note }], folders: [] }],
+    ['unsafe revision', { version: 6, items: [{ ...note, revision: 0 }], folders: [] }],
+    ['invalid enum', { version: 6, items: [{ ...note, bodyTheme: 'sepia' }], folders: [] }],
+    ['invalid date', { version: 6, items: [{ ...note, createdAt: 'soon' }], folders: [] }],
+    ['invalid window', { version: 6, items: [{ ...note, windowBounds: { x: 0, y: 0, width: -1, height: 20 } }], folders: [] }],
+    ['invalid task schedule', { version: 6, items: [{ ...todo, tasks: [{ ...todo.tasks[0], schedule: { ...todo.tasks[0].schedule, mode: 'later' } }] }], folders: [] }]
   ])('rejects %s', (_name, value) => {
     expect(() => validateNotesFile(value)).toThrow()
   })
 
   it('rejects unknown fields instead of silently stripping them', () => {
     expect(() => validateNotesFile({
-      version: 5,
+      version: 6,
       items: [{ ...note, surprise: true }],
       folders: []
     })).toThrow('surprise')
@@ -118,7 +135,7 @@ describe('storage validators', () => {
       }
     }
     expect(() => validateNotesFile({
-      version: 5,
+      version: 6,
       items: [{ ...todo, tasks: [todo.tasks[0], secondTask] }],
       folders: []
     })).not.toThrow()
@@ -151,7 +168,7 @@ describe('storage validators', () => {
     }
   ])('rejects negative reminder offsets', (item) => {
     expect(() => validateNotesFile({
-      version: 5,
+      version: 6,
       items: [item],
       folders: []
     })).toThrow('offsetMinutes')
@@ -159,7 +176,7 @@ describe('storage validators', () => {
 
   it('rejects a persisted folder tree deeper than three levels', () => {
     expect(() => validateNotesFile({
-      version: 5,
+      version: 6,
       items: [],
       folders: [
         folder('folder_1', null),

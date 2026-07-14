@@ -4,6 +4,7 @@ import type {
   FolderItem,
   FolderPatch,
   MutationResult,
+  NoteItem,
   NoteType,
   OrderedNodeRef,
   RecycleContents,
@@ -15,6 +16,30 @@ import type {
   TodoTask,
   TodoTaskPatch
 } from './models'
+
+export interface SiyuanSendResult {
+  status: 'sent' | 'already-sent'
+  documentId: string
+  item: NoteItem
+}
+
+export interface SiyuanSettings {
+  endpoint: string
+  inboxNotebookId: string | null
+  inboxNotebookName: '00 收件箱'
+  hasToken: boolean
+}
+
+export interface SiyuanSettingsPatch {
+  endpoint?: string
+  token?: string
+}
+
+export interface SiyuanConnectionResult {
+  version: string
+  notebookId: string
+  notebookName: string
+}
 
 export interface ReminderAlertPayload {
   itemId?: string
@@ -113,6 +138,12 @@ export interface StickyApi {
   assets: {
     selectImage(): Promise<AssetReference | null>
     importImageData(bytes: Uint8Array, mimeType: string): Promise<AssetReference>
+  }
+  siyuan: {
+    getSettings(): Promise<SiyuanSettings>
+    updateSettings(patch: SiyuanSettingsPatch): Promise<SiyuanSettings>
+    testConnection(): Promise<SiyuanConnectionResult>
+    sendNote(noteId: string): Promise<SiyuanSendResult>
   }
   folders: {
     list(): Promise<FolderItem[]>

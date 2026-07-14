@@ -24,7 +24,10 @@ import {
   type ImportSummary,
   type PreparedImport
 } from './ImportTransactionService'
-import { validateNotesFile } from './storageValidators'
+import {
+  migrateAndValidateRecoverableNotesFile,
+  validateNotesFile
+} from './storageValidators'
 
 const STAGING_PREFIX = 'data-import-staging-'
 const reservedWindowsName =
@@ -53,7 +56,7 @@ export interface ArchiveManifest {
   format: 'sticky-notes-data'
   version: 1
   exportedAt: string
-  notesVersion: 5
+  notesVersion: 5 | 6
   itemCount: number
   folderCount: number
   assetCount: number
@@ -122,7 +125,7 @@ export class DataArchiveService {
       format: 'sticky-notes-data',
       version: 1,
       exportedAt: this.now().toISOString(),
-      notesVersion: 5,
+      notesVersion: 6,
       itemCount: notes.items.length,
       folderCount: notes.folders.length,
       assetCount: manifestAssets.length,
@@ -184,9 +187,11 @@ export class DataArchiveService {
       if (manifestFile.size > this.limits.maxManifestBytes) throw new Error('Manifest size limit exceeded')
       if (notesFile.size > this.limits.maxNotesBytes) throw new Error('Notes size limit exceeded')
       if (notesFile.sha256 !== manifest.notesSha256) throw new Error('Notes hash mismatch')
-      const importedNotes = validateNotesFile(JSON.parse(await readFile(notesFile.path, 'utf8')))
+      const rawNotes = JSON.parse(await readFile(notesFile.path, 'utf8')) as unknown
+      const sourceNotesVersion = isObject(rawNotes) ? rawNotes.version : undefined
+      const importedNotes = migrateAndValidateRecoverableNotesFile(rawNotes)
       if (
-        manifest.notesVersion !== importedNotes.version ||
+        manifest.notesVersion !== sourceNotesVersion ||
         manifest.itemCount !== importedNotes.items.length ||
         manifest.folderCount !== importedNotes.folders.length ||
         manifest.assetCount !== manifest.assets.length
@@ -364,7 +369,8 @@ function validateManifest(value: unknown): ArchiveManifest {
   ])
   if (
     value.format !== 'sticky-notes-data' || value.version !== 1 ||
-    value.notesVersion !== 5 || !isIsoDate(value.exportedAt) ||
+    (value.notesVersion !== 5 && value.notesVersion !== 6) ||
+    !isIsoDate(value.exportedAt) ||
     !Number.isSafeInteger(value.itemCount) || !Number.isSafeInteger(value.folderCount) ||
     !Number.isSafeInteger(value.assetCount) || !isSha256(value.notesSha256) ||
     (value.itemCount as number) < 0 || (value.folderCount as number) < 0 ||

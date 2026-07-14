@@ -65,6 +65,13 @@ const api: StickyApi = {
     importImageData: (bytes, mimeType) =>
       ipcRenderer.invoke(ipcChannels.assetImportData, bytes, mimeType)
   },
+  siyuan: {
+    getSettings: () => ipcRenderer.invoke(ipcChannels.siyuanSettingsGet),
+    updateSettings: (patch) =>
+      ipcRenderer.invoke(ipcChannels.siyuanSettingsUpdate, patch),
+    testConnection: () => ipcRenderer.invoke(ipcChannels.siyuanTestConnection),
+    sendNote: (noteId) => ipcRenderer.invoke(ipcChannels.siyuanSendNote, noteId)
+  },
   folders: {
     list: () => ipcRenderer.invoke(ipcChannels.foldersList),
     create: (title, parentFolderId) =>

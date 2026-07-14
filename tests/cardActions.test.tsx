@@ -8,6 +8,7 @@ import { StickyCard } from '../src/renderer/src/components/StickyCard'
 import { CardContextMenu } from '../src/renderer/src/components/CardContextMenu'
 import { FolderContextMenu } from '../src/renderer/src/components/FolderContextMenu'
 import { TitleDialog } from '../src/renderer/src/components/TitleDialog'
+import { NoteCard } from '../src/renderer/src/components/NoteCard'
 
 const note: NoteItem = {
   id: 'note_1',
@@ -19,7 +20,7 @@ const note: NoteItem = {
   pinned: false,
   detached: false,
   windowBounds: null,
-  syncedToSiyuan: false,
+  siyuanDelivery: null,
   createdAt: '2026-06-14T09:00:00.000Z',
   updatedAt: '2026-06-14T09:00:00.000Z'
 }
@@ -103,6 +104,51 @@ describe('card and navigation actions', () => {
 
     fireEvent.click(screen.getByRole('menuitem', { name: '置顶' }))
     expect(onAction).toHaveBeenCalledWith({ type: 'pin', pinned: true })
+  })
+
+  it('offers SiYuan delivery beside a note title without opening the editor', () => {
+    const onOpen = vi.fn()
+    const onSend = vi.fn().mockResolvedValue(undefined)
+    render(
+      <NoteCard
+        item={note}
+        onOpen={onOpen}
+        onSend={onSend}
+        onContextMenu={vi.fn()}
+        onDetach={vi.fn()}
+      />
+    )
+
+    const sendButton = screen.getByRole('button', { name: '发送到思源' })
+    fireEvent.click(sendButton)
+
+    expect(onSend).toHaveBeenCalledOnce()
+    expect(onOpen).not.toHaveBeenCalled()
+    expect(sendButton).toHaveClass('siyuan-card-send-button')
+  })
+
+  it('does not offer SiYuan delivery from the context menu', () => {
+    const onAction = vi.fn()
+    const view = render(
+      <CardContextMenu
+        item={note}
+        position={{ x: 10, y: 20 }}
+        onAction={onAction}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.queryByRole('menuitem', { name: '发送到思源' }))
+      .not.toBeInTheDocument()
+
+    view.rerender(
+      <CardContextMenu
+        item={todo}
+        position={{ x: 10, y: 20 }}
+        onAction={onAction}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.queryByRole('menuitem', { name: '发送到思源' })).not.toBeInTheDocument()
   })
 
   it('offers local creation from a folder context menu', () => {

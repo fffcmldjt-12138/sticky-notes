@@ -93,7 +93,7 @@ describe('resolveTreeDrop', () => {
       tags: [],
       order: 0,
       deletedAt: null,
-      syncedToSiyuan: false,
+      siyuanDelivery: null,
       createdAt: '',
       updatedAt: ''
     }
@@ -125,7 +125,7 @@ describe('resolveTreeDrop', () => {
       tags: [],
       order: 0,
       deletedAt: null,
-      syncedToSiyuan: false,
+      siyuanDelivery: null,
       createdAt: '',
       updatedAt: ''
     }

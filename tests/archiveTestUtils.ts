@@ -100,10 +100,10 @@ export function archiveEntries(
 }
 
 export function emptyNotes(markdown = ''): NotesFile {
-  if (!markdown) return { version: 5, items: [], folders: [] }
+  if (!markdown) return { version: 6, items: [], folders: [] }
   const now = '2026-07-14T00:00:00.000Z'
   return {
-    version: 5,
+    version: 6,
     folders: [],
     items: [{
       id: 'note-1',
@@ -122,7 +122,7 @@ export function emptyNotes(markdown = ''): NotesFile {
       createdAt: now,
       updatedAt: now,
       contentMarkdown: markdown,
-      syncedToSiyuan: false
+      siyuanDelivery: null
     }]
   }
 }

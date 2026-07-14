@@ -11,6 +11,7 @@ export function StickyPanel({
   items,
   folders,
   onOpen,
+  onSendNote,
   onToggleTodo,
   onToggleTodoSubtask,
   onToggleTodoExpanded,
@@ -28,6 +29,7 @@ export function StickyPanel({
   items: StickyItem[]
   folders: FolderItem[]
   onOpen(item: StickyItem): void
+  onSendNote(item: StickyItem): Promise<void>
   onToggleTodo(item: StickyItem, taskId: string, completed: boolean): void
   onToggleTodoSubtask(
     item: StickyItem,
@@ -83,6 +85,7 @@ export function StickyPanel({
             <NoteCard
               item={entry.item}
               onOpen={() => onOpen(entry.item)}
+              onSend={() => onSendNote(entry.item)}
               onContextMenu={(event) => onContextMenu(entry.item, event)}
               onDetach={() => onDetach(entry.item)}
               onRender={onCardRender}
@@ -109,6 +112,7 @@ export function StickyPanel({
               node={entry.folder}
               onOpenItem={onOpen}
               onItemContextMenu={onContextMenu}
+              onSendItem={onSendNote}
               onToggle={onToggleFolder}
               onContextMenu={onFolderContextMenu}
               onCreate={onCreateInFolder}

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import type { AppConfig } from '../../../shared/models'
 import { RecycleBinPanel } from './RecycleBinPanel'
 import { DataManagementPanel } from './DataManagementPanel'
+import { SiyuanSettingsPanel } from './SiyuanSettingsPanel'
 
 export function SettingsPanel({
   config,
@@ -14,7 +15,11 @@ export function SettingsPanel({
   onBack(): void
   onDataChanged(): void
 }): React.JSX.Element {
-  const [subpage, setSubpage] = useState<'recycle' | 'data' | null>(null)
+  const [subpage, setSubpage] = useState<'recycle' | 'data' | 'siyuan' | null>(null)
+
+  if (subpage === 'siyuan') {
+    return <SiyuanSettingsPanel onBack={() => setSubpage(null)} />
+  }
 
   if (subpage === 'recycle') {
     return (
@@ -58,6 +63,10 @@ export function SettingsPanel({
         </button>
         <button className="settings-row" onClick={() => setSubpage('data')}>
           <span><strong>数据与备份</strong><small>备份、恢复、导入和导出</small></span>
+          <span>›</span>
+        </button>
+        <button className="settings-row" onClick={() => setSubpage('siyuan')}>
+          <span><strong>思源笔记</strong><small>连接并发送笔记到 00 收件箱</small></span>
           <span>›</span>
         </button>
         <button

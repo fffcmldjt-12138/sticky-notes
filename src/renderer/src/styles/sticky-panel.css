@@ -245,7 +245,7 @@
   min-width: 0;
   padding: 9px 10px;
   display: grid;
-  grid-template-columns: 26px minmax(0, 1fr);
+  grid-template-columns: 26px minmax(0, 1fr) auto;
   align-items: center;
   gap: 8px;
   border-left: 5px solid;
@@ -342,6 +342,21 @@
 .settings-card label:last-child { border-bottom: 0; }
 .settings-card strong, .settings-card small { display: block; }
 .settings-card small { color: #818895; margin-top: 3px; }
+.siyuan-settings-card .settings-field {
+  align-items: flex-start;
+  gap: 14px;
+}
+.siyuan-settings-card .settings-field > span:first-child { flex: 1; }
+.siyuan-settings-card input {
+  width: min(210px, 48%);
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #d8dde5;
+  border-radius: 6px;
+}
+.settings-target-row { padding: 16px; display: flex; justify-content: space-between; }
+.settings-actions { padding: 0 14px; }
+.settings-actions .primary-button { width: 100%; }
 .settings-row {
   width: 100%;
   padding: 16px;
@@ -616,6 +631,25 @@
   color: #2457b8;
   cursor: pointer;
   font-weight: 600;
+}
+.delivery-toast {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 45;
+  max-width: calc(100% - 32px);
+  padding: 9px 12px;
+  border: 1px solid #b8c8bc;
+  border-radius: 6px;
+  background: #f4fbf5;
+  color: #245b32;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 14%);
+  overflow-wrap: anywhere;
+}
+.delivery-toast.error {
+  border-color: #e0b4b4;
+  background: #fff5f5;
+  color: #8b2f2f;
 }
 .search-panel {
   display: flex;

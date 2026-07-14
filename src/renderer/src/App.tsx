@@ -102,6 +102,10 @@ function PanelApp(): React.JSX.Element {
   const [activeReminder, setActiveReminder] =
     useState<ReminderAlertPayload | null>(null)
   const [undoLabel, setUndoLabel] = useState<string | null>(null)
+  const [deliveryFeedback, setDeliveryFeedback] = useState<{
+    kind: 'success' | 'error'
+    message: string
+  } | null>(null)
   const [contextMenu, setContextMenu] = useState<{
     item: StickyItem
     x: number
@@ -127,6 +131,13 @@ function PanelApp(): React.JSX.Element {
     const timer = window.setTimeout(() => setUndoLabel(null), 5000)
     return () => window.clearTimeout(timer)
   }, [undoLabel])
+
+  useEffect(() => {
+    if (!deliveryFeedback) return
+    const duration = deliveryFeedback.kind === 'error' ? 6000 : 3000
+    const timer = window.setTimeout(() => setDeliveryFeedback(null), duration)
+    return () => window.clearTimeout(timer)
+  }, [deliveryFeedback])
 
   useEffect(() => {
     void loadItems()
@@ -281,6 +292,26 @@ function PanelApp(): React.JSX.Element {
     }
   }
 
+  async function sendNoteToSiyuan(
+    noteId: string,
+    title = items.find((item) => item.id === noteId)?.title || '无标题'
+  ): Promise<void> {
+    try {
+      const result = await window.stickyApi.siyuan.sendNote(noteId)
+      setItems((current) => upsertItem(current, result.item))
+      setDeliveryFeedback({
+        kind: 'success',
+        message: `已发送到思源：${title || '无标题'}`
+      })
+    } catch (error) {
+      setDeliveryFeedback({
+        kind: 'error',
+        message: `发送失败：${error instanceof Error ? error.message : '未知错误'}`
+      })
+      throw error
+    }
+  }
+
   function openSearchResult(result: SearchResult): void {
     if (result.itemId) {
       setSelectedId(result.itemId)
@@ -332,7 +363,7 @@ function PanelApp(): React.JSX.Element {
         </div>
       )}
       {selected?.type === 'note' && (
-        <NoteEditor item={selected} onSave={(revision, patch) => save(selected.id, revision, patch)} onBack={() => setSelectedId(null)} onDelete={() => void remove(selected)} />
+        <NoteEditor item={selected} onSave={(revision, patch) => save(selected.id, revision, patch)} onSend={() => sendNoteToSiyuan(selected.id)} onBack={() => setSelectedId(null)} onDelete={() => void remove(selected)} />
       )}
       {selected?.type === 'todo' && (
         <TodoEditor
@@ -491,6 +522,7 @@ function PanelApp(): React.JSX.Element {
             items={visibleItems}
             folders={folders}
             onOpen={(item) => setSelectedId(item.id)}
+            onSendNote={(item) => sendNoteToSiyuan(item.id, item.title)}
             onToggleTodo={async (item, taskId, completed) => {
               if (item.type !== 'todo') return
               const updated = await window.stickyApi.notes.updateTodoTask(
@@ -668,6 +700,15 @@ function PanelApp(): React.JSX.Element {
             })
           }}
         />
+      )}
+      {deliveryFeedback && (
+        <div
+          className={`delivery-toast ${deliveryFeedback.kind}`}
+          role={deliveryFeedback.kind === 'error' ? 'alert' : 'status'}
+          aria-label="思源发送结果"
+        >
+          {deliveryFeedback.message}
+        </div>
       )}
     </div>
   )

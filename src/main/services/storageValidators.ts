@@ -8,6 +8,7 @@ import type {
   TodoSchedule,
   TodoSubtask,
   TodoTask,
+  SiyuanDelivery,
   WindowBounds
 } from '../../shared/models'
 import { migrateNotesFile } from './noteMigration'
@@ -17,7 +18,7 @@ type JsonObject = Record<string, unknown>
 export function validateNotesFile(value: unknown): NotesFile {
   const root = objectAt(value, 'notes')
   exactKeys(root, ['version', 'items', 'folders'], 'notes')
-  if (root.version !== 5) fail('notes.version must be 5')
+  if (root.version !== 6) fail('notes.version must be 6')
   const items = arrayAt(root.items, 'notes.items')
   const folders = arrayAt(root.folders, 'notes.folders')
   const ids = new Set<string>()
@@ -44,12 +45,13 @@ export function migrateAndValidateRecoverableNotesFile(
   value: unknown
 ): NotesFile {
   const root = objectAt(value, 'notes recovery candidate')
-  if (root.version === 5) return validateNotesFile(value)
+  if (root.version === 6) return validateNotesFile(value)
   if (
     root.version === 1 ||
     root.version === 2 ||
     root.version === 3 ||
-    root.version === 4
+    root.version === 4 ||
+    root.version === 5
   ) {
     return validateNotesFile(migrateNotesFile(value))
   }
@@ -65,10 +67,11 @@ export function validateAppConfig(value: unknown): AppConfig {
       'autoLaunch',
       'panelPosition',
       'alwaysOnTop',
-      'recentHeaderColors'
+      'recentHeaderColors',
+      'siyuan'
     ],
     'config',
-    ['recentHeaderColors']
+    ['recentHeaderColors', 'siyuan']
   )
   if (config.version !== 1) fail('config.version must be 1')
   booleanAt(config.autoLaunch, 'config.autoLaunch')
@@ -80,6 +83,16 @@ export function validateAppConfig(value: unknown): AppConfig {
     arrayAt(config.recentHeaderColors, 'config.recentHeaderColors').forEach(
       (color, index) => colorAt(color, `config.recentHeaderColors[${index}]`)
     )
+  }
+  if (config.siyuan !== undefined) {
+    const siyuan = objectAt(config.siyuan, 'config.siyuan')
+    exactKeys(siyuan, ['endpoint', 'inboxNotebookId'], 'config.siyuan')
+    const endpoint = stringAt(siyuan.endpoint, 'config.siyuan.endpoint')
+    const url = new URL(endpoint)
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+      fail('config.siyuan.endpoint must use http or https')
+    }
+    nullableStringAt(siyuan.inboxNotebookId, 'config.siyuan.inboxNotebookId')
   }
   return value as AppConfig
 }
@@ -121,7 +134,7 @@ function validateItem(
   ]
   const type = item.type
   if (type === 'note') {
-    exactKeys(item, [...common, 'contentMarkdown', 'syncedToSiyuan'], path)
+    exactKeys(item, [...common, 'contentMarkdown', 'siyuanDelivery'], path)
   } else if (type === 'todo') {
     exactKeys(item, [...common, 'tasks', 'panelExpanded'], path)
   } else {
@@ -145,9 +158,7 @@ function validateItem(
 
   if (type === 'note') {
     stringAt(item.contentMarkdown, `${path}.contentMarkdown`)
-    if (item.syncedToSiyuan !== false) {
-      fail(`${path}.syncedToSiyuan must be false`)
-    }
+    siyuanDeliveryAt(item.siyuanDelivery, `${path}.siyuanDelivery`)
   } else {
     arrayAt(item.tasks, `${path}.tasks`).forEach((task, index) =>
       validateTask(task, `${path}.tasks[${index}]`, ids)
@@ -155,6 +166,21 @@ function validateItem(
     booleanAt(item.panelExpanded, `${path}.panelExpanded`)
   }
   return value as StickyItem
+}
+
+function siyuanDeliveryAt(value: unknown, path: string): SiyuanDelivery | null {
+  if (value === null) return null
+  const delivery = objectAt(value, path)
+  exactKeys(
+    delivery,
+    ['notebookId', 'documentId', 'sentAt', 'contentFingerprint'],
+    path
+  )
+  stringAt(delivery.notebookId, `${path}.notebookId`)
+  stringAt(delivery.documentId, `${path}.documentId`)
+  dateAt(delivery.sentAt, `${path}.sentAt`)
+  stringAt(delivery.contentFingerprint, `${path}.contentFingerprint`)
+  return value as SiyuanDelivery
 }
 
 function validateTask(value: unknown, path: string, ids: Set<string>): TodoTask {

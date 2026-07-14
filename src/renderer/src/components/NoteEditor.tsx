@@ -12,6 +12,7 @@ import { HeaderColorPicker } from './HeaderColorPicker'
 import { MarkdownEditor } from './MarkdownEditor'
 import { SaveStatus } from './SaveStatus'
 import { TagEditor } from './TagEditor'
+import { SiyuanDeliveryButton } from './SiyuanDeliveryButton'
 
 interface Props {
   item: NoteItem
@@ -21,6 +22,7 @@ interface Props {
   ): Promise<MutationResult<StickyItem>>
   onBack(): void
   onDelete(): void
+  onSend?(): Promise<unknown>
   detached?: boolean
 }
 
@@ -29,6 +31,7 @@ export function NoteEditor({
   onSave,
   onBack,
   onDelete,
+  onSend,
   detached = false
 }: Props): React.JSX.Element {
   const coordinator = useEntitySaveCoordinator({
@@ -72,8 +75,17 @@ export function NoteEditor({
     fields.map((field) => field.state)
   )
 
+  async function flushFields(): Promise<void> {
+    for (const field of fields) {
+      const result = await field.flush()
+      if (result && result.status !== 'ok') {
+        throw new Error('内容尚未保存，解决保存冲突后再发送')
+      }
+    }
+  }
+
   function saveAndBack(): void {
-    void Promise.all(fields.map((field) => field.flush()))
+    void flushFields().catch(() => undefined)
     onBack()
   }
 
@@ -128,16 +140,31 @@ export function NoteEditor({
         compact={detached}
       />
       {!detached && (
-        <SaveStatus
-          state={saveState}
-          onRetry={() => void coordinator.retry()}
-          onCopy={() => {
-            void navigator.clipboard?.writeText(
-              `${title.draft}\n\n${content.draft}`.trim()
-            )
-          }}
-          onLoadLatest={discardLocal}
-        />
+        <div className="editor-status-row">
+          {onSend && (
+            <SiyuanDeliveryButton
+              note={{
+                ...item,
+                title: title.draft,
+                contentMarkdown: content.draft
+              }}
+              onSend={async () => {
+                await flushFields()
+                await onSend()
+              }}
+            />
+          )}
+          <SaveStatus
+            state={saveState}
+            onRetry={() => void coordinator.retry()}
+            onCopy={() => {
+              void navigator.clipboard?.writeText(
+                `${title.draft}\n\n${content.draft}`.trim()
+              )
+            }}
+            onLoadLatest={discardLocal}
+          />
+        </div>
       )}
     </section>
   )

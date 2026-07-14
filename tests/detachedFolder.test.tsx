@@ -40,7 +40,7 @@ const note: NoteItem = {
   tags: [],
   order: 0,
   deletedAt: null,
-  syncedToSiyuan: false,
+  siyuanDelivery: null,
   createdAt: '2026-06-15T00:00:00.000Z',
   updatedAt: '2026-06-15T00:00:00.000Z'
 }
@@ -70,6 +70,22 @@ beforeEach(() => {
         update: vi.fn(),
         delete: vi.fn(),
         reorderChildren: vi.fn()
+      },
+      siyuan: {
+        sendNote: vi.fn().mockResolvedValue({
+          status: 'sent',
+          documentId: 'doc-1',
+          item: {
+            ...note,
+            revision: 2,
+            siyuanDelivery: {
+              notebookId: 'inbox',
+              documentId: 'doc-1',
+              sentAt: '2026-07-14T12:00:00.000Z',
+              contentFingerprint: 'fingerprint'
+            }
+          }
+        })
       },
       window: {
         attachFolder,
@@ -139,5 +155,29 @@ describe('DetachedFolder', () => {
     fireEvent.contextMenu(await screen.findByText('Nested note'))
 
     expect(screen.getByRole('menuitem', { name: '编辑' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: '发送到思源' }))
+      .not.toBeInTheDocument()
+  })
+
+  it('sends a nested note from beside its title and reports success', async () => {
+    render(<DetachedFolder folderId={rootFolder.id} />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '发送到思源' }))
+
+    await waitFor(() => {
+      expect(window.stickyApi.siyuan.sendNote).toHaveBeenCalledWith(note.id)
+    })
+    expect(await screen.findByRole('status', { name: '思源发送结果' }))
+      .toHaveTextContent('已发送到思源：Nested note')
+  })
+
+  it('keeps delivery feedback visible while editing a nested note', async () => {
+    render(<DetachedFolder folderId={rootFolder.id} />)
+
+    fireEvent.click(await screen.findByText('Nested note'))
+    fireEvent.click(await screen.findByRole('button', { name: '发送到思源' }))
+
+    expect(await screen.findByRole('status', { name: '思源发送结果' }))
+      .toHaveTextContent('已发送到思源：Nested note')
   })
 })

@@ -58,6 +58,17 @@ describe('AssetService', () => {
     await expect(access(join(directory, 'assets', asset.fileName))).resolves.toBeUndefined()
   })
 
+  it('reads a local asset URL for delivery', async () => {
+    const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47])
+    const asset = await service.importBuffer(bytes, 'image/png')
+
+    await expect(service.readUrl(asset.url)).resolves.toEqual({
+      fileName: asset.fileName,
+      mimeType: 'image/png',
+      bytes
+    })
+  })
+
   it('does not overwrite a live image with an older trashed copy', async () => {
     const liveBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47])
     const asset = await service.importBuffer(liveBytes, 'image/png')
@@ -80,14 +91,14 @@ describe('AssetService', () => {
     const second = '11234567-89ab-4cde-8fab-0123456789ab.jpg'
     const third = '21234567-89ab-4cde-8fab-0123456789ab.webp'
     const notes = {
-      version: 5,
+      version: 6,
       folders: [],
       items: [
         {
           ...baseItem('note-1'),
           type: 'note',
           contentMarkdown: `![one](asset://local/${first}) bad asset://local/%E0%A4%A`,
-          syncedToSiyuan: false
+          siyuanDelivery: null
         },
         {
           ...baseItem('todo-1'),

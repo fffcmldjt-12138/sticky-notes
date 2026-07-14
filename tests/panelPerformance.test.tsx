@@ -42,7 +42,7 @@ function makeNote(index: number): NoteItem {
     id: `note_${index}`, revision: 1, type: 'note', title: `Note ${index}`,
     contentMarkdown: '', headerColor: '#f2c94c', bodyTheme: 'light',
     pinned: false, detached: false, windowBounds: null, parentFolderId: null,
-    tags: [], order: index, deletedAt: null, syncedToSiyuan: false,
+    tags: [], order: index, deletedAt: null, siyuanDelivery: null,
     createdAt: '2026-07-14T00:00:00.000Z', updatedAt: '2026-07-14T00:00:00.000Z'
   }
 }

@@ -2,10 +2,12 @@ import { memo, Profiler } from 'react'
 import type { NoteItem } from '../../../shared/models'
 import { getItemTags } from '../../../shared/tags'
 import { StickyCard } from './StickyCard'
+import { SiyuanDeliveryButton } from './SiyuanDeliveryButton'
 
 interface NoteCardProps {
   item: NoteItem
   onOpen(): void
+  onSend(): Promise<void>
   onContextMenu(event: React.MouseEvent<HTMLElement>): void
   onDetach(): void
   onRender?(id: string, actualDuration: number): void
@@ -14,6 +16,7 @@ interface NoteCardProps {
 function NoteCardView({
   item,
   onOpen,
+  onSend,
   onContextMenu,
   onDetach,
   onRender
@@ -21,6 +24,9 @@ function NoteCardView({
   return (
     <StickyCard
       item={item}
+      headerAction={(
+        <SiyuanDeliveryButton compact note={item} onSend={onSend} />
+      )}
       onOpen={onOpen}
       onContextMenu={onContextMenu}
       onDetach={onDetach}

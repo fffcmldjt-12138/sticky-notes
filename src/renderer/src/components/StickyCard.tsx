@@ -7,6 +7,7 @@ import { TreeDragHandle } from './TreeDragHandle'
 
 interface Props extends PropsWithChildren {
   item: StickyItem
+  headerAction?: React.ReactNode
   onOpen(): void
   onContextMenu?(event: React.MouseEvent<HTMLElement>): void
   onDetach?(): void
@@ -14,6 +15,7 @@ interface Props extends PropsWithChildren {
 
 export function StickyCard({
   item,
+  headerAction,
   onOpen,
   onContextMenu,
   onDetach,
@@ -56,6 +58,14 @@ export function StickyCard({
           <span className="card-title">{item.title || '无标题'}</span>
           {item.pinned && <span className="pin-indicator" title="已置顶">置顶</span>}
         </button>
+        {headerAction && (
+          <div
+            className="sticky-card-header-action"
+            onPointerDown={(event) => event.stopPropagation()}
+          >
+            {headerAction}
+          </div>
+        )}
       </div>
       <div className="sticky-card-body">{children}</div>
     </article>

@@ -1,16 +1,18 @@
 import { memo } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
-import type { StickyItem } from '../../../shared/models'
+import type { NoteItem, StickyItem } from '../../../shared/models'
 import type { FolderTreeNode } from '../lib/folderTree'
 import { draggableId } from '../lib/treeDrag'
 import { TreeDragHandle } from './TreeDragHandle'
 import { TreeDropZone } from './TreeDropZone'
+import { SiyuanDeliveryButton } from './SiyuanDeliveryButton'
 
 function FolderCardView({
   node,
   onOpenItem,
   onItemContextMenu,
+  onSendItem,
   onToggle,
   onContextMenu,
   onCreate,
@@ -22,6 +24,7 @@ function FolderCardView({
     item: StickyItem,
     event: React.MouseEvent<HTMLElement>
   ): void
+  onSendItem(item: NoteItem): Promise<void>
   onToggle(node: FolderTreeNode): void
   onContextMenu(node: FolderTreeNode, event: React.MouseEvent<HTMLElement>): void
   onCreate(node: FolderTreeNode): void
@@ -123,12 +126,14 @@ function FolderCardView({
                   item={entry.item}
                   onOpen={onOpenItem}
                   onContextMenu={onItemContextMenu}
+                  onSend={onSendItem}
                 />
               ) : (
                 <FolderCard
                   node={entry.folder}
                   onOpenItem={onOpenItem}
                   onItemContextMenu={onItemContextMenu}
+                  onSendItem={onSendItem}
                   onToggle={onToggle}
                   onContextMenu={onContextMenu}
                   onCreate={onCreate}
@@ -171,11 +176,13 @@ function folderRenderKey(node: FolderTreeNode): string {
 function FolderItemTitle({
   item,
   onOpen,
-  onContextMenu
+  onContextMenu,
+  onSend
 }: {
   item: StickyItem
   onOpen(item: StickyItem): void
   onContextMenu(item: StickyItem, event: React.MouseEvent<HTMLElement>): void
+  onSend(item: NoteItem): Promise<void>
 }): React.JSX.Element {
   const node = { kind: 'item' as const, id: item.id }
   const { attributes, listeners, setNodeRef, transform, isDragging } =
@@ -212,6 +219,13 @@ function FolderItemTitle({
         <span>{item.type === 'note' ? '笔记' : '待办'}</span>
         <strong>{item.title || '无标题'}</strong>
       </button>
+      {item.type === 'note' && (
+        <SiyuanDeliveryButton
+          compact
+          note={item}
+          onSend={() => onSend(item)}
+        />
+      )}
     </div>
   )
 }

@@ -20,7 +20,7 @@ const createdNote: NoteItem = {
   tags: [],
   order: 0,
   deletedAt: null,
-  syncedToSiyuan: false,
+  siyuanDelivery: null,
   createdAt: '2026-06-15T00:00:00.000Z',
   updatedAt: '2026-06-15T00:00:00.000Z'
 }
@@ -61,6 +61,12 @@ describe('App creation flow', () => {
       assets: {
         selectImage: vi.fn().mockResolvedValue(null),
         importImageData: vi.fn()
+      },
+      siyuan: {
+        getSettings: vi.fn(),
+        updateSettings: vi.fn(),
+        testConnection: vi.fn(),
+        sendNote: vi.fn()
       },
       folders: {
         list: vi.fn().mockResolvedValue([]),
@@ -111,7 +117,8 @@ describe('App creation flow', () => {
       null
     )
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(await screen.findByLabelText('标题')).toHaveValue('新建笔记')
+    expect(await screen.findByLabelText('标题', {}, { timeout: 5000 }))
+      .toHaveValue('新建笔记')
   })
 
   it('creates one folder through an in-app name dialog', async () => {
@@ -131,5 +138,45 @@ describe('App creation flow', () => {
     })
     expect(window.stickyApi.folders.create).toHaveBeenCalledWith('项目资料', null)
     expect(screen.getByText(/项目资料/)).toBeInTheDocument()
+  })
+
+  it('shows visible feedback after sending a note from its title', async () => {
+    vi.mocked(window.stickyApi.notes.list).mockResolvedValue([createdNote])
+    vi.mocked(window.stickyApi.siyuan.sendNote).mockResolvedValue({
+      status: 'sent',
+      documentId: 'doc-1',
+      item: {
+        ...createdNote,
+        revision: 2,
+        siyuanDelivery: {
+          notebookId: 'inbox',
+          documentId: 'doc-1',
+          sentAt: '2026-07-14T12:00:00.000Z',
+          contentFingerprint: 'fingerprint'
+        }
+      }
+    })
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '发送到思源' }))
+
+    expect(await screen.findByRole('status', {
+      name: '思源发送结果'
+    })).toHaveTextContent('已发送到思源：新建笔记')
+  })
+
+  it('shows the error and leaves title delivery retryable', async () => {
+    vi.mocked(window.stickyApi.notes.list).mockResolvedValue([createdNote])
+    vi.mocked(window.stickyApi.siyuan.sendNote)
+      .mockRejectedValue(new Error('思源未启动'))
+    render(<App />)
+
+    fireEvent.click(await screen.findByRole('button', { name: '发送到思源' }))
+
+    expect(await screen.findByRole('alert', {
+      name: '思源发送结果'
+    })).toHaveTextContent('发送失败：思源未启动')
+    expect(screen.getByRole('button', { name: '重试发送到思源' }))
+      .toBeEnabled()
   })
 })

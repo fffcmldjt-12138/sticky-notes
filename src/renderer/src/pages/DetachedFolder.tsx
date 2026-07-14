@@ -43,6 +43,10 @@ export function DetachedFolder({
   const [folders, setFolders] = useState<FolderItem[]>([])
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [error, setError] = useState('')
+  const [deliveryFeedback, setDeliveryFeedback] = useState<{
+    kind: 'success' | 'error'
+    message: string
+  } | null>(null)
   const [createOpen, setCreateOpen] = useState(false)
   const [createParentId, setCreateParentId] = useState(folderId)
   const [folderDialogOpen, setFolderDialogOpen] = useState(false)
@@ -121,6 +125,32 @@ export function DetachedFolder({
     }
     return updated
   }, [])
+
+  useEffect(() => {
+    if (!deliveryFeedback) return
+    const duration = deliveryFeedback.kind === 'error' ? 6000 : 3000
+    const timer = window.setTimeout(() => setDeliveryFeedback(null), duration)
+    return () => window.clearTimeout(timer)
+  }, [deliveryFeedback])
+
+  async function sendNote(item: Extract<StickyItem, { type: 'note' }>): Promise<void> {
+    try {
+      const result = await window.stickyApi.siyuan.sendNote(item.id)
+      setItems((current) => current.map((entry) =>
+        entry.id === result.item.id ? result.item : entry
+      ))
+      setDeliveryFeedback({
+        kind: 'success',
+        message: `已发送到思源：${item.title || '无标题'}`
+      })
+    } catch (reason) {
+      setDeliveryFeedback({
+        kind: 'error',
+        message: `发送失败：${reason instanceof Error ? reason.message : '未知错误'}`
+      })
+      throw reason
+    }
+  }
 
   async function updateTask(
     todoId: string,
@@ -205,17 +235,23 @@ export function DetachedFolder({
 
   if (selected?.type === 'note') {
     return (
-      <NoteEditor
-        item={selected}
-        onSave={(revision, patch) => save(selected.id, revision, patch)}
-        onBack={() => setSelectedItemId(null)}
-        onDelete={async () => {
-          if (!window.confirm(`确定删除“${selected.title}”吗？`)) return
-          await window.stickyApi.notes.delete(selected.id)
-          setSelectedItemId(null)
-          await load()
-        }}
-      />
+      <>
+        <NoteEditor
+          item={selected}
+          onSave={(revision, patch) => save(selected.id, revision, patch)}
+          onSend={async () => {
+            await sendNote(selected)
+          }}
+          onBack={() => setSelectedItemId(null)}
+          onDelete={async () => {
+            if (!window.confirm(`确定删除“${selected.title}”吗？`)) return
+            await window.stickyApi.notes.delete(selected.id)
+            setSelectedItemId(null)
+            await load()
+          }}
+        />
+        <DeliveryToast feedback={deliveryFeedback} />
+      </>
     )
   }
 
@@ -321,6 +357,7 @@ export function DetachedFolder({
         <FolderCard
           node={root}
           onOpenItem={(item) => setSelectedItemId(item.id)}
+          onSendItem={sendNote}
           onItemContextMenu={(item, event) =>
             setContextMenu({
               item,
@@ -347,6 +384,7 @@ export function DetachedFolder({
           }}
         />
       </div>
+      <DeliveryToast feedback={deliveryFeedback} />
       {contextMenu && (
         <CardContextMenu
           item={contextMenu.item}
@@ -428,6 +466,23 @@ export function DetachedFolder({
       )}
       </section>
     </TreeDndContext>
+  )
+}
+
+function DeliveryToast({
+  feedback
+}: {
+  feedback: { kind: 'success' | 'error'; message: string } | null
+}): React.JSX.Element | null {
+  if (!feedback) return null
+  return (
+    <div
+      className={`delivery-toast ${feedback.kind}`}
+      role={feedback.kind === 'error' ? 'alert' : 'status'}
+      aria-label="思源发送结果"
+    >
+      {feedback.message}
+    </div>
   )
 }
 

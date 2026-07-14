@@ -15,12 +15,12 @@ interface PersistedFieldOptions<T, P extends object, E extends { revision: numbe
 export interface PersistedField<T> {
   draft: T
   change(value: T): void
-  flush(): Promise<MutationResult<unknown> | null>
+  flush(): Promise<MutationResult<unknown> | { status: 'failed' } | null>
   retry(): Promise<void>
   discardLocal(): void
   state: SaveState
   onCompositionStart(): void
-  onCompositionEnd(): Promise<MutationResult<unknown> | null>
+  onCompositionEnd(): Promise<MutationResult<unknown> | { status: 'failed' } | null>
 }
 
 export function usePersistedField<
@@ -41,14 +41,18 @@ export function usePersistedField<
   const composingRef = useRef(false)
   const sequenceRef = useRef(0)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const flushRef = useRef<() => Promise<MutationResult<E> | null>>(async () => null)
+  const flushRef = useRef<
+    () => Promise<MutationResult<E> | { status: 'failed' } | null>
+  >(async () => null)
 
   const clearTimer = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current)
     timerRef.current = null
   }, [])
 
-  const flush = useCallback(async (): Promise<MutationResult<E> | null> => {
+  const flush = useCallback(async (): Promise<
+    MutationResult<E> | { status: 'failed' } | null
+  > => {
     clearTimer()
     if (!dirtyRef.current || composingRef.current) return null
     const sentSequence = sequenceRef.current
@@ -68,7 +72,7 @@ export function usePersistedField<
       return result
     } catch {
       setState('failed')
-      return null
+      return { status: 'failed' }
     }
   }, [clearTimer, coordinator, makePatch])
   flushRef.current = flush

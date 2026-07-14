@@ -15,7 +15,11 @@ const defaultConfig = (): AppConfig => ({
   version: 1,
   autoLaunch: false,
   panelPosition: 'right',
-  alwaysOnTop: true
+  alwaysOnTop: true,
+  siyuan: {
+    endpoint: 'http://127.0.0.1:6806',
+    inboxNotebookId: null
+  }
 })
 
 export class ConfigStore {

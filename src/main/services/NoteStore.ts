@@ -11,6 +11,7 @@ import type {
   NoteType,
   OrderedNodeRef,
   RecycleContents,
+  SiyuanDelivery,
   StickyItem,
   StickyItemPatch,
   TodoItem,
@@ -358,7 +359,7 @@ export class NoteStore {
       }
       const item: NoteItem | TodoItem =
         type === 'note'
-          ? { ...base, type, contentMarkdown: '', syncedToSiyuan: false }
+          ? { ...base, type, contentMarkdown: '', siyuanDelivery: null }
           : {
               ...base,
               type,
@@ -392,6 +393,29 @@ export class NoteStore {
         revision: current.revision + 1,
         updatedAt: new Date().toISOString()
       } as StickyItem
+      data.items[index] = updated
+      await this.file.write(data)
+      return { status: 'ok', value: updated }
+    })
+  }
+
+  async recordSiyuanDelivery(
+    id: string,
+    delivery: SiyuanDelivery
+  ): Promise<MutationResult<NoteItem>> {
+    await this.ensureInitialized()
+    return this.mutate(async () => {
+      const data = await this.file.read()
+      const index = data.items.findIndex((item) => item.id === id)
+      if (index < 0 || data.items[index].type !== 'note') {
+        return { status: 'not-found' }
+      }
+      const current = data.items[index] as NoteItem
+      const updated: NoteItem = {
+        ...current,
+        revision: current.revision + 1,
+        siyuanDelivery: structuredClone(delivery)
+      }
       data.items[index] = updated
       await this.file.write(data)
       return { status: 'ok', value: updated }
@@ -743,10 +767,10 @@ export class NoteStore {
     }
 
     const version = persistedVersion(raw)
-    if (Number.isSafeInteger(version) && Number(version) > 5) {
+    if (Number.isSafeInteger(version) && Number(version) > 6) {
       throw new UnsupportedDataVersionError('notes', version)
     }
-    if (version === 5) {
+    if (version === 6) {
       try {
         validateNotesFile(raw)
       } catch (error) {
@@ -754,7 +778,10 @@ export class NoteStore {
       }
       return
     }
-    if (version === 1 || version === 2 || version === 3 || version === 4) {
+    if (
+      version === 1 || version === 2 || version === 3 ||
+      version === 4 || version === 5
+    ) {
       let migrated: NotesFile
       try {
         migrated = validateNotesFile(migrateNotesFile(raw))
@@ -801,7 +828,7 @@ export class NoteStore {
 }
 
 function createDefaultNotes(): NotesFile {
-  return { version: 5, items: [], folders: [] }
+  return { version: 6, items: [], folders: [] }
 }
 
 function persistedVersion(value: unknown): unknown {

@@ -15,6 +15,13 @@ export interface AssetReference {
   url: string
 }
 
+export interface SiyuanDelivery {
+  notebookId: string
+  documentId: string
+  sentAt: string
+  contentFingerprint: string
+}
+
 export interface BaseItem {
   id: string
   revision: number
@@ -36,7 +43,7 @@ export interface BaseItem {
 export interface NoteItem extends BaseItem {
   type: 'note'
   contentMarkdown: string
-  syncedToSiyuan: false
+  siyuanDelivery: SiyuanDelivery | null
 }
 
 export type TaskImportance = 'important' | 'normal'
@@ -135,7 +142,7 @@ export type FolderPatch = Partial<
 >
 
 export interface NotesFile {
-  version: 5
+  version: 6
   items: StickyItem[]
   folders: FolderItem[]
 }
@@ -151,6 +158,10 @@ export interface AppConfig {
   panelPosition: 'right'
   alwaysOnTop: boolean
   recentHeaderColors?: HeaderColor[]
+  siyuan?: {
+    endpoint: string
+    inboxNotebookId: string | null
+  }
 }
 
 export type StickyItemPatch = Partial<

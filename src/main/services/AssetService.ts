@@ -146,6 +146,24 @@ export class AssetService {
     return restored
   }
 
+  async readUrl(url: string): Promise<{
+    fileName: string
+    mimeType: string
+    bytes: Buffer
+  }> {
+    const path = this.resolveUrl(url)
+    if (!path) throw new Error('无效的本地图片地址')
+    const fileName = basename(path)
+    if (!this.isCanonicalFileName(fileName)) {
+      throw new Error('无效的本地图片文件名')
+    }
+    return {
+      fileName,
+      mimeType: mimeTypeForFileName(fileName),
+      bytes: await readFile(path)
+    }
+  }
+
   async findMissingReferenced(notes: NotesFile): Promise<string[]> {
     const referenced = this.collectReferencedFileNames(notes)
     const live = new Set((await this.listLiveAssets()).map((asset) => asset.fileName))

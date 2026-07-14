@@ -33,6 +33,20 @@ describe('preload data API', () => {
     expect(electron.invoke).toHaveBeenCalledWith('data:cancel-import', 'inspection-id')
   })
 
+  it('exposes typed SiYuan settings and send calls', async () => {
+    const api = electron.exposeInMainWorld.mock.calls[0][1]
+    await api.siyuan.updateSettings({ endpoint: 'http://localhost:6806' })
+    await api.siyuan.testConnection()
+    await api.siyuan.sendNote('note-1')
+
+    expect(electron.invoke).toHaveBeenCalledWith(
+      'siyuan:settings-update',
+      { endpoint: 'http://localhost:6806' }
+    )
+    expect(electron.invoke).toHaveBeenCalledWith('siyuan:test-connection')
+    expect(electron.invoke).toHaveBeenCalledWith('siyuan:send-note', 'note-1')
+  })
+
   it('removes exactly the data reload listener on unsubscribe', () => {
     const api = electron.exposeInMainWorld.mock.calls[0][1]
     const callback = vi.fn()

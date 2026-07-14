@@ -9,7 +9,7 @@ const note: NoteItem = {
   revision: 1, id: 'n1', type: 'note', title: '搜索测试', contentMarkdown: '正文内容',
   headerColor: '#f2c94c', bodyTheme: 'light', pinned: false, detached: false,
   windowBounds: null, parentFolderId: null, tags: [], order: 0, deletedAt: null,
-  syncedToSiyuan: false, createdAt: '2026-07-14T00:00:00.000Z', updatedAt: '2026-07-14T00:00:00.000Z'
+  siyuanDelivery: null, createdAt: '2026-07-14T00:00:00.000Z', updatedAt: '2026-07-14T00:00:00.000Z'
 }
 
 describe('SearchPanel', () => {

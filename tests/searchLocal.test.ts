@@ -8,7 +8,7 @@ const base = {
   tags: [], order: 0, deletedAt: null, createdAt: '2026-07-14T00:00:00.000Z',
   updatedAt: '2026-07-14T00:00:00.000Z'
 }
-const note: NoteItem = { ...base, id: 'n1', type: 'note', title: 'C# 复习', contentMarkdown: '## 默认构造函数', syncedToSiyuan: false }
+const note: NoteItem = { ...base, id: 'n1', type: 'note', title: 'C# 复习', contentMarkdown: '## 默认构造函数', siyuanDelivery: null }
 const todo: TodoItem = { ...base, id: 't1', type: 'todo', title: '作业', panelExpanded: false, tasks: [{
   id: 'task1', contentMarkdown: '提交交互设计', completed: false, tags: ['课程'],
   importance: 'important', urgency: 'urgent', schedule: null,

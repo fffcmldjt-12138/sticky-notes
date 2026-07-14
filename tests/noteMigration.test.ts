@@ -2,7 +2,41 @@ import { describe, expect, it } from 'vitest'
 import { migrateNotesFile } from '../src/main/services/noteMigration'
 
 describe('migrateNotesFile', () => {
-  it('migrates version 1 notes and todos to version 5 without data loss', () => {
+  it('migrates version 5 note delivery placeholders to version 6 records', () => {
+    const result = migrateNotesFile({
+      version: 5,
+      folders: [],
+      items: [{
+        id: 'note_5',
+        revision: 3,
+        type: 'note',
+        title: 'Video notes',
+        contentMarkdown: '## Key point',
+        headerColor: '#f2c94c',
+        bodyTheme: 'light',
+        pinned: false,
+        detached: false,
+        windowBounds: null,
+        parentFolderId: null,
+        tags: [],
+        order: 0,
+        deletedAt: null,
+        createdAt: '2026-07-14T09:00:00.000Z',
+        updatedAt: '2026-07-14T10:00:00.000Z',
+        syncedToSiyuan: false
+      }]
+    })
+
+    expect(result.version).toBe(6)
+    expect(result.items[0]).toMatchObject({
+      id: 'note_5',
+      revision: 3,
+      siyuanDelivery: null
+    })
+    expect(result.items[0]).not.toHaveProperty('syncedToSiyuan')
+  })
+
+  it('migrates version 1 notes and todos to version 6 without data loss', () => {
     const result = migrateNotesFile({
       version: 1,
       items: [
@@ -36,7 +70,7 @@ describe('migrateNotesFile', () => {
     })
 
     expect(result).toMatchObject({
-      version: 5,
+      version: 6,
       folders: [],
       items: [
         {
@@ -106,7 +140,7 @@ describe('migrateNotesFile', () => {
     expect(result.items[0].revision).toBe(7)
   })
 
-  it('migrates version 2 items to version 5 organization fields', () => {
+  it('migrates version 2 items to version 6 organization fields', () => {
     const result = migrateNotesFile({
       version: 2,
       items: [
@@ -128,7 +162,7 @@ describe('migrateNotesFile', () => {
     })
 
     expect(result).toEqual({
-      version: 5,
+      version: 6,
       folders: [],
       items: [
         expect.objectContaining({
@@ -226,7 +260,7 @@ describe('migrateNotesFile', () => {
     })
   })
 
-  it('migrates version 4 entities to revisioned version 5', () => {
+  it('migrates version 4 entities to revisioned version 6', () => {
     const result = migrateNotesFile({
       version: 4,
       folders: [{
@@ -261,7 +295,7 @@ describe('migrateNotesFile', () => {
       }]
     })
 
-    expect(result.version).toBe(5)
+    expect(result.version).toBe(6)
     expect(result.items[0].revision).toBe(1)
     expect(result.folders[0].revision).toBe(1)
   })
@@ -321,7 +355,7 @@ describe('migrateNotesFile', () => {
     '2'
   ])('normalizes unsafe revision %p to 1', (revision) => {
     const result = migrateNotesFile({
-      version: 5,
+      version: 6,
       items: [{ type: 'note', revision }],
       folders: [{ revision }]
     })
