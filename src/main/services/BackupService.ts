@@ -35,7 +35,7 @@ const PROTECTED_MAX_AGE_MS = 168 * 60 * 60 * 1000
 
 export class BackupService {
   private operationQueue: Promise<void> = Promise.resolve()
-  private lastLogicalEpoch = Number.NEGATIVE_INFINITY
+  private nextEpochByDirectoryAndDay = new Map<string, number>()
 
   constructor(
     readonly rootPath: string,
@@ -63,13 +63,13 @@ export class BackupService {
       const sameDayFiles = files.filter(({ epoch }) =>
         isSameLocalDate(new Date(epoch), current)
       )
-      const alreadyRecorded = (
-        await Promise.all(
-          sameDayFiles.map(({ name }) =>
-            this.isValidSnapshot(source, join(directory, name))
-          )
-        )
-      ).some(Boolean)
+      let alreadyRecorded = false
+      for (const { name } of sameDayFiles) {
+        if (await this.isValidSnapshot(source, join(directory, name))) {
+          alreadyRecorded = true
+          break
+        }
+      }
       const entry = alreadyRecorded
         ? null
         : await this.writeSnapshot(source, 'daily', value, current)
@@ -177,9 +177,19 @@ export class BackupService {
     const validatedValue = this.validators[source](value)
     const directory = this.kindPath(source, kind)
     await mkdir(directory, { recursive: true })
-    let epoch = Math.max(current.getTime(), this.lastLogicalEpoch + 1)
+    const businessDay = formatLocalDate(current)
+    const namingKey = `${directory}\0${businessDay}`
+    const nextDayEpoch = new Date(
+      current.getFullYear(),
+      current.getMonth(),
+      current.getDate() + 1
+    ).getTime()
+    let epoch = Math.max(
+      current.getTime(),
+      this.nextEpochByDirectoryAndDay.get(namingKey) ?? Number.NEGATIVE_INFINITY
+    )
 
-    while (true) {
+    while (epoch < nextDayEpoch) {
       const path = join(directory, formatBackupName(new Date(epoch)))
       try {
         const contents = `${JSON.stringify(validatedValue, null, 2)}\n`
@@ -188,7 +198,7 @@ export class BackupService {
           flag: 'wx',
           flush: true
         })
-        this.lastLogicalEpoch = epoch
+        this.nextEpochByDirectoryAndDay.set(namingKey, epoch + 1)
         return {
           path,
           source,
@@ -203,6 +213,11 @@ export class BackupService {
         epoch += 1
       }
     }
+
+    throw Object.assign(
+      new Error(`No unique backup filename remains for ${businessDay}`),
+      { code: 'EEXIST' }
+    )
   }
 
   private async retainNewest(
@@ -214,17 +229,13 @@ export class BackupService {
     const files = (await this.listParsedFiles(directory)).sort(
       (left, right) => right.epoch - left.epoch
     )
-    const validity = await Promise.all(
-      files.map(({ name }) =>
-        this.isValidSnapshot(source, join(directory, name))
-      )
-    )
-    const validFiles = files.filter((_file, index) => validity[index])
-    await Promise.all(
-      validFiles.slice(limit).map(({ name }) =>
-        rm(join(directory, name), { force: true })
-      )
-    )
+    const validFiles: ParsedBackupFile[] = []
+    for (const file of files) {
+      if (await this.isValidSnapshot(source, join(directory, file.name))) {
+        validFiles.push(file)
+      }
+    }
+    await this.removeSnapshots(directory, validFiles.slice(limit))
   }
 
   private async isValidSnapshot(
@@ -252,13 +263,12 @@ export class BackupService {
     ).getTime()
     const newestDay = currentDay.getTime()
     const files = await this.listParsedFiles(directory)
-    await Promise.all(
-      files
-        .filter(({ epoch }) => {
-          const day = localDayStart(new Date(epoch)).getTime()
-          return day < oldestDay || day > newestDay
-        })
-        .map(({ name }) => rm(join(directory, name), { force: true }))
+    await this.removeSnapshots(
+      directory,
+      files.filter(({ epoch }) => {
+        const day = localDayStart(new Date(epoch)).getTime()
+        return day < oldestDay || day > newestDay
+      })
     )
   }
 
@@ -268,11 +278,20 @@ export class BackupService {
   ): Promise<void> {
     const directory = this.kindPath(source, 'protected')
     const files = await this.listParsedFiles(directory)
-    await Promise.all(
+    await this.removeSnapshots(
+      directory,
       files
         .filter(({ epoch }) => current.getTime() - epoch > PROTECTED_MAX_AGE_MS)
-        .map(({ name }) => rm(join(directory, name), { force: true }))
     )
+  }
+
+  private async removeSnapshots(
+    directory: string,
+    files: ParsedBackupFile[]
+  ): Promise<void> {
+    for (const { name } of files) {
+      await rm(join(directory, name), { force: true })
+    }
   }
 
   private async listParsedFiles(
@@ -301,13 +320,17 @@ export class BackupService {
 }
 
 function formatBackupName(date: Date): string {
+  return `${formatLocalDate(date)}T${pad(date.getHours(), 2)}-${pad(
+    date.getMinutes(),
+    2
+  )}-${pad(date.getSeconds(), 2)}-${pad(date.getMilliseconds(), 3)}.json`
+}
+
+function formatLocalDate(date: Date): string {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1, 2)}-${pad(
     date.getDate(),
     2
-  )}T${pad(date.getHours(), 2)}-${pad(date.getMinutes(), 2)}-${pad(
-    date.getSeconds(),
-    2
-  )}-${pad(date.getMilliseconds(), 3)}.json`
+  )}`
 }
 
 function parseBackupName(name: string): number | null {

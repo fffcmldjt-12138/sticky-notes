@@ -123,6 +123,28 @@ describe('BackupService', () => {
     expect(files.filter((file) => file.startsWith('2026-07-01T'))).toHaveLength(1)
   })
 
+  it('uses the current local day after the system clock moves backward', async () => {
+    now = new Date(2026, 6, 20, 18, 0, 0, 0)
+    await backups.recordChange('notes', { kind: 'notes', value: 1 })
+
+    now = new Date(2026, 6, 14, 8, 30, 0, 0)
+    const entry = await backups.recordDaily('notes', {
+      kind: 'notes',
+      value: 2
+    })
+
+    expect(basename(entry?.path ?? '')).toBe(
+      '2026-07-14T08-30-00-000.json'
+    )
+    expect(JSON.parse(await readFile(entry?.path ?? '', 'utf8'))).toEqual({
+      kind: 'notes',
+      value: 2
+    })
+    await expect(
+      backups.recordDaily('notes', { kind: 'notes', value: 3 })
+    ).resolves.toBeNull()
+  })
+
   it('creates a daily when same-day files are corrupt or domain-invalid', async () => {
     const dailyDirectory = join(directory, 'notes', 'daily')
     await mkdir(dailyDirectory, { recursive: true })
@@ -248,6 +270,35 @@ describe('BackupService', () => {
       expect(files).toContain(corruptName)
       expect(files).toContain(invalidName)
     }
+  })
+
+  it('handles many invalid change snapshots without deleting them', async () => {
+    const changeDirectory = join(directory, 'notes', 'change')
+    await mkdir(changeDirectory, { recursive: true })
+    const invalidNames: string[] = []
+    for (let index = 0; index < 500; index += 1) {
+      const second = Math.floor(index / 1000)
+      const millisecond = index % 1000
+      const name = `2026-07-13T10-00-${String(second).padStart(
+        2,
+        '0'
+      )}-${String(millisecond).padStart(3, '0')}.json`
+      invalidNames.push(name)
+      await writeFile(join(changeDirectory, name), '{broken')
+    }
+
+    const entry = await backups.recordChange('notes', {
+      kind: 'notes',
+      value: 42
+    })
+
+    expect(JSON.parse(await readFile(entry.path, 'utf8'))).toEqual({
+      kind: 'notes',
+      value: 42
+    })
+    const files = await readdir(changeDirectory)
+    expect(files).toHaveLength(501)
+    expect(invalidNames.every((name) => files.includes(name))).toBe(true)
   })
 
   it('does not recover config from a config daily directory', async () => {
