@@ -16,7 +16,8 @@ vi.mock('node:fs/promises', async (importOriginal) => {
   return {
     ...actual,
     rename: vi.fn(actual.rename),
-    rm: vi.fn(actual.rm)
+    rm: vi.fn(actual.rm),
+    writeFile: vi.fn(actual.writeFile)
   }
 })
 
@@ -51,6 +52,7 @@ describe('SafeJsonStore', () => {
     await rm(directory, { recursive: true, force: true })
     vi.mocked(rm).mockClear()
     vi.mocked(rename).mockClear()
+    vi.mocked(writeFile).mockClear()
   })
 
   it('serializes overlapping writes in invocation order', async () => {
@@ -361,7 +363,7 @@ describe('SafeJsonStore', () => {
     expect(await readdir(directory)).toEqual(['data.json'])
   })
 
-  it('moves an invalid formal file aside before safely restoring a candidate', async () => {
+  it('copies an invalid formal file before atomically restoring a candidate', async () => {
     const preservedPath = join(directory, 'data.json.corrupt-hash')
     const store = new SafeJsonStore(
       filePath,
@@ -376,7 +378,7 @@ describe('SafeJsonStore', () => {
     expect(await store.read()).toEqual({ value: 8 })
   })
 
-  it('rolls the invalid formal file back when recovery replacement fails', async () => {
+  it('keeps the invalid formal file and evidence when recovery rename fails', async () => {
     const preservedPath = join(directory, 'data.json.corrupt-hash')
     const store = new SafeJsonStore(
       filePath,
@@ -384,58 +386,40 @@ describe('SafeJsonStore', () => {
       validateStoredValue
     )
     await writeFile(filePath, '{broken', 'utf8')
-    const actualFs = await vi.importActual<typeof import('node:fs/promises')>(
-      'node:fs/promises'
-    )
-    vi.mocked(rename)
-      .mockImplementationOnce(actualFs.rename)
-      .mockRejectedValueOnce(new Error('replacement failed'))
+    vi.mocked(rename).mockRejectedValueOnce(new Error('replacement failed'))
 
     await expect(
       store.replaceInvalid({ value: 8 }, preservedPath)
     ).rejects.toThrow('replacement failed')
 
     expect(await readFile(filePath, 'utf8')).toBe('{broken')
-    await expect(readFile(preservedPath, 'utf8')).rejects.toMatchObject({
-      code: 'ENOENT'
-    })
+    expect(await readFile(preservedPath, 'utf8')).toBe('{broken')
   })
 
-  it('preserves the moved original and reports both errors when replacement and rollback fail', async () => {
+  it('keeps the formal path present when recovery stops after evidence copy', async () => {
     const preservedPath = join(directory, 'data.json.corrupt-hash')
-    const replacementError = new Error('replacement failed')
-    const rollbackError = new Error('rollback failed')
+    let defaultCalls = 0
     const store = new SafeJsonStore(
       filePath,
-      () => ({ value: 0 }),
+      () => {
+        defaultCalls += 1
+        return { value: 0 }
+      },
       validateStoredValue
     )
     await writeFile(filePath, '{broken', 'utf8')
-    const actualFs = await vi.importActual<typeof import('node:fs/promises')>(
-      'node:fs/promises'
+    vi.mocked(writeFile).mockRejectedValueOnce(
+      new Error('stopped after evidence copy')
     )
-    vi.mocked(rename)
-      .mockImplementationOnce(actualFs.rename)
-      .mockImplementationOnce(async () => {
-        await actualFs.writeFile(filePath, 'replacement occupant', 'utf8')
-        throw replacementError
-      })
-      .mockRejectedValueOnce(rollbackError)
 
-    let failure: unknown
-    try {
-      await store.replaceInvalid({ value: 8 }, preservedPath)
-    } catch (error) {
-      failure = error
-    }
+    await expect(
+      store.replaceInvalid({ value: 8 }, preservedPath)
+    ).rejects.toThrow('stopped after evidence copy')
 
-    expect(failure).toBeInstanceOf(AggregateError)
-    expect((failure as AggregateError).errors).toEqual([
-      replacementError,
-      rollbackError
-    ])
     expect(await readFile(preservedPath, 'utf8')).toBe('{broken')
-    expect(await readFile(filePath, 'utf8')).toBe('replacement occupant')
+    expect(await readFile(filePath, 'utf8')).toBe('{broken')
+    await expect(store.read()).rejects.toBeInstanceOf(SyntaxError)
+    expect(defaultCalls).toBe(0)
   })
 
   it('validates a recovery candidate before moving the invalid formal file', async () => {
@@ -452,8 +436,6 @@ describe('SafeJsonStore', () => {
     ).rejects.toThrow('invalid')
 
     expect(await readFile(filePath, 'utf8')).toBe('{broken')
-    await expect(readFile(preservedPath, 'utf8')).rejects.toMatchObject({
-      code: 'ENOENT'
-    })
+    expect(await readFile(preservedPath, 'utf8')).toBe('{broken')
   })
 })

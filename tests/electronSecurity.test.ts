@@ -16,4 +16,12 @@ describe('Electron preload compatibility', () => {
     expect(esmPreloads.length).toBeGreaterThan(0)
     expect(unsandboxedWindows).toHaveLength(esmPreloads.length)
   })
+
+  it('terminates the process when the top-level startup chain rejects', async () => {
+    const source = await readFile('src/main/main.ts', 'utf8')
+
+    expect(source).toMatch(
+      /app\.whenReady\(\)[\s\S]*\.catch\(\(error\) => \{[\s\S]*console\.error\([\s\S]*app\.exit\(1\)/
+    )
+  })
 })

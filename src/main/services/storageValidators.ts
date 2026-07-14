@@ -255,7 +255,7 @@ function validateReminder(
     ['snoozedUntil']
   )
   uniqueId(reminder.id, `${path}.id`, ids)
-  safeIntegerAt(reminder.offsetMinutes, `${path}.offsetMinutes`)
+  nonNegativeSafeIntegerAt(reminder.offsetMinutes, `${path}.offsetMinutes`)
   nullableDateAt(reminder.remindedAt, `${path}.remindedAt`)
   if (reminder.snoozedUntil !== undefined) {
     nullableDateAt(reminder.snoozedUntil, `${path}.snoozedUntil`)
@@ -271,7 +271,7 @@ function validateDeadlineReminder(
   const reminder = objectAt(value, path)
   exactKeys(reminder, ['id', 'offsetMinutes', 'remindedAt'], path)
   uniqueId(reminder.id, `${path}.id`, ids)
-  safeIntegerAt(reminder.offsetMinutes, `${path}.offsetMinutes`)
+  nonNegativeSafeIntegerAt(reminder.offsetMinutes, `${path}.offsetMinutes`)
   nullableDateAt(reminder.remindedAt, `${path}.remindedAt`)
   return value as DeadlineReminder
 }
@@ -374,6 +374,12 @@ function positiveNumberAt(value: unknown, path: string): number {
 function safeIntegerAt(value: unknown, path: string): number {
   if (!Number.isSafeInteger(value)) fail(`${path} must be a safe integer`)
   return value as number
+}
+
+function nonNegativeSafeIntegerAt(value: unknown, path: string): number {
+  const integer = safeIntegerAt(value, path)
+  if (integer < 0) fail(`${path} must not be negative`)
+  return integer
 }
 
 function revisionAt(value: unknown, path: string): number {

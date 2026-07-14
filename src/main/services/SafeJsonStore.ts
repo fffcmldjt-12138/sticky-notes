@@ -1,5 +1,13 @@
 import { randomUUID } from 'node:crypto'
-import { mkdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import {
+  copyFile,
+  mkdir,
+  readFile,
+  rename,
+  rm,
+  writeFile
+} from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 
 export type BackupPhase = 'beforeReplace' | 'afterReplace'
@@ -115,44 +123,31 @@ export class SafeJsonStore<T> {
       directory,
       `.${basename(this.filePath)}.${process.pid}.${randomUUID()}.tmp`
     )
-    const stagingPath = join(
-      directory,
-      `.${basename(this.filePath)}.${process.pid}.${randomUUID()}.recovery`
-    )
-    let movedPath: string | undefined
+    let hasPrimaryError = false
 
     try {
+      try {
+        await copyFile(this.filePath, preservedPath, constants.COPYFILE_EXCL)
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+      }
+
       await writeFile(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, {
         encoding: 'utf8',
         flag: 'wx',
         flush: true
       })
       this.validate(JSON.parse(await readFile(temporaryPath, 'utf8')))
-
-      const preserveAlreadyExists = await pathExists(preservedPath)
-      movedPath = preserveAlreadyExists ? stagingPath : preservedPath
-      await rename(this.filePath, movedPath)
-      try {
-        await rename(temporaryPath, this.filePath)
-      } catch (error) {
-        try {
-          await rename(movedPath, this.filePath)
-          movedPath = undefined
-        } catch (rollbackError) {
-          throw new AggregateError(
-            [error, rollbackError],
-            'Failed to replace invalid JSON and roll back the original'
-          )
-        }
-        throw error
-      }
-
-      if (preserveAlreadyExists) {
-        await rm(movedPath, { force: true })
-        movedPath = undefined
-      }
+      await rename(temporaryPath, this.filePath)
+    } catch (error) {
+      hasPrimaryError = true
+      throw error
     } finally {
-      await rm(temporaryPath, { force: true }).catch(() => undefined)
+      try {
+        await rm(temporaryPath, { force: true })
+      } catch (cleanupError) {
+        if (!hasPrimaryError) throw cleanupError
+      }
     }
   }
 
@@ -184,15 +179,5 @@ export class SafeJsonStore<T> {
       }
       throw error
     }
-  }
-}
-
-async function pathExists(path: string): Promise<boolean> {
-  try {
-    await stat(path)
-    return true
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false
-    throw error
   }
 }

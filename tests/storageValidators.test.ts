@@ -124,6 +124,39 @@ describe('storage validators', () => {
     })).not.toThrow()
   })
 
+  it.each([
+    {
+      ...todo,
+      tasks: [{
+        ...todo.tasks[0],
+        schedule: {
+          ...todo.tasks[0].schedule,
+          reminders: [{
+            ...todo.tasks[0].schedule.reminders[0],
+            offsetMinutes: -1
+          }]
+        }
+      }]
+    },
+    {
+      ...todo,
+      tasks: [{
+        ...todo.tasks[0],
+        deadlineReminders: [{
+          id: 'legacy-negative',
+          offsetMinutes: -1,
+          remindedAt: null
+        }]
+      }]
+    }
+  ])('rejects negative reminder offsets', (item) => {
+    expect(() => validateNotesFile({
+      version: 5,
+      items: [item],
+      folders: []
+    })).toThrow('offsetMinutes')
+  })
+
   it('rejects a persisted folder tree deeper than three levels', () => {
     expect(() => validateNotesFile({
       version: 5,

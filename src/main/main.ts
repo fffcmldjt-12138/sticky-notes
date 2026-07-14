@@ -305,6 +305,9 @@ if (!hasLock) {
       folderWindows.beginShutdown()
       windows.quit()
     })
+  }).catch((error) => {
+    console.error('Fatal startup failure', error)
+    app.exit(1)
   })
 }
 
