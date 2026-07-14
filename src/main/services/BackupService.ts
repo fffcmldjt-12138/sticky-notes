@@ -111,7 +111,10 @@ export class BackupService {
     await this.recordDaily(source, newValue)
   }
 
-  findNewestValid(source: BackupSource): Promise<ValidBackup | null> {
+  findNewestValid(
+    source: BackupSource,
+    validateCandidate: BackupValidator = this.validators[source]
+  ): Promise<ValidBackup | null> {
     return this.enqueue(async () => {
       const kinds: Array<'change' | 'daily'> =
         source === 'notes' ? ['change', 'daily'] : ['change']
@@ -133,7 +136,7 @@ export class BackupService {
           candidate.name
         )
         try {
-          const value = this.validators[source](
+          const value = validateCandidate(
             JSON.parse(await readFile(path, 'utf8'))
           )
           const details = await stat(path)

@@ -26,7 +26,11 @@ import {
   DataUnavailableError,
   UnsupportedDataVersionError
 } from './storageErrors'
-import { validateAppConfig, validateNotesFile } from './storageValidators'
+import {
+  migrateAndValidateRecoverableNotesFile,
+  validateAppConfig,
+  validateNotesFile
+} from './storageValidators'
 
 export class NoteStore {
   private readonly filePath: string
@@ -694,7 +698,10 @@ export class NoteStore {
 
   private async recover(contents: Buffer, cause: unknown): Promise<void> {
     const corruptPath = corruptCopyPath(this.filePath, contents)
-    const backup = await this.backups.findNewestValid('notes')
+    const backup = await this.backups.findNewestValid(
+      'notes',
+      migrateAndValidateRecoverableNotesFile
+    )
     if (!backup) {
       await preserveCorruptCopy(this.filePath, corruptPath)
       throw new DataUnavailableError('notes', cause)

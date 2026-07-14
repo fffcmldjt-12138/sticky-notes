@@ -401,6 +401,43 @@ describe('SafeJsonStore', () => {
     })
   })
 
+  it('preserves the moved original and reports both errors when replacement and rollback fail', async () => {
+    const preservedPath = join(directory, 'data.json.corrupt-hash')
+    const replacementError = new Error('replacement failed')
+    const rollbackError = new Error('rollback failed')
+    const store = new SafeJsonStore(
+      filePath,
+      () => ({ value: 0 }),
+      validateStoredValue
+    )
+    await writeFile(filePath, '{broken', 'utf8')
+    const actualFs = await vi.importActual<typeof import('node:fs/promises')>(
+      'node:fs/promises'
+    )
+    vi.mocked(rename)
+      .mockImplementationOnce(actualFs.rename)
+      .mockImplementationOnce(async () => {
+        await actualFs.writeFile(filePath, 'replacement occupant', 'utf8')
+        throw replacementError
+      })
+      .mockRejectedValueOnce(rollbackError)
+
+    let failure: unknown
+    try {
+      await store.replaceInvalid({ value: 8 }, preservedPath)
+    } catch (error) {
+      failure = error
+    }
+
+    expect(failure).toBeInstanceOf(AggregateError)
+    expect((failure as AggregateError).errors).toEqual([
+      replacementError,
+      rollbackError
+    ])
+    expect(await readFile(preservedPath, 'utf8')).toBe('{broken')
+    expect(await readFile(filePath, 'utf8')).toBe('replacement occupant')
+  })
+
   it('validates a recovery candidate before moving the invalid formal file', async () => {
     const preservedPath = join(directory, 'data.json.corrupt-hash')
     const store = new SafeJsonStore(

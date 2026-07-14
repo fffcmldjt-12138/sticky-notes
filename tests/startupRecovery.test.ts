@@ -19,6 +19,37 @@ const config = {
   alwaysOnTop: false
 }
 
+function legacyNotes(version: 1 | 2 | 3 | 4): unknown {
+  const item = {
+    id: `note_v${version}`,
+    type: 'note',
+    title: `Version ${version}`,
+    contentMarkdown: 'legacy',
+    headerColor: version === 1 ? 'yellow' : '#f2c94c',
+    bodyTheme: 'light',
+    pinned: false,
+    detached: false,
+    windowBounds: null,
+    syncedToSiyuan: false,
+    createdAt: '2026-07-14T00:00:00.000Z',
+    updatedAt: '2026-07-14T00:00:00.000Z'
+  }
+  if (version === 1 || version === 2) {
+    return { version, items: [item] }
+  }
+  return {
+    version,
+    items: [{
+      ...item,
+      parentFolderId: null,
+      tags: [],
+      order: 0,
+      deletedAt: null
+    }],
+    folders: []
+  }
+}
+
 describe('startup recovery', () => {
   let directory: string
   let backups: BackupService
@@ -90,6 +121,35 @@ describe('startup recovery', () => {
     expect(copies).toHaveLength(1)
     expect(await readFile(join(directory, copies[0]), 'utf8')).toBe(corrupt)
   })
+
+  it.each([1, 2, 3, 4] as const)(
+    'migrates a valid v%s notes backup during recovery and skips a newer future version',
+    async (version) => {
+      const backupDirectory = join(directory, 'backups', 'notes', 'change')
+      await mkdir(backupDirectory, { recursive: true })
+      await writeFile(
+        join(backupDirectory, '2026-07-14T10-00-00-000.json'),
+        JSON.stringify(legacyNotes(version)),
+        'utf8'
+      )
+      await writeFile(
+        join(backupDirectory, '2026-07-14T11-00-00-000.json'),
+        JSON.stringify({ version: 99, items: [], folders: [] }),
+        'utf8'
+      )
+      await writeFile(join(directory, 'notes.json'), '{broken', 'utf8')
+
+      const snapshot = await new NoteStore(directory, backups).getSnapshot()
+
+      expect(snapshot).toMatchObject({
+        version: 5,
+        items: [{ id: `note_v${version}`, revision: 1 }]
+      })
+      expect(
+        JSON.parse(await readFile(join(directory, 'notes.json'), 'utf8'))
+      ).toEqual(snapshot)
+    }
+  )
 
   it('recovers corrupt config and preserves it byte-for-byte', async () => {
     await backups.recordChange('config', config)

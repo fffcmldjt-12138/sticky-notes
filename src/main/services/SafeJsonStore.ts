@@ -120,7 +120,6 @@ export class SafeJsonStore<T> {
       `.${basename(this.filePath)}.${process.pid}.${randomUUID()}.recovery`
     )
     let movedPath: string | undefined
-    let replacementSucceeded = false
 
     try {
       await writeFile(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, {
@@ -135,13 +134,15 @@ export class SafeJsonStore<T> {
       await rename(this.filePath, movedPath)
       try {
         await rename(temporaryPath, this.filePath)
-        replacementSucceeded = true
       } catch (error) {
         try {
           await rename(movedPath, this.filePath)
           movedPath = undefined
-        } catch {
-          // Preserve the replacement error; the moved original remains recoverable.
+        } catch (rollbackError) {
+          throw new AggregateError(
+            [error, rollbackError],
+            'Failed to replace invalid JSON and roll back the original'
+          )
         }
         throw error
       }
@@ -152,9 +153,6 @@ export class SafeJsonStore<T> {
       }
     } finally {
       await rm(temporaryPath, { force: true }).catch(() => undefined)
-      if (!replacementSucceeded && movedPath && await pathExists(this.filePath)) {
-        await rm(movedPath, { force: true }).catch(() => undefined)
-      }
     }
   }
 

@@ -207,6 +207,39 @@ describe('BackupService', () => {
     expect(recovered?.entry.kind).toBe('daily')
   })
 
+  it('uses an explicit recovery validator without weakening the strict default', async () => {
+    const changeDirectory = join(directory, 'notes', 'change')
+    const dailyDirectory = join(directory, 'notes', 'daily')
+    await mkdir(changeDirectory, { recursive: true })
+    await mkdir(dailyDirectory, { recursive: true })
+    await writeFile(
+      join(dailyDirectory, '2026-07-14T09-00-00-000.json'),
+      JSON.stringify({ kind: 'notes', value: 7 })
+    )
+    await writeFile(
+      join(changeDirectory, '2026-07-14T10-00-00-000.json'),
+      JSON.stringify({ kind: 'legacy-notes', value: 9 })
+    )
+
+    const strict = await backups.findNewestValid('notes')
+    const recoverable = await backups.findNewestValid('notes', (value) => {
+      if (
+        value &&
+        typeof value === 'object' &&
+        'kind' in value &&
+        value.kind === 'legacy-notes' &&
+        'value' in value &&
+        typeof value.value === 'number'
+      ) {
+        return { kind: 'notes' as const, value: value.value }
+      }
+      return validateNotes(value)
+    })
+
+    expect(strict?.value).toEqual({ kind: 'notes', value: 7 })
+    expect(recoverable?.value).toEqual({ kind: 'notes', value: 9 })
+  })
+
   it('counts only domain-valid change snapshots toward source retention', async () => {
     const fixtures = [
       {

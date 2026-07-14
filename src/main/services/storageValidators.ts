@@ -10,6 +10,7 @@ import type {
   TodoTask,
   WindowBounds
 } from '../../shared/models'
+import { migrateNotesFile } from './noteMigration'
 
 type JsonObject = Record<string, unknown>
 
@@ -37,6 +38,22 @@ export function validateNotesFile(value: unknown): NotesFile {
   }
   validateFolderCycles(validatedFolders)
   return value as NotesFile
+}
+
+export function migrateAndValidateRecoverableNotesFile(
+  value: unknown
+): NotesFile {
+  const root = objectAt(value, 'notes recovery candidate')
+  if (root.version === 5) return validateNotesFile(value)
+  if (
+    root.version === 1 ||
+    root.version === 2 ||
+    root.version === 3 ||
+    root.version === 4
+  ) {
+    return validateNotesFile(migrateNotesFile(value))
+  }
+  fail(`notes recovery candidate version ${String(root.version)} is unsupported`)
 }
 
 export function validateAppConfig(value: unknown): AppConfig {
