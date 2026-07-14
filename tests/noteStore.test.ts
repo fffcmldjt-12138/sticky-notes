@@ -255,6 +255,35 @@ describe('NoteStore', () => {
     expect(files.some((file) => file.startsWith('notes.json.backup-'))).toBe(true)
   })
 
+  it('backs up a version 4 notes file before migrating to version 5', async () => {
+    await writeFile(
+      join(directory, 'notes.json'),
+      JSON.stringify({ version: 4, items: [], folders: [] }),
+      'utf8'
+    )
+
+    await store.list()
+
+    const files = await readdir(directory)
+    expect(files.some((file) => file.startsWith('notes.json.backup-'))).toBe(true)
+    expect(JSON.parse(await readFile(join(directory, 'notes.json'), 'utf8')).version)
+      .toBe(5)
+  })
+
+  it('does not back up an already migrated version 5 file on startup', async () => {
+    await writeFile(
+      join(directory, 'notes.json'),
+      JSON.stringify({ version: 5, items: [], folders: [] }),
+      'utf8'
+    )
+
+    await store.list()
+    await new NoteStore(directory).list()
+
+    const files = await readdir(directory)
+    expect(files.some((file) => file.startsWith('notes.json.backup-'))).toBe(false)
+  })
+
   it('preserves malformed notes and recovers with an empty version 5 file', async () => {
     await writeFile(join(directory, 'notes.json'), '{broken json', 'utf8')
 

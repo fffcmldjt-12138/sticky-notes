@@ -610,10 +610,15 @@ export class NoteStore {
       const raw = JSON.parse(await readFile(this.filePath, 'utf8')) as {
         version?: number
       }
-      if (raw.version === 1 || raw.version === 2 || raw.version === 3) {
+      if (
+        raw.version === 1 ||
+        raw.version === 2 ||
+        raw.version === 3 ||
+        raw.version === 4
+      ) {
         await copyFile(this.filePath, `${this.filePath}.backup-${Date.now()}`)
         await this.file.write(migrateNotesFile(raw))
-      } else if (raw.version === 4 || raw.version === 5) {
+      } else if (raw.version === 5) {
         const normalized = migrateNotesFile(raw)
         await this.file.write(normalized)
       } else {

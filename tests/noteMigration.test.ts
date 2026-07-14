@@ -307,6 +307,29 @@ describe('migrateNotesFile', () => {
     expect(result.folders[0].revision).toBe(1)
   })
 
+  it.each([
+    ['missing items', { version: 5, folders: [] }],
+    ['null folders', { version: 5, items: [], folders: null }],
+    ['non-array items', { version: 5, items: {}, folders: [] }]
+  ])('rejects version 5 files with %s', (_label, value) => {
+    expect(() => migrateNotesFile(value)).toThrow('Invalid notes file')
+  })
+
+  it.each([
+    Number.MAX_SAFE_INTEGER + 1,
+    1.5,
+    '2'
+  ])('normalizes unsafe revision %p to 1', (revision) => {
+    const result = migrateNotesFile({
+      version: 5,
+      items: [{ type: 'note', revision }],
+      folders: [{ revision }]
+    })
+
+    expect(result.items[0].revision).toBe(1)
+    expect(result.folders[0].revision).toBe(1)
+  })
+
   it('falls back to yellow for invalid legacy colors', () => {
     const result = migrateNotesFile({
       version: 1,

@@ -30,7 +30,13 @@ function normalizeBodyTheme(value: unknown): BodyTheme {
 export function migrateNotesFile(value: unknown): NotesFile {
   if (!value || typeof value !== 'object') throw new Error('Invalid notes file')
   const source = value as { version?: number; items?: unknown[]; folders?: unknown[] }
-  if (source.version === 5 || source.version === 4) {
+  if (source.version === 5) {
+    if (!Array.isArray(source.items) || !Array.isArray(source.folders)) {
+      throw new Error('Invalid notes file collections')
+    }
+    return normalizeCurrentVersion(source)
+  }
+  if (source.version === 4) {
     return normalizeCurrentVersion(source)
   }
   if (source.version === 3) return migrateVersion3(source)
@@ -165,7 +171,7 @@ function normalizeCurrentVersion(
 }
 
 function normalizeRevision(value: unknown): number {
-  return Number.isInteger(value) && Number(value) > 0 ? Number(value) : 1
+  return Number.isSafeInteger(value) && Number(value) > 0 ? Number(value) : 1
 }
 
 function normalizeTodoTasks(item: StickyItem): StickyItem {
