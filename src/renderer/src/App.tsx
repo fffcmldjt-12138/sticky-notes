@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useState } from 'react'
+import { Search } from 'lucide-react'
 import type {
   AppConfig,
   FolderItem,
@@ -22,6 +23,7 @@ import { upsertItem } from './lib/itemList'
 import { getItemTags, mergeTags } from '../../shared/tags'
 import type { FolderTreeNode } from './lib/folderTree'
 import { upsertNewer } from './lib/entityEvents'
+import type { SearchResult } from '../../shared/search'
 
 const NoteEditor = lazy(() =>
   import('./components/NoteEditor').then((module) => ({
@@ -31,6 +33,11 @@ const NoteEditor = lazy(() =>
 const SettingsPanel = lazy(() =>
   import('./pages/SettingsPanel').then((module) => ({
     default: module.SettingsPanel
+  }))
+)
+const SearchPanel = lazy(() =>
+  import('./pages/SearchPanel').then((module) => ({
+    default: module.SearchPanel
   }))
 )
 const DetachedEditor = lazy(() =>
@@ -85,6 +92,7 @@ function PanelApp(): React.JSX.Element {
   const [pendingFolderParentId, setPendingFolderParentId] =
     useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
   const [config, setConfig] = useState<AppConfig | null>(null)
   const [pendingRename, setPendingRename] = useState<StickyItem | null>(null)
   const [pendingFolderRename, setPendingFolderRename] =
@@ -212,6 +220,7 @@ function PanelApp(): React.JSX.Element {
     createOpen ||
     folderDialogOpen ||
     settingsOpen ||
+    searchOpen ||
     pendingRename ||
     pendingFolderRename ||
     contextMenu ||
@@ -269,6 +278,21 @@ function PanelApp(): React.JSX.Element {
       if (item.detached) await window.stickyApi.window.attach(item.id)
       else await window.stickyApi.window.detach(item.id)
       await loadItems()
+    }
+  }
+
+  function openSearchResult(result: SearchResult): void {
+    if (result.itemId) {
+      setSelectedId(result.itemId)
+      setSearchOpen(false)
+      return
+    }
+    setSearchOpen(false)
+    if (result.folderId) {
+      window.requestAnimationFrame(() => {
+        document.querySelector(`[data-folder-id="${result.folderId}"]`)
+          ?.scrollIntoView({ block: 'nearest' })
+      })
     }
   }
 
@@ -418,6 +442,12 @@ function PanelApp(): React.JSX.Element {
               </div>
             </div>
             <div className="header-actions">
+              <button className="icon-button" onClick={() => {
+                setCreateOpen(false)
+                setSearchOpen(true)
+              }} aria-label="搜索" title="搜索">
+                <Search size={18} />
+              </button>
               <button className="icon-button" onClick={() => setSettingsOpen(true)} aria-label="设置">⚙</button>
               <button
                 className="primary-button"
@@ -450,7 +480,14 @@ function PanelApp(): React.JSX.Element {
               }}
             />
           )}
-          <StickyPanel
+          {searchOpen ? (
+            <SearchPanel
+              items={items}
+              folders={folders}
+              onClose={() => setSearchOpen(false)}
+              onOpenResult={openSearchResult}
+            />
+          ) : <StickyPanel
             items={visibleItems}
             folders={folders}
             onOpen={(item) => setSelectedId(item.id)}
@@ -539,7 +576,7 @@ function PanelApp(): React.JSX.Element {
               setCreateOpen(false)
             }}
             onDragStateChange={setTreeDragActive}
-          />
+          />}
         </>
       )}
       {contextMenu && (

@@ -55,6 +55,7 @@ function FolderCardView({
 
   return (
     <section
+      data-folder-id={node.id}
       ref={(element) => {
         setDragRef(element)
         setDropRef(element)
