@@ -3,8 +3,9 @@ import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { basename, dirname, join } from 'node:path'
 
 export class SafeJsonStore<T> {
-  private writeQueue: Promise<void> = Promise.resolve()
+  private operationQueue: Promise<void> = Promise.resolve()
 
+  /** The validator only validates and narrows persisted JSON; it must not migrate it. */
   constructor(
     readonly filePath: string,
     private readonly createDefault: () => T,
@@ -15,33 +16,44 @@ export class SafeJsonStore<T> {
     ) => Promise<void>
   ) {}
 
-  async read(): Promise<T> {
-    await this.writeQueue
+  read(): Promise<T> {
+    return this.enqueue(() => this.readNow())
+  }
+
+  write(value: T): Promise<void> {
+    return this.enqueue(async () => {
+      await this.writeNow(value)
+    })
+  }
+
+  private enqueue<TResult>(operation: () => Promise<TResult>): Promise<TResult> {
+    const result = this.operationQueue.then(operation)
+    this.operationQueue = result.then(
+      () => undefined,
+      () => undefined
+    )
+    return result
+  }
+
+  private async readNow(): Promise<T> {
     await mkdir(dirname(this.filePath), { recursive: true })
 
     const contents = await this.readFileIfExists()
     if (contents === undefined) {
-      const initial = this.createDefault()
-      await this.write(initial)
-      return initial
+      return this.writeNow(this.createDefault())
     }
 
     return this.validate(JSON.parse(contents))
   }
 
-  write(value: T): Promise<void> {
-    const operation = this.writeQueue.then(() => this.writeNow(value))
-    this.writeQueue = operation.catch(() => undefined)
-    return operation
-  }
-
-  private async writeNow(value: T): Promise<void> {
+  private async writeNow(value: T): Promise<T> {
     const directory = dirname(this.filePath)
     await mkdir(directory, { recursive: true })
     const temporaryPath = join(
       directory,
       `.${basename(this.filePath)}.${process.pid}.${randomUUID()}.tmp`
     )
+    let hasPrimaryError = false
 
     try {
       await writeFile(temporaryPath, `${JSON.stringify(value, null, 2)}\n`, {
@@ -50,7 +62,9 @@ export class SafeJsonStore<T> {
         flush: true
       })
 
-      this.validate(JSON.parse(await readFile(temporaryPath, 'utf8')))
+      const validatedValue = this.validate(
+        JSON.parse(await readFile(temporaryPath, 'utf8'))
+      )
 
       const currentContents = await this.readFileIfExists()
       if (currentContents !== undefined) {
@@ -59,8 +73,18 @@ export class SafeJsonStore<T> {
       }
 
       await rename(temporaryPath, this.filePath)
+      return validatedValue
+    } catch (error) {
+      hasPrimaryError = true
+      throw error
     } finally {
-      await rm(temporaryPath, { force: true })
+      try {
+        await rm(temporaryPath, { force: true })
+      } catch (cleanupError) {
+        if (!hasPrimaryError) {
+          throw cleanupError
+        }
+      }
     }
   }
 

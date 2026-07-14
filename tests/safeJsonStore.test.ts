@@ -1,8 +1,16 @@
-import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { SafeJsonStore } from '../src/main/services/SafeJsonStore'
+
+vi.mock('node:fs/promises', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs/promises')>()
+  return {
+    ...actual,
+    rm: vi.fn(actual.rm)
+  }
+})
 
 interface StoredValue {
   value: number
@@ -29,6 +37,11 @@ describe('SafeJsonStore', () => {
   beforeEach(async () => {
     directory = await mkdtemp(join(tmpdir(), 'sticky-safe-json-'))
     filePath = join(directory, 'data.json')
+  })
+
+  afterEach(async () => {
+    await rm(directory, { recursive: true, force: true })
+    vi.mocked(rm).mockClear()
   })
 
   it('serializes overlapping writes in invocation order', async () => {
@@ -95,6 +108,40 @@ describe('SafeJsonStore', () => {
 
     expect(await store.read()).toEqual({ value: 3 })
     expect(JSON.parse(await readFile(filePath, 'utf8'))).toEqual({ value: 3 })
+  })
+
+  it('keeps a following explicit write after initializing a missing file', async () => {
+    const store = new SafeJsonStore(
+      filePath,
+      () => ({ value: 3 }),
+      validateStoredValue
+    )
+
+    const pendingRead = store.read()
+    const explicitWrite = store.write({ value: 9 })
+
+    await Promise.all([pendingRead, explicitWrite])
+    expect(await store.read()).toEqual({ value: 9 })
+  })
+
+  it('returns the validated persistence round-trip for a default value', async () => {
+    const initial = { value: 3 }
+    let validatedValue: StoredValue | undefined
+    const store = new SafeJsonStore(
+      filePath,
+      () => initial,
+      (value) => {
+        const storedValue = validateStoredValue(value)
+        validatedValue = { value: storedValue.value }
+        return validatedValue
+      }
+    )
+
+    const result = await store.read()
+
+    expect(result).toBe(validatedValue)
+    expect(result).not.toBe(initial)
+    expect(JSON.parse(await readFile(filePath, 'utf8'))).toEqual(result)
   })
 
   it('propagates an ENOENT-coded validation error while reading', async () => {
@@ -225,6 +272,23 @@ describe('SafeJsonStore', () => {
 
     await expect(store.write({ value: 6 })).rejects.toThrow('backup failed')
     expect(await readdir(directory)).toEqual(['data.json'])
+  })
+
+  it('preserves the primary error when temporary cleanup also fails', async () => {
+    const primaryError = new Error('replacement failed')
+    const cleanupError = new Error('cleanup failed')
+    const store = new SafeJsonStore(
+      filePath,
+      () => ({ value: 0 }),
+      validateStoredValue,
+      async () => {
+        throw primaryError
+      }
+    )
+    await writeFile(filePath, '{"value":1}', 'utf8')
+    vi.mocked(rm).mockRejectedValueOnce(cleanupError)
+
+    await expect(store.write({ value: 6 })).rejects.toBe(primaryError)
   })
 
   it('replaces an existing file using the real filesystem', async () => {
