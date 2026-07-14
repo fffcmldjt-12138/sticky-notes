@@ -1,8 +1,6 @@
 import type { StickyItem } from '../../../shared/models'
+import { upsertNewer } from './entityEvents'
 
 export function upsertItem(items: StickyItem[], changed: StickyItem): StickyItem[] {
-  const index = items.findIndex((item) => item.id === changed.id)
-  if (index < 0) return [changed, ...items]
-
-  return items.map((item) => item.id === changed.id ? changed : item)
+  return upsertNewer(items, changed)
 }

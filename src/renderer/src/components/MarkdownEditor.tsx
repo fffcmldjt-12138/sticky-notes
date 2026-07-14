@@ -75,14 +75,22 @@ export function cutMarkdownSelection(
 export function MarkdownEditor({
   value,
   onChange,
+  onCompositionStart,
+  onCompositionEnd,
   compact = false
 }: {
   value: string
   onChange(value: string): void
+  onCompositionStart?(): void
+  onCompositionEnd?(): void
   compact?: boolean
 }): React.JSX.Element | null {
   const lastEmittedValue = useRef(value)
   const editorRef = useRef<Editor | null>(null)
+  const compositionStartRef = useRef(onCompositionStart)
+  const compositionEndRef = useRef(onCompositionEnd)
+  compositionStartRef.current = onCompositionStart
+  compositionEndRef.current = onCompositionEnd
 
   async function importImage(file: File): Promise<void> {
     if (!file.type.startsWith('image/')) return
@@ -132,6 +140,14 @@ export function MarkdownEditor({
         return true
       },
       handleDOMEvents: {
+        compositionstart: () => {
+          compositionStartRef.current?.()
+          return false
+        },
+        compositionend: () => {
+          compositionEndRef.current?.()
+          return false
+        },
         copy: (_view, event) => {
           const currentEditor = editorRef.current
           return currentEditor

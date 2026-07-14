@@ -55,4 +55,28 @@ describe('folder IPC events', () => {
     expect(await remove({}, 'folder_1')).toBe(true)
     expect(deleted).toHaveBeenCalledWith('folder_1')
   })
+
+  it('forwards expectedRevision and does not publish conflicts', async () => {
+    const current = { id: 'folder_1', revision: 3, title: 'current' }
+    const store = {
+      listFolders: vi.fn(), createFolder: vi.fn(),
+      updateFolder: vi.fn().mockResolvedValue({ status: 'conflict', current }),
+      deleteFolder: vi.fn(), moveItem: vi.fn(), reorderChildren: vi.fn()
+    }
+    const changed = vi.fn()
+    registerFolderIpc(store as never, {
+      beforeDelete: vi.fn(), changed, deleted: vi.fn()
+    })
+    const update = handle.mock.calls.find(
+      ([channel]) => channel === ipcChannels.foldersUpdate
+    )?.[1]
+
+    await expect(update({}, 'folder_1', 2, { title: 'stale' })).resolves.toEqual({
+      status: 'conflict', current
+    })
+    expect(store.updateFolder).toHaveBeenCalledWith('folder_1', 2, {
+      title: 'stale'
+    })
+    expect(changed).not.toHaveBeenCalled()
+  })
 })

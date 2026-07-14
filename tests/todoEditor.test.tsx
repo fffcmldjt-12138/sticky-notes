@@ -7,6 +7,7 @@ import { TodoEditor } from '../src/renderer/src/components/TodoEditor'
 
 const todo: TodoItem = {
   id: 'todo_1',
+  revision: 1,
   type: 'todo',
   title: 'Project',
   headerColor: '#5b8def',
@@ -46,7 +47,7 @@ function renderEditor(overrides: Record<string, ReturnType<typeof vi.fn>> = {}) 
     <TodoEditor
       item={todo}
       onSave={vi.fn()}
-      onAddTask={vi.fn()}
+      onAddTask={overrides.onAddTask ?? vi.fn()}
       onUpdateTask={overrides.onUpdateTask ?? vi.fn()}
       onDeleteTask={vi.fn()}
       onReorderTasks={vi.fn()}
@@ -77,7 +78,7 @@ describe('TodoEditor', () => {
       target: { value: 'important-urgent' }
     })
 
-    expect(onUpdateTask).toHaveBeenCalledWith('task_1', {
+    expect(onUpdateTask).toHaveBeenCalledWith('task_1', null, {
       importance: 'important',
       urgency: 'urgent'
     })
@@ -108,7 +109,7 @@ describe('TodoEditor', () => {
       container.querySelector('.todo-subtask-row input[type="checkbox"]')!
     )
 
-    expect(onUpdateSubtask).toHaveBeenCalledWith('task_1', 'subtask_1', {
+    expect(onUpdateSubtask).toHaveBeenCalledWith('task_1', 'subtask_1', null, {
       completed: false
     })
   })
@@ -151,6 +152,26 @@ describe('TodoEditor', () => {
     await waitFor(() => {
       const taskInputs = view.container.querySelectorAll('.task-content-input')
       expect(taskInputs[taskInputs.length - 1]).toHaveFocus()
+    })
+  })
+
+  it('renders and focuses a new task before persistence resolves', async () => {
+    let resolveAdd!: (value: TodoItem['tasks'][number]) => void
+    const onAddTask = vi.fn(() => new Promise<TodoItem['tasks'][number]>((resolve) => {
+      resolveAdd = resolve
+    }))
+    const view = renderEditor({ onAddTask })
+
+    fireEvent.click(screen.getByRole('button', { name: /添加任务/ }))
+
+    const inputs = screen.getAllByLabelText('任务内容')
+    expect(inputs).toHaveLength(2)
+    expect(inputs[1]).toHaveFocus()
+    expect(onAddTask).toHaveBeenCalledOnce()
+
+    resolveAdd({
+      id: 'task_2', contentMarkdown: '', completed: false, tags: [],
+      importance: 'normal', urgency: 'normal', children: [], schedule: null
     })
   })
 

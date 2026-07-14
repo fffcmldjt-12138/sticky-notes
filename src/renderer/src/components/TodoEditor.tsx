@@ -15,9 +15,12 @@ import {
   verticalListSortingStrategy
 } from '@dnd-kit/sortable'
 import type {
+  MutationResult,
+  StickyItem,
   StickyItemPatch,
   TodoItem,
   TodoSubtaskPatch,
+  TodoTask,
   TodoTaskPatch
 } from '../../../shared/models'
 import { BodyThemeToggle } from './BodyThemeToggle'
@@ -25,20 +28,43 @@ import { HeaderColorPicker } from './HeaderColorPicker'
 import { TodoTaskRow } from './TodoTaskRow'
 import { TagEditor } from './TagEditor'
 import { extractTags } from '../../../shared/tags'
+import { useEntitySaveCoordinator } from '../hooks/useEntitySaveCoordinator'
+
+type TodoSaveOperation =
+  | { kind: 'item'; patch: StickyItemPatch }
+  | { kind: 'task'; taskId: string; patch: TodoTaskPatch }
+  | {
+      kind: 'subtask'
+      taskId: string
+      subtaskId: string
+      patch: TodoSubtaskPatch
+    }
+
+interface TodoSaveBatch {
+  operations: TodoSaveOperation[]
+}
 
 interface Props {
   item: TodoItem
-  onSave(patch: StickyItemPatch): void
-  onAddTask(): void
-  onUpdateTask(taskId: string, patch: TodoTaskPatch): void
+  onSave(
+    expectedRevision: number,
+    patch: StickyItemPatch
+  ): Promise<MutationResult<StickyItem>>
+  onAddTask(): Promise<TodoTask | null> | TodoTask | null | void
+  onUpdateTask(
+    taskId: string,
+    expectedRevision: number | null,
+    patch: TodoTaskPatch
+  ): Promise<MutationResult<TodoItem>>
   onDeleteTask(taskId: string): void
   onReorderTasks(taskIds: string[]): void
   onAddSubtask(taskId: string): void
   onUpdateSubtask(
     taskId: string,
     subtaskId: string,
+    expectedRevision: number | null,
     patch: TodoSubtaskPatch
-  ): void
+  ): Promise<MutationResult<TodoItem>>
   onDeleteSubtask(taskId: string, subtaskId: string): void
   onBack(): void
   onDelete(): void
@@ -60,8 +86,9 @@ export function TodoEditor({
   detached = false
 }: Props): React.JSX.Element {
   const [draft, setDraft] = useState(item)
-  const onSaveRef = useRef(onSave)
+  const [pendingTasks, setPendingTasks] = useState<TodoTask[]>([])
   const lastSubmittedRef = useRef<StickyItemPatch | null>(null)
+  const composingIdentityRef = useRef(false)
   const taskInputRefs = useRef(new Map<string, HTMLInputElement>())
   const previousTaskIdsRef = useRef(item.tasks.map((task) => task.id))
   const pendingFocusTaskIdRef = useRef<string | null>(null)
@@ -70,13 +97,70 @@ export function TodoEditor({
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
+  const coordinator = useEntitySaveCoordinator<TodoSaveBatch, TodoItem>({
+    remoteEntity: item,
+    mergePatches: (current, incoming) => ({
+      operations: [...current.operations, ...incoming.operations]
+    }),
+    save: async (expectedRevision, batch) => {
+      let revision = expectedRevision
+      let latest: MutationResult<TodoItem> = { status: 'ok', value: item }
+      for (const operation of batch.operations) {
+        if (operation.kind === 'item') {
+          const result = await onSave(revision, operation.patch)
+          if (result.status !== 'ok') return result as MutationResult<TodoItem>
+          if (result.value.type !== 'todo') return { status: 'not-found' }
+          latest = { status: 'ok', value: result.value }
+        } else if (operation.kind === 'task') {
+          latest = await onUpdateTask(operation.taskId, revision, operation.patch)
+        } else {
+          latest = await onUpdateSubtask(
+            operation.taskId,
+            operation.subtaskId,
+            revision,
+            operation.patch
+          )
+        }
+        if (latest.status !== 'ok') return latest
+        revision = latest.value.revision
+      }
+      return latest
+    }
+  })
+
+  function addTaskOptimistically(): void {
+    const localTask = createOptimisticTask()
+    pendingFocusTaskIdRef.current = localTask.id
+    setPendingTasks((current) => [...current, localTask])
+    void Promise.resolve(onAddTask()).then((persisted) => {
+      if (!persisted) return
+      setPendingTasks((current) =>
+        current.map((task) =>
+          task.id === localTask.id ? persisted : task
+        )
+      )
+    })
+  }
+
+  const pendingOnly = pendingTasks.filter(
+    (task) => !draft.tasks.some((saved) => saved.id === task.id)
+  )
+  const renderedTasks = [...draft.tasks, ...pendingOnly]
 
   useEffect(() => {
     if (!item.tasks.length && !requestedInitialTaskRef.current) {
       requestedInitialTaskRef.current = true
-      onAddTask()
+      addTaskOptimistically()
     }
   }, [item.tasks.length, onAddTask])
+  useEffect(() => {
+    setPendingTasks((current) => {
+      const pending = current.filter(
+        (task) => !item.tasks.some((saved) => saved.id === task.id)
+      )
+      return pending.length === current.length ? current : pending
+    })
+  }, [item.tasks])
   useEffect(() => {
     const previousTaskIds = previousTaskIdsRef.current
     const nextTaskIds = item.tasks.map((task) => task.id)
@@ -113,7 +197,7 @@ export function TodoEditor({
     const taskId = pendingFocusTaskIdRef.current
     const firstEmptyTaskId =
       taskId ??
-      draft.tasks.find((task) => !task.contentMarkdown.trim())?.id ??
+      renderedTasks.find((task) => !task.contentMarkdown.trim())?.id ??
       null
     if (!firstEmptyTaskId) return
     const input = taskId
@@ -122,11 +206,9 @@ export function TodoEditor({
     if (!input) return
     input.focus()
     pendingFocusTaskIdRef.current = null
-  }, [draft.tasks])
+  }, [renderedTasks.map((task) => task.id).join('|')])
   useEffect(() => {
-    onSaveRef.current = onSave
-  }, [onSave])
-  useEffect(() => {
+    if (composingIdentityRef.current) return
     const timer = window.setTimeout(() => {
       const patch = {
         title: draft.title,
@@ -134,19 +216,35 @@ export function TodoEditor({
         bodyTheme: draft.bodyTheme
         , tags: draft.tags
       } satisfies StickyItemPatch
+      if (
+        patch.title === item.title &&
+        patch.headerColor === item.headerColor &&
+        patch.bodyTheme === item.bodyTheme &&
+        JSON.stringify(patch.tags) === JSON.stringify(item.tags)
+      ) return
       lastSubmittedRef.current = patch
-      onSaveRef.current(patch)
+      void coordinator.enqueue({ operations: [{ kind: 'item', patch }] })
     }, 500)
     return () => window.clearTimeout(timer)
-  }, [draft])
+  }, [
+    coordinator.enqueue,
+    draft.bodyTheme,
+    draft.headerColor,
+    draft.tags,
+    draft.title,
+    item.bodyTheme,
+    item.headerColor,
+    item.tags,
+    item.title
+  ])
 
   function handleDragEnd(event: DragEndEvent): void {
     const { active, over } = event
     if (!over || active.id === over.id) return
-    const oldIndex = draft.tasks.findIndex((task) => task.id === active.id)
-    const newIndex = draft.tasks.findIndex((task) => task.id === over.id)
+    const oldIndex = renderedTasks.findIndex((task) => task.id === active.id)
+    const newIndex = renderedTasks.findIndex((task) => task.id === over.id)
     if (oldIndex < 0 || newIndex < 0) return
-    onReorderTasks(arrayMove(draft.tasks, oldIndex, newIndex).map((task) => task.id))
+    onReorderTasks(arrayMove(renderedTasks, oldIndex, newIndex).map((task) => task.id))
   }
 
   function saveAndBack(): void {
@@ -157,7 +255,7 @@ export function TodoEditor({
       , tags: draft.tags
     } satisfies StickyItemPatch
     lastSubmittedRef.current = patch
-    onSaveRef.current(patch)
+    void coordinator.enqueue({ operations: [{ kind: 'item', patch }] })
     onBack()
   }
 
@@ -188,6 +286,15 @@ export function TodoEditor({
               aria-label="标题"
               value={draft.title}
               onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+              onCompositionStart={() => {
+                composingIdentityRef.current = true
+              }}
+              onCompositionEnd={() => {
+                composingIdentityRef.current = false
+                void coordinator.enqueue({
+                  operations: [{ kind: 'item', patch: { title: draft.title } }]
+                })
+              }}
             />
             <BodyThemeToggle
               value={draft.bodyTheme}
@@ -196,7 +303,7 @@ export function TodoEditor({
           </div>
           <TagEditor
             value={draft.tags}
-            contentTags={draft.tasks.flatMap((task) => extractTags(task.contentMarkdown))}
+            contentTags={renderedTasks.flatMap((task) => extractTags(task.contentMarkdown))}
             onChange={(tags) => setDraft({ ...draft, tags })}
           />
         </>
@@ -207,21 +314,40 @@ export function TodoEditor({
         onDragEnd={handleDragEnd}
       >
         <SortableContext
-          items={draft.tasks.map((task) => task.id)}
+          items={renderedTasks.map((task) => task.id)}
           strategy={verticalListSortingStrategy}
         >
           <div className="todo-task-list">
-            {draft.tasks.map((task) => (
+            {renderedTasks.map((task) => (
               <TodoTaskRow
                 key={task.id}
                 task={task}
                 bodyTheme={draft.bodyTheme}
-                onUpdate={(patch) => onUpdateTask(task.id, patch)}
+                onUpdate={(patch) => {
+                  if (Object.hasOwn(patch, 'contentMarkdown')) {
+                    void coordinator.enqueue({
+                      operations: [{ kind: 'task', taskId: task.id, patch }]
+                    })
+                  } else {
+                    void onUpdateTask(task.id, null, patch)
+                  }
+                }}
                 onDelete={() => onDeleteTask(task.id)}
                 onAddSubtask={() => onAddSubtask(task.id)}
-                onUpdateSubtask={(subtaskId, patch) =>
-                  onUpdateSubtask(task.id, subtaskId, patch)
-                }
+                onUpdateSubtask={(subtaskId, patch) => {
+                  if (Object.hasOwn(patch, 'contentMarkdown')) {
+                    void coordinator.enqueue({
+                      operations: [{
+                        kind: 'subtask',
+                        taskId: task.id,
+                        subtaskId,
+                        patch
+                      }]
+                    })
+                  } else {
+                    void onUpdateSubtask(task.id, subtaskId, null, patch)
+                  }
+                }}
                 onDeleteSubtask={(subtaskId) =>
                   onDeleteSubtask(task.id, subtaskId)
                 }
@@ -234,7 +360,7 @@ export function TodoEditor({
                 }}
               />
             ))}
-            <button className="primary-button add-task-button" onClick={onAddTask}>
+            <button className="primary-button add-task-button" onClick={addTaskOptimistically}>
               ＋ 添加任务
             </button>
           </div>
@@ -243,4 +369,17 @@ export function TodoEditor({
       {!detached && <span className="save-status">自动保存</span>}
     </section>
   )
+}
+
+function createOptimisticTask(): TodoTask {
+  return {
+    id: `local_${crypto.randomUUID()}`,
+    contentMarkdown: '',
+    completed: false,
+    tags: [],
+    importance: 'normal',
+    urgency: 'normal',
+    children: [],
+    schedule: null
+  }
 }

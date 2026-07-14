@@ -5,6 +5,7 @@ import { join } from 'node:path'
 import type {
   FolderItem,
   FolderPatch,
+  MutationResult,
   NoteItem,
   NotesFile,
   NoteType,
@@ -127,24 +128,30 @@ export class NoteStore {
 
   async updateFolder(
     id: string,
+    expectedRevision: number | null,
     patch: FolderPatch
-  ): Promise<FolderItem | null> {
+  ): Promise<MutationResult<FolderItem>> {
     await this.ensureInitialized()
     return this.mutate(async () => {
       const data = await this.file.read()
       const index = data.folders.findIndex((folder) => folder.id === id)
-      if (index < 0) return null
+      if (index < 0) return { status: 'not-found' }
+      const current = data.folders[index]
+      if (expectedRevision !== null && current.revision !== expectedRevision) {
+        return { status: 'conflict', current }
+      }
       if (Object.hasOwn(patch, 'parentFolderId')) {
         assertFolderMove(data.folders, id, patch.parentFolderId ?? null)
       }
       const updated = {
-        ...data.folders[index],
+        ...current,
         ...patch,
+        revision: current.revision + 1,
         updatedAt: new Date().toISOString()
       }
       data.folders[index] = updated
       await this.file.write(data)
-      return updated
+      return { status: 'ok', value: updated }
     })
   }
 
@@ -168,6 +175,7 @@ export class NoteStore {
           const item = data.items.find((candidate) => candidate.id === reference.id)
           if (item) {
             item.parentFolderId = parentFolderId
+            item.revision += 1
             item.updatedAt = now
           }
         } else {
@@ -176,11 +184,13 @@ export class NoteStore {
           )
           if (child) {
             child.parentFolderId = parentFolderId
+            child.revision += 1
             child.updatedAt = now
           }
         }
       }
       folder.deletedAt = now
+      folder.revision += 1
       folder.updatedAt = now
 
       const promotedKeys = new Set(
@@ -217,6 +227,7 @@ export class NoteStore {
       const updated = {
         ...data.items[index],
         parentFolderId,
+        revision: data.items[index].revision + 1,
         updatedAt: new Date().toISOString()
       } as StickyItem
       data.items[index] = updated
@@ -232,6 +243,16 @@ export class NoteStore {
     await this.ensureInitialized()
     return this.mutate(async () => {
       const data = await this.file.read()
+      const before = new Map<string, { parentFolderId: string | null; order: number }>([
+        ...data.items.map((item) => [
+          `item:${item.id}`,
+          { parentFolderId: item.parentFolderId, order: item.order }
+        ] as const),
+        ...data.folders.map((folder) => [
+          `folder:${folder.id}`,
+          { parentFolderId: folder.parentFolderId, order: folder.order }
+        ] as const)
+      ])
       if (
         parentFolderId &&
         !data.folders.some(
@@ -255,7 +276,6 @@ export class NoteStore {
           if (!item) throw new Error('Sticky item does not exist')
           sourceParents.add(item.parentFolderId)
           item.parentFolderId = parentFolderId
-          item.updatedAt = new Date().toISOString()
         } else {
           const folder = data.folders.find(
             (candidate) => candidate.id === reference.id && !candidate.deletedAt
@@ -264,7 +284,6 @@ export class NoteStore {
           assertFolderMove(data.folders, folder.id, parentFolderId)
           sourceParents.add(folder.parentFolderId)
           folder.parentFolderId = parentFolderId
-          folder.updatedAt = new Date().toISOString()
         }
       }
 
@@ -275,6 +294,27 @@ export class NoteStore {
       for (const sourceParent of sourceParents) {
         if (sourceParent !== parentFolderId) {
           assignSiblingOrder(data, siblingReferences(data, sourceParent))
+        }
+      }
+      const now = new Date().toISOString()
+      for (const item of data.items) {
+        const previous = before.get(`item:${item.id}`)
+        if (
+          previous &&
+          (previous.parentFolderId !== item.parentFolderId || previous.order !== item.order)
+        ) {
+          item.revision += 1
+          item.updatedAt = now
+        }
+      }
+      for (const folder of data.folders) {
+        const previous = before.get(`folder:${folder.id}`)
+        if (
+          previous &&
+          (previous.parentFolderId !== folder.parentFolderId || previous.order !== folder.order)
+        ) {
+          folder.revision += 1
+          folder.updatedAt = now
         }
       }
       await this.file.write(data)
@@ -332,20 +372,29 @@ export class NoteStore {
     })
   }
 
-  async update(id: string, patch: StickyItemPatch): Promise<StickyItem | null> {
+  async update(
+    id: string,
+    expectedRevision: number | null,
+    patch: StickyItemPatch
+  ): Promise<MutationResult<StickyItem>> {
     await this.ensureInitialized()
     return this.mutate(async () => {
       const data = await this.file.read()
       const index = data.items.findIndex((item) => item.id === id)
-      if (index < 0) return null
+      if (index < 0) return { status: 'not-found' }
+      const current = data.items[index]
+      if (expectedRevision !== null && current.revision !== expectedRevision) {
+        return { status: 'conflict', current }
+      }
       const updated = {
-        ...data.items[index],
+        ...current,
         ...patch,
+        revision: current.revision + 1,
         updatedAt: new Date().toISOString()
       } as StickyItem
       data.items[index] = updated
       await this.file.write(data)
-      return updated
+      return { status: 'ok', value: updated }
     })
   }
 
@@ -358,6 +407,7 @@ export class NoteStore {
       data.items[index] = {
         ...data.items[index],
         deletedAt: new Date().toISOString(),
+        revision: data.items[index].revision + 1,
         updatedAt: new Date().toISOString()
       } as StickyItem
       await this.file.write(data)
@@ -391,6 +441,7 @@ export class NoteStore {
         ...data.items[index],
         parentFolderId,
         deletedAt: null,
+        revision: data.items[index].revision + 1,
         updatedAt: new Date().toISOString()
       } as StickyItem
       await this.file.write(data)
@@ -416,6 +467,7 @@ export class NoteStore {
         ...data.folders[index],
         parentFolderId,
         deletedAt: null,
+        revision: data.folders[index].revision + 1,
         updatedAt: new Date().toISOString()
       }
       await this.file.write(data)
@@ -469,14 +521,18 @@ export class NoteStore {
         tasks: [...todo.tasks, task]
       }
     })
-    return updated ? task : null
+    return updated.status === 'ok' ? task : null
   }
 
   async updateTodoTask(
     todoId: string,
     taskId: string,
+    expectedRevision: number | null,
     patch: TodoTaskPatch
-  ): Promise<TodoItem | null> {
+  ): Promise<MutationResult<TodoItem>> {
+    if (Object.hasOwn(patch, 'contentMarkdown') && expectedRevision === null) {
+      throw new Error('Task text updates require an expected revision')
+    }
     return this.changeTodo(todoId, (todo) => ({
       ...todo,
       tasks: todo.tasks.map((task) => {
@@ -504,10 +560,13 @@ export class NoteStore {
         }
         return updated
       })
-    }))
+    }), expectedRevision)
   }
 
-  async deleteTodoTask(todoId: string, taskId: string): Promise<TodoItem | null> {
+  async deleteTodoTask(
+    todoId: string,
+    taskId: string
+  ): Promise<MutationResult<TodoItem>> {
     return this.changeTodo(todoId, (todo) => ({
       ...todo,
       tasks: todo.tasks.filter((task) => task.id !== taskId)
@@ -536,15 +595,19 @@ export class NoteStore {
           : task
       )
     }))
-    return updated ? child : null
+    return updated.status === 'ok' ? child : null
   }
 
   async updateTodoSubtask(
     todoId: string,
     taskId: string,
     subtaskId: string,
+    expectedRevision: number | null,
     patch: TodoSubtaskPatch
-  ): Promise<TodoItem | null> {
+  ): Promise<MutationResult<TodoItem>> {
+    if (Object.hasOwn(patch, 'contentMarkdown') && expectedRevision === null) {
+      throw new Error('Subtask text updates require an expected revision')
+    }
     return this.changeTodo(todoId, (todo) => ({
       ...todo,
       tasks: todo.tasks.map((task) =>
@@ -552,14 +615,14 @@ export class NoteStore {
           ? updateTaskSubtask(task, subtaskId, patch)
           : task
       )
-    }))
+    }), expectedRevision)
   }
 
   async deleteTodoSubtask(
     todoId: string,
     taskId: string,
     subtaskId: string
-  ): Promise<TodoItem | null> {
+  ): Promise<MutationResult<TodoItem>> {
     return this.changeTodo(todoId, (todo) => ({
       ...todo,
       tasks: todo.tasks.map((task) =>
@@ -581,7 +644,7 @@ export class NoteStore {
       reminderId: string
     },
     snoozedUntil: Date
-  ): Promise<TodoItem | null> {
+  ): Promise<MutationResult<TodoItem>> {
     return this.changeTodo(target.itemId, (todo) => ({
       ...todo,
       tasks: todo.tasks.map((task) => {
@@ -618,7 +681,7 @@ export class NoteStore {
   async reorderTodoTasks(
     todoId: string,
     orderedTaskIds: string[]
-  ): Promise<TodoItem | null> {
+  ): Promise<MutationResult<TodoItem>> {
     return this.changeTodo(todoId, (todo) => {
       const byId = new Map(todo.tasks.map((task) => [task.id, task]))
       const ordered = orderedTaskIds
@@ -631,21 +694,26 @@ export class NoteStore {
 
   private async changeTodo(
     todoId: string,
-    change: (todo: TodoItem) => TodoItem
-  ): Promise<TodoItem | null> {
+    change: (todo: TodoItem) => TodoItem,
+    expectedRevision: number | null = null
+  ): Promise<MutationResult<TodoItem>> {
     await this.ensureInitialized()
     return this.mutate(async () => {
       const data = await this.file.read()
       const index = data.items.findIndex((item) => item.id === todoId)
       const current = data.items[index]
-      if (index < 0 || current.type !== 'todo') return null
+      if (index < 0 || current.type !== 'todo') return { status: 'not-found' }
+      if (expectedRevision !== null && current.revision !== expectedRevision) {
+        return { status: 'conflict', current }
+      }
       const updated = {
         ...change(current),
+        revision: current.revision + 1,
         updatedAt: new Date().toISOString()
       }
       data.items[index] = updated
       await this.file.write(data)
-      return updated
+      return { status: 'ok', value: updated }
     })
   }
 

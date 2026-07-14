@@ -8,6 +8,7 @@ import { TodoEditor } from '../src/renderer/src/components/TodoEditor'
 
 const note: NoteItem = {
   id: 'note_1',
+  revision: 1,
   type: 'note',
   title: 'Note',
   contentMarkdown: 'Text',
@@ -23,6 +24,7 @@ const note: NoteItem = {
 
 const todo: TodoItem = {
   id: 'todo_1',
+  revision: 1,
   type: 'todo',
   title: 'Todo',
   headerColor: '#5b8def',

@@ -35,7 +35,9 @@ describe('RecycleService', () => {
 
   it('purges entries after seven days', async () => {
     const note = await store.create('note')
-    await store.update(note.id, { deletedAt: '2026-06-08T11:59:59.000Z' })
+    await store.update(note.id, note.revision, {
+      deletedAt: '2026-06-08T11:59:59.000Z'
+    })
 
     expect(await recycle.purgeExpired()).toBe(1)
     expect((await recycle.list()).items).toEqual([])
@@ -63,8 +65,10 @@ describe('RecycleService', () => {
     await assets.importBuffer(Buffer.from('c'), 'image/png')
     const active = await store.create('note')
     const recycled = await store.create('note')
-    await store.update(active.id, { contentMarkdown: `![](${activeAsset.url})` })
-    await store.update(recycled.id, {
+    await store.update(active.id, active.revision, {
+      contentMarkdown: `![](${activeAsset.url})`
+    })
+    await store.update(recycled.id, recycled.revision, {
       contentMarkdown: `![](${recycledAsset.url})`
     })
     await store.delete(recycled.id)
@@ -86,7 +90,9 @@ describe('RecycleService', () => {
     )
     const asset = await assets.importBuffer(Buffer.from('image'), 'image/png')
     const note = await store.create('note')
-    await store.update(note.id, { contentMarkdown: `![](${asset.url})` })
+    await store.update(note.id, note.revision, {
+      contentMarkdown: `![](${asset.url})`
+    })
     await store.delete(note.id)
 
     await recycle.empty()

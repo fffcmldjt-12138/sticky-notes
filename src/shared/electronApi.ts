@@ -3,6 +3,7 @@ import type {
   AssetReference,
   FolderItem,
   FolderPatch,
+  MutationResult,
   NoteType,
   OrderedNodeRef,
   RecycleContents,
@@ -60,6 +61,10 @@ export interface ImportSummary {
 
 export type DataReloadReason = 'restore' | 'import'
 
+export type UndoExecutionResult =
+  | { status: 'empty' }
+  | { status: 'ok' | 'conflict'; label: string }
+
 export interface StickyApi {
   notes: {
     list(): Promise<StickyItem[]>
@@ -68,16 +73,21 @@ export interface StickyApi {
       title?: string,
       parentFolderId?: string | null
     ): Promise<StickyItem>
-    update(id: string, patch: StickyItemPatch): Promise<StickyItem | null>
+    update(
+      id: string,
+      expectedRevision: number,
+      patch: StickyItemPatch
+    ): Promise<MutationResult<StickyItem>>
     delete(id: string): Promise<boolean>
     addTodoTask(todoId: string, contentMarkdown?: string): Promise<TodoTask | null>
     updateTodoTask(
       todoId: string,
       taskId: string,
+      expectedRevision: number | null,
       patch: TodoTaskPatch
-    ): Promise<TodoItem | null>
-    deleteTodoTask(todoId: string, taskId: string): Promise<TodoItem | null>
-    reorderTodoTasks(todoId: string, taskIds: string[]): Promise<TodoItem | null>
+    ): Promise<MutationResult<TodoItem>>
+    deleteTodoTask(todoId: string, taskId: string): Promise<MutationResult<TodoItem>>
+    reorderTodoTasks(todoId: string, taskIds: string[]): Promise<MutationResult<TodoItem>>
     addTodoSubtask(
       todoId: string,
       taskId: string,
@@ -87,13 +97,14 @@ export interface StickyApi {
       todoId: string,
       taskId: string,
       subtaskId: string,
+      expectedRevision: number | null,
       patch: TodoSubtaskPatch
-    ): Promise<TodoItem | null>
+    ): Promise<MutationResult<TodoItem>>
     deleteTodoSubtask(
       todoId: string,
       taskId: string,
       subtaskId: string
-    ): Promise<TodoItem | null>
+    ): Promise<MutationResult<TodoItem>>
   }
   config: {
     get(): Promise<AppConfig>
@@ -106,7 +117,11 @@ export interface StickyApi {
   folders: {
     list(): Promise<FolderItem[]>
     create(title: string, parentFolderId?: string | null): Promise<FolderItem>
-    update(id: string, patch: FolderPatch): Promise<FolderItem | null>
+    update(
+      id: string,
+      expectedRevision: number,
+      patch: FolderPatch
+    ): Promise<MutationResult<FolderItem>>
     delete(id: string): Promise<boolean>
     moveItem(itemId: string, parentFolderId: string | null): Promise<StickyItem | null>
     reorderChildren(
@@ -123,6 +138,10 @@ export interface StickyApi {
   }
   reminder: {
     respond(action: ReminderWindowAction): Promise<void>
+  }
+  undo: {
+    latest(): Promise<{ label: string } | null>
+    execute(): Promise<UndoExecutionResult>
   }
   data: {
     openDirectory(): Promise<void>

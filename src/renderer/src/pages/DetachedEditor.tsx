@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import type { StickyItem, StickyItemPatch, TodoTaskPatch } from '../../../shared/models'
 import { NoteEditor } from '../components/NoteEditor'
 import { TodoEditor } from '../components/TodoEditor'
+import { acceptNewer } from '../lib/entityEvents'
 
 export function DetachedEditor({ itemId }: { itemId: string }): React.JSX.Element {
   const [item, setItem] = useState<StickyItem | null>(null)
@@ -16,10 +17,15 @@ export function DetachedEditor({ itemId }: { itemId: string }): React.JSX.Elemen
   useEffect(() => {
     void load()
     const removeChanged = window.stickyApi.onItemChanged((changed) => {
-      if (changed.id === itemId) setItem(changed)
+      if (changed.id === itemId) {
+        setItem((current) => acceptNewer(current ?? undefined, changed))
+      }
     })
     const removeDeleted = window.stickyApi.onItemDeleted((deletedId) => {
-      if (deletedId === itemId) setError('便签已删除')
+      if (deletedId === itemId) {
+        setItem(null)
+        setError('便签已删除')
+      }
     })
     const removeReloaded = window.stickyApi.onDataReloaded(() => void load())
     return () => {
@@ -29,9 +35,12 @@ export function DetachedEditor({ itemId }: { itemId: string }): React.JSX.Elemen
     }
   }, [itemId, load])
 
-  async function save(patch: StickyItemPatch): Promise<void> {
-    const updated = await window.stickyApi.notes.update(itemId, patch)
-    if (updated) setItem(updated)
+  async function save(expectedRevision: number, patch: StickyItemPatch) {
+    const updated = await window.stickyApi.notes.update(
+      itemId, expectedRevision, patch
+    )
+    if (updated.status === 'ok') setItem(updated.value)
+    return updated
   }
 
   async function remove(): Promise<void> {
@@ -39,9 +48,20 @@ export function DetachedEditor({ itemId }: { itemId: string }): React.JSX.Elemen
     await window.stickyApi.notes.delete(item.id)
   }
 
-  async function updateTask(taskId: string, patch: TodoTaskPatch): Promise<void> {
-    const updated = await window.stickyApi.notes.updateTodoTask(itemId, taskId, patch)
-    if (updated) setItem(updated)
+  async function updateTask(
+    taskId: string,
+    expectedRevision: number | null,
+    patch: TodoTaskPatch
+  ) {
+    if (!item || item.type !== 'todo') return { status: 'not-found' as const }
+    const updated = await window.stickyApi.notes.updateTodoTask(
+      itemId,
+      taskId,
+      expectedRevision,
+      patch
+    )
+    if (updated.status === 'ok') setItem(updated.value)
+    return updated
   }
 
   if (error) return <div className="detached-error">{error}</div>
@@ -56,7 +76,7 @@ export function DetachedEditor({ itemId }: { itemId: string }): React.JSX.Elemen
       <NoteEditor
         detached
         item={item}
-        onSave={(patch) => void save(patch)}
+        onSave={save}
         onBack={attach}
         onDelete={() => void remove()}
       />
@@ -67,33 +87,32 @@ export function DetachedEditor({ itemId }: { itemId: string }): React.JSX.Elemen
     <TodoEditor
       detached
       item={item}
-      onSave={(patch) => void save(patch)}
-      onAddTask={async () => {
-        await window.stickyApi.notes.addTodoTask(item.id)
-        await load()
-      }}
-      onUpdateTask={(taskId, patch) => void updateTask(taskId, patch)}
+      onSave={save}
+      onAddTask={() => window.stickyApi.notes.addTodoTask(item.id)}
+      onUpdateTask={updateTask}
       onDeleteTask={async (taskId) => {
         if (!window.confirm('确定删除这条任务吗？')) return
         const updated = await window.stickyApi.notes.deleteTodoTask(item.id, taskId)
-        if (updated) setItem(updated)
+        if (updated.status === 'ok') setItem(updated.value)
       }}
       onReorderTasks={async (taskIds) => {
         const updated = await window.stickyApi.notes.reorderTodoTasks(item.id, taskIds)
-        if (updated) setItem(updated)
+        if (updated.status === 'ok') setItem(updated.value)
       }}
       onAddSubtask={async (taskId) => {
         await window.stickyApi.notes.addTodoSubtask(item.id, taskId)
         await load()
       }}
-      onUpdateSubtask={async (taskId, subtaskId, patch) => {
+      onUpdateSubtask={async (taskId, subtaskId, expectedRevision, patch) => {
         const updated = await window.stickyApi.notes.updateTodoSubtask(
           item.id,
           taskId,
           subtaskId,
+          expectedRevision,
           patch
         )
-        if (updated) setItem(updated)
+        if (updated.status === 'ok') setItem(updated.value)
+        return updated
       }}
       onDeleteSubtask={async (taskId, subtaskId) => {
         const updated = await window.stickyApi.notes.deleteTodoSubtask(
@@ -101,7 +120,7 @@ export function DetachedEditor({ itemId }: { itemId: string }): React.JSX.Elemen
           taskId,
           subtaskId
         )
-        if (updated) setItem(updated)
+        if (updated.status === 'ok') setItem(updated.value)
       }}
       onBack={attach}
       onDelete={() => void remove()}

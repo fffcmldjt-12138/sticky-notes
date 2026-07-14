@@ -594,3 +594,26 @@
 .tree-dnd-surface.outside-drag .folder-card {
   transition: none !important;
 }
+.undo-toast {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 1px solid #c9ced8;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #252a33;
+  box-shadow: 0 4px 14px rgb(0 0 0 / 14%);
+}
+
+.undo-toast button {
+  border: 0;
+  background: transparent;
+  color: #2457b8;
+  cursor: pointer;
+  font-weight: 600;
+}

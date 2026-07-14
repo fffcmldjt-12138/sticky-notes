@@ -23,6 +23,7 @@ export function StickyPanel({
   onReorder
   , onBeginDrag
   , onDragStateChange
+  , onCardRender
 }: {
   items: StickyItem[]
   folders: FolderItem[]
@@ -47,8 +48,9 @@ export function StickyPanel({
   onReorder(parentFolderId: string | null, orderedNodes: OrderedNodeRef[]): void
   onBeginDrag?(): void
   onDragStateChange?(active: boolean): void
+  onCardRender?(id: string, actualDuration: number): void
 }): React.JSX.Element {
-  const tree = buildFolderTree(folders, items)
+  const tree = useMemo(() => buildFolderTree(folders, items), [folders, items])
 
   if (!items.length && !folders.length) {
     return (
@@ -83,6 +85,7 @@ export function StickyPanel({
               onOpen={() => onOpen(entry.item)}
               onContextMenu={(event) => onContextMenu(entry.item, event)}
               onDetach={() => onDetach(entry.item)}
+              onRender={onCardRender}
             />
           ) : entry.kind === 'item' && entry.item.type === 'todo' ? (
             <TodoCard
@@ -99,6 +102,7 @@ export function StickyPanel({
               }
               onContextMenu={(event) => onContextMenu(entry.item, event)}
               onDetach={() => onDetach(entry.item)}
+              onRender={onCardRender}
             />
           ) : entry.kind === 'folder' ? (
             <FolderCard
@@ -108,6 +112,7 @@ export function StickyPanel({
               onToggle={onToggleFolder}
               onContextMenu={onFolderContextMenu}
               onCreate={onCreateInFolder}
+              onRender={onCardRender}
             />
           ) : null}
           </div>
@@ -120,3 +125,4 @@ export function StickyPanel({
     </TreeDndContext>
   )
 }
+import { useMemo } from 'react'

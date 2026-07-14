@@ -22,6 +22,22 @@ describe('folder storage', () => {
     expect(await store.listFolders()).toHaveLength(3)
   })
 
+  it('accepts the expected revision and rejects a stale folder patch', async () => {
+    const folder = await store.createFolder('Folder')
+
+    const first = await store.updateFolder(folder.id, 1, { title: 'first' })
+    expect(first).toMatchObject({
+      status: 'ok',
+      value: { title: 'first', revision: 2 }
+    })
+
+    const stale = await store.updateFolder(folder.id, 1, { title: 'stale' })
+    expect(stale).toMatchObject({
+      status: 'conflict',
+      current: { title: 'first', revision: 2 }
+    })
+  })
+
   it('moves notes and todos into a folder', async () => {
     const folder = await store.createFolder('项目')
     const note = await store.create('note')
@@ -31,8 +47,8 @@ describe('folder storage', () => {
     await store.moveItem(todo.id, folder.id)
 
     expect(await store.list()).toEqual([
-      expect.objectContaining({ id: todo.id, parentFolderId: folder.id }),
-      expect.objectContaining({ id: note.id, parentFolderId: folder.id })
+      expect.objectContaining({ id: todo.id, parentFolderId: folder.id, revision: 2 }),
+      expect.objectContaining({ id: note.id, parentFolderId: folder.id, revision: 2 })
     ])
   })
 
@@ -72,7 +88,9 @@ describe('folder storage', () => {
     await store.createFolder('待移动二级', moving.id)
 
     await expect(
-      store.updateFolder(moving.id, { parentFolderId: destinationChild.id })
+      store.updateFolder(moving.id, moving.revision, {
+        parentFolderId: destinationChild.id
+      })
     ).rejects.toThrow('文件夹最多嵌套 3 层')
   })
 
@@ -148,12 +166,15 @@ describe('folder storage', () => {
     const folder = await store.createFolder('Window')
     const bounds = { x: 120, y: 80, width: 380, height: 520 }
 
-    const updated = await store.updateFolder(folder.id, {
+    const updated = await store.updateFolder(folder.id, folder.revision, {
       detached: true,
       windowBounds: bounds
     })
 
-    expect(updated).toMatchObject({ detached: true, windowBounds: bounds })
+    expect(updated).toMatchObject({
+      status: 'ok',
+      value: { detached: true, windowBounds: bounds, revision: 2 }
+    })
     expect(await store.listFolders()).toContainEqual(
       expect.objectContaining({ id: folder.id, detached: true, windowBounds: bounds })
     )

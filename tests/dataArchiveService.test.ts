@@ -33,7 +33,7 @@ describe('DataArchiveService', () => {
   it('exports only a sorted manifest, notes, and canonical assets', async () => {
     const asset = await assets.importBuffer(pngBytes, 'image/png')
     const note = await notes.create('note', 'Round trip')
-    await notes.update(note.id, {
+    await notes.update(note.id, note.revision, {
       contentMarkdown: `![image](asset://local/${asset.fileName})`
     })
     const output = join(directory, 'export.zip')
@@ -209,7 +209,7 @@ describe('DataArchiveService', () => {
 
   it('refuses to export notes that reference a missing live asset', async () => {
     const note = await notes.create('note', 'Missing asset')
-    await notes.update(note.id, {
+    await notes.update(note.id, note.revision, {
       contentMarkdown: `![missing](asset://local/${assetName})`
     })
 

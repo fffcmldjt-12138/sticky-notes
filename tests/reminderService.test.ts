@@ -84,7 +84,7 @@ describe('ReminderService', () => {
       '强提醒：距离截止还有 1 天',
       { itemId: 'todo_1', taskId: 'task_1', reminderId: 'one-day' }
     )
-    expect(updateTodoTask).toHaveBeenCalledWith('todo_1', 'task_1', {
+    expect(updateTodoTask).toHaveBeenCalledWith('todo_1', 'task_1', null, {
       schedule: {
         ...todo.tasks[0].schedule,
         reminders: [{
@@ -127,7 +127,7 @@ describe('ReminderService', () => {
 
     await service.check()
 
-    expect(updateTodoTask).toHaveBeenCalledWith('todo_1', 'task_1', {
+    expect(updateTodoTask).toHaveBeenCalledWith('todo_1', 'task_1', null, {
       completed: false,
       schedule: expect.objectContaining({
         startAt: '2026-06-21T12:00:00.000Z',
@@ -191,6 +191,7 @@ describe('ReminderService', () => {
       'todo_1',
       'task_1',
       'subtask_1',
+      null,
       { schedule: expect.any(Object) }
     )
   })
@@ -240,6 +241,7 @@ describe('ReminderService', () => {
     expect(updateTodoTask).toHaveBeenLastCalledWith(
       'todo_1',
       'task_1',
+      null,
       {
         schedule: expect.objectContaining({
           reminders: [expect.objectContaining({

@@ -1,5 +1,6 @@
 import type {
   StickyItem,
+  MutationResult,
   TodoItem,
   TodoSchedule,
   TodoSubtaskPatch,
@@ -24,14 +25,16 @@ interface ReminderStore {
   updateTodoTask(
     todoId: string,
     taskId: string,
+    expectedRevision: number | null,
     patch: TodoTaskPatch
-  ): Promise<TodoItem | null>
+  ): Promise<MutationResult<TodoItem>>
   updateTodoSubtask(
     todoId: string,
     taskId: string,
     subtaskId: string,
+    expectedRevision: number | null,
     patch: TodoSubtaskPatch
-  ): Promise<TodoItem | null>
+  ): Promise<MutationResult<TodoItem>>
 }
 
 type ReminderNotify = (
@@ -75,7 +78,7 @@ export class ReminderService {
           { itemId: item.id, taskId: task.id }
         )
         if (taskPatch) {
-          await this.store.updateTodoTask(item.id, task.id, taskPatch)
+          await this.store.updateTodoTask(item.id, task.id, null, taskPatch)
         }
 
         for (const child of task.children) {
@@ -92,6 +95,7 @@ export class ReminderService {
               item.id,
               task.id,
               child.id,
+              null,
               childPatch
             )
           }

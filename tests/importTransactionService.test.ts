@@ -45,7 +45,7 @@ describe('ImportTransactionService', () => {
     const sourceAssets = new AssetService(source)
     const image = await sourceAssets.importBuffer(pngBytes, 'image/png')
     const note = await sourceNotes.create('note', 'Imported')
-    await sourceNotes.update(note.id, {
+    await sourceNotes.update(note.id, note.revision, {
       contentMarkdown: `![image](asset://local/${image.fileName})`
     })
     const archivePath = join(source, 'data.zip')

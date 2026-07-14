@@ -21,6 +21,7 @@ import { ReminderWindow } from './pages/ReminderWindow'
 import { upsertItem } from './lib/itemList'
 import { getItemTags, mergeTags } from '../../shared/tags'
 import type { FolderTreeNode } from './lib/folderTree'
+import { upsertNewer } from './lib/entityEvents'
 
 const NoteEditor = lazy(() =>
   import('./components/NoteEditor').then((module) => ({
@@ -92,6 +93,7 @@ function PanelApp(): React.JSX.Element {
   const [treeDragActive, setTreeDragActive] = useState(false)
   const [activeReminder, setActiveReminder] =
     useState<ReminderAlertPayload | null>(null)
+  const [undoLabel, setUndoLabel] = useState<string | null>(null)
   const [contextMenu, setContextMenu] = useState<{
     item: StickyItem
     x: number
@@ -108,6 +110,15 @@ function PanelApp(): React.JSX.Element {
     async () => setFolders(await window.stickyApi.folders.list()),
     []
   )
+  const refreshUndo = useCallback(async () => {
+    setUndoLabel((await window.stickyApi.undo.latest())?.label ?? null)
+  }, [])
+
+  useEffect(() => {
+    if (!undoLabel) return
+    const timer = window.setTimeout(() => setUndoLabel(null), 5000)
+    return () => window.clearTimeout(timer)
+  }, [undoLabel])
 
   useEffect(() => {
     void loadItems()
@@ -135,11 +146,7 @@ function PanelApp(): React.JSX.Element {
 
   useEffect(() => {
     const removeChanged = window.stickyApi.onFolderChanged?.((changed) => {
-      setFolders((current) => {
-        const index = current.findIndex((folder) => folder.id === changed.id)
-        if (index < 0) return [...current, changed]
-        return current.map((folder) => folder.id === changed.id ? changed : folder)
-      })
+      setFolders((current) => upsertNewer(current, changed))
     })
     const removeDeleted = window.stickyApi.onFolderDeleted?.((folderId) => {
       setFolders((current) => current.filter((folder) => folder.id !== folderId))
@@ -216,9 +223,18 @@ function PanelApp(): React.JSX.Element {
     window.stickyApi.window.suspendAutoHide(suspendAutoHide)
   }, [suspendAutoHide])
 
-  const save = useCallback(async (id: string, patch: StickyItemPatch) => {
-    const updated = await window.stickyApi.notes.update(id, patch)
-    if (updated) setItems((current) => current.map((item) => item.id === id ? updated : item))
+  const save = useCallback(async (
+    id: string,
+    expectedRevision: number,
+    patch: StickyItemPatch
+  ) => {
+    const result = await window.stickyApi.notes.update(id, expectedRevision, patch)
+    if (result.status === 'ok') {
+      setItems((entries) =>
+        entries.map((item) => item.id === id ? result.value : item)
+      )
+    }
+    return result
   }, [])
 
   async function remove(item: StickyItem): Promise<void> {
@@ -226,6 +242,7 @@ function PanelApp(): React.JSX.Element {
     if (await window.stickyApi.notes.delete(item.id)) {
       setItems((current) => current.filter((entry) => entry.id !== item.id))
       setSelectedId(null)
+      await refreshUndo()
     }
   }
 
@@ -236,9 +253,12 @@ function PanelApp(): React.JSX.Element {
   async function handleCardAction(item: StickyItem, action: CardAction): Promise<void> {
     if (action.type === 'edit') setSelectedId(item.id)
     if (action.type === 'rename') setPendingRename(item)
-    if (action.type === 'color') await save(item.id, { headerColor: action.color })
-    if (action.type === 'theme') await save(item.id, { bodyTheme: action.theme })
-    if (action.type === 'pin') await save(item.id, { pinned: action.pinned })
+    if (action.type === 'color') await save(item.id, item.revision, { headerColor: action.color })
+    if (action.type === 'theme') await save(item.id, item.revision, { bodyTheme: action.theme })
+    if (action.type === 'pin') {
+      await save(item.id, item.revision, { pinned: action.pinned })
+      await refreshUndo()
+    }
     if (action.type === 'add-task' && item.type === 'todo') {
       await window.stickyApi.notes.addTodoTask(item.id)
       await loadItems()
@@ -288,27 +308,27 @@ function PanelApp(): React.JSX.Element {
         </div>
       )}
       {selected?.type === 'note' && (
-        <NoteEditor item={selected} onSave={(patch) => void save(selected.id, patch)} onBack={() => setSelectedId(null)} onDelete={() => void remove(selected)} />
+        <NoteEditor item={selected} onSave={(revision, patch) => save(selected.id, revision, patch)} onBack={() => setSelectedId(null)} onDelete={() => void remove(selected)} />
       )}
       {selected?.type === 'todo' && (
         <TodoEditor
           item={selected}
-          onSave={(patch) => void save(selected.id, patch)}
-          onAddTask={async () => {
-            await window.stickyApi.notes.addTodoTask(selected.id)
-            await loadItems()
-          }}
-          onUpdateTask={async (taskId, patch) => {
+          onSave={(revision, patch) => save(selected.id, revision, patch)}
+          onAddTask={() => window.stickyApi.notes.addTodoTask(selected.id)}
+          onUpdateTask={async (taskId, expectedRevision, patch) => {
             const updated = await window.stickyApi.notes.updateTodoTask(
               selected.id,
               taskId,
+              expectedRevision,
               patch
             )
-            if (updated) {
+            if (updated.status === 'ok') {
               setItems((current) =>
-                current.map((item) => item.id === updated.id ? updated : item)
+                current.map((item) => item.id === updated.value.id ? updated.value : item)
               )
             }
+            if (Object.hasOwn(patch, 'completed')) await refreshUndo()
+            return updated
           }}
           onDeleteTask={async (taskId) => {
             if (!window.confirm('确定删除这条任务吗？')) return
@@ -316,9 +336,9 @@ function PanelApp(): React.JSX.Element {
               selected.id,
               taskId
             )
-            if (updated) {
+            if (updated.status === 'ok') {
               setItems((current) =>
-                current.map((item) => item.id === updated.id ? updated : item)
+                current.map((item) => item.id === updated.value.id ? updated.value : item)
               )
             }
           }}
@@ -327,9 +347,9 @@ function PanelApp(): React.JSX.Element {
               selected.id,
               taskIds
             )
-            if (updated) {
+            if (updated.status === 'ok') {
               setItems((current) =>
-                current.map((item) => item.id === updated.id ? updated : item)
+                current.map((item) => item.id === updated.value.id ? updated.value : item)
               )
             }
           }}
@@ -337,18 +357,20 @@ function PanelApp(): React.JSX.Element {
             await window.stickyApi.notes.addTodoSubtask(selected.id, taskId)
             await loadItems()
           }}
-          onUpdateSubtask={async (taskId, subtaskId, patch) => {
+          onUpdateSubtask={async (taskId, subtaskId, expectedRevision, patch) => {
             const updated = await window.stickyApi.notes.updateTodoSubtask(
               selected.id,
               taskId,
               subtaskId,
+              expectedRevision,
               patch
             )
-            if (updated) {
+            if (updated.status === 'ok') {
               setItems((current) =>
-                current.map((item) => item.id === updated.id ? updated : item)
+                current.map((item) => item.id === updated.value.id ? updated.value : item)
               )
             }
+            return updated
           }}
           onDeleteSubtask={async (taskId, subtaskId) => {
             const updated = await window.stickyApi.notes.deleteTodoSubtask(
@@ -356,9 +378,9 @@ function PanelApp(): React.JSX.Element {
               taskId,
               subtaskId
             )
-            if (updated) {
+            if (updated.status === 'ok') {
               setItems((current) =>
-                current.map((item) => item.id === updated.id ? updated : item)
+                current.map((item) => item.id === updated.value.id ? updated.value : item)
               )
             }
           }}
@@ -437,13 +459,15 @@ function PanelApp(): React.JSX.Element {
               const updated = await window.stickyApi.notes.updateTodoTask(
                 item.id,
                 taskId,
+                null,
                 { completed }
               )
-              if (updated) {
+              if (updated.status === 'ok') {
                 setItems((current) =>
-                  current.map((entry) => entry.id === updated.id ? updated : entry)
+                  current.map((entry) => entry.id === updated.value.id ? updated.value : entry)
                 )
               }
+              await refreshUndo()
             }}
             onToggleTodoSubtask={async (item, taskId, subtaskId, completed) => {
               if (item.type !== 'todo') return
@@ -451,16 +475,17 @@ function PanelApp(): React.JSX.Element {
                 item.id,
                 taskId,
                 subtaskId,
+                null,
                 { completed }
               )
-              if (updated) {
+              if (updated.status === 'ok') {
                 setItems((current) =>
-                  current.map((entry) => entry.id === updated.id ? updated : entry)
+                  current.map((entry) => entry.id === updated.value.id ? updated.value : entry)
                 )
               }
             }}
             onToggleTodoExpanded={(item, panelExpanded) => {
-              void save(item.id, { panelExpanded })
+              void save(item.id, item.revision, { panelExpanded })
             }}
             onContextMenu={(item, event) =>
               setContextMenu({ item, x: event.clientX, y: event.clientY })
@@ -470,11 +495,15 @@ function PanelApp(): React.JSX.Element {
             }
             onToggleFolder={(folder: FolderTreeNode) => {
               void window.stickyApi.folders
-                .update(folder.id, { collapsed: !folder.collapsed })
+                .update(folder.id, folder.revision, {
+                  collapsed: !folder.collapsed
+                })
                 .then((updated) => {
-                  if (!updated) return
+                  if (updated.status !== 'ok') return
                   setFolders((current) =>
-                    current.map((entry) => entry.id === updated.id ? updated : entry)
+                    current.map((entry) =>
+                      entry.id === updated.value.id ? updated.value : entry
+                    )
                   )
                 })
             }}
@@ -498,6 +527,7 @@ function PanelApp(): React.JSX.Element {
                 .then(() => {
                   void loadItems()
                   void loadFolders()
+                  void refreshUndo()
                 })
                 .catch((error: unknown) =>
                   window.alert(error instanceof Error ? error.message : '移动失败')
@@ -557,7 +587,7 @@ function PanelApp(): React.JSX.Element {
           type={pendingRename.type}
           initialTitle={pendingRename.title}
           onConfirm={(title) => {
-            void save(pendingRename.id, { title })
+            void save(pendingRename.id, pendingRename.revision, { title })
             setPendingRename(null)
           }}
           onCancel={() => setPendingRename(null)}
@@ -576,15 +606,47 @@ function PanelApp(): React.JSX.Element {
         <FolderDialog
           initialTitle={pendingFolderRename.title}
           onConfirm={async (title) => {
-            await window.stickyApi.folders.update(pendingFolderRename.id, {
+            await window.stickyApi.folders.update(
+              pendingFolderRename.id,
+              pendingFolderRename.revision,
+              {
               title
-            })
+              }
+            )
             setPendingFolderRename(null)
             await loadFolders()
           }}
           onCancel={() => setPendingFolderRename(null)}
         />
       )}
+      {undoLabel && (
+        <UndoToast
+          label={undoLabel}
+          onUndo={() => {
+            void window.stickyApi.undo.execute().then((result) => {
+              setUndoLabel(null)
+              if (result.status === 'conflict') {
+                window.alert('内容已发生变化，无法撤销')
+              }
+            })
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+export function UndoToast({
+  label,
+  onUndo
+}: {
+  label: string
+  onUndo(): void
+}): React.JSX.Element {
+  return (
+    <div className="undo-toast" role="status">
+      <span>{label}</span>
+      <button type="button" onClick={onUndo}>撤销</button>
     </div>
   )
 }

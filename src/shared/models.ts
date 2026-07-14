@@ -97,6 +97,11 @@ export interface TodoItem extends BaseItem {
 
 export type StickyItem = NoteItem | TodoItem
 
+export type MutationResult<T> =
+  | { status: 'ok'; value: T }
+  | { status: 'not-found' }
+  | { status: 'conflict'; current: T }
+
 export interface OrderedNodeRef {
   kind: 'item' | 'folder'
   id: string

@@ -17,6 +17,7 @@ import { registerNoteIpc } from './ipc/noteIpc'
 import { registerReminderIpc } from './ipc/reminderIpc'
 import { registerRecycleIpc } from './ipc/recycleIpc'
 import { registerWindowIpc } from './ipc/windowIpc'
+import { registerUndoIpc } from './ipc/undoIpc'
 import { ipcChannels } from '../shared/ipcChannels'
 import { AutoLaunchService } from './services/AutoLaunchService'
 import { AssetService } from './services/AssetService'
@@ -33,6 +34,7 @@ import {
 } from './services/FolderWindowService'
 import { ImportTransactionService } from './services/ImportTransactionService'
 import { NoteStore } from './services/NoteStore'
+import { UndoService } from './services/UndoService'
 import { DragPreviewWindowService } from './services/DragPreviewWindowService'
 import { ReminderService } from './services/ReminderService'
 import { ReminderPresentationService } from './services/ReminderPresentationService'
@@ -71,6 +73,7 @@ if (!hasLock) {
       config: validateAppConfig
     })
     const notes = new NoteStore(userData, backups)
+    const undo = new UndoService()
     const assets = new AssetService(userData)
     const importTransaction = new ImportTransactionService(userData, notes, assets)
     const archives = new DataArchiveService(userData, notes, assets, {
@@ -237,7 +240,9 @@ if (!hasLock) {
             },
             new Date(Date.now() + action.minutes * 60_000)
           )
-          if (updated) broadcast(ipcChannels.itemChanged, updated)
+          if (updated.status === 'ok') {
+            broadcast(ipcChannels.itemChanged, updated.value)
+          }
         }
       }
     )
@@ -286,13 +291,15 @@ if (!hasLock) {
         detachedWindows.closeForDelete(itemId)
         broadcast('notes:item-deleted', itemId)
       }
-    })
+    }, undo)
     registerAssetIpc(assets)
     registerFolderIpc(notes, {
       beforeDelete: (folderId) => folderWindows.closeForDelete(folderId),
       changed: (folder) => broadcast(ipcChannels.folderChanged, folder),
-      deleted: (folderId) => broadcast(ipcChannels.folderDeleted, folderId)
-    })
+      deleted: (folderId) => broadcast(ipcChannels.folderDeleted, folderId),
+      itemChanged: (item) => broadcast(ipcChannels.itemChanged, item)
+    }, undo)
+    registerUndoIpc(undo)
     registerRecycleIpc(recycle)
     registerReminderIpc(reminderWindows)
     registerWindowIpc(windows, detachedWindows, folderWindows, notes, dragPreview)
@@ -305,7 +312,10 @@ if (!hasLock) {
       assets,
       detachedWindows,
       folderWindows,
-      broadcast: (reason) => broadcast(ipcChannels.dataReloaded, reason)
+      broadcast: (reason) => {
+        undo.clear()
+        broadcast(ipcChannels.dataReloaded, reason)
+      }
     })
     reminder.start()
     await detachedWindows.restore(await notes.list())
@@ -322,6 +332,7 @@ if (!hasLock) {
       dragPreview.stop()
       detachedWindows.beginShutdown()
       folderWindows.beginShutdown()
+      undo.clear()
       windows.quit()
     })
   }).catch((error) => {

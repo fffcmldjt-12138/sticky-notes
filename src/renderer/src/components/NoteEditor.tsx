@@ -1,14 +1,24 @@
-import { useEffect, useRef, useState } from 'react'
-import type { NoteItem, StickyItemPatch } from '../../../shared/models'
+import type {
+  MutationResult,
+  NoteItem,
+  StickyItem,
+  StickyItemPatch
+} from '../../../shared/models'
+import { extractTags } from '../../../shared/tags'
+import { useEntitySaveCoordinator, type SaveState } from '../hooks/useEntitySaveCoordinator'
+import { usePersistedField } from '../hooks/usePersistedField'
 import { BodyThemeToggle } from './BodyThemeToggle'
 import { HeaderColorPicker } from './HeaderColorPicker'
 import { MarkdownEditor } from './MarkdownEditor'
+import { SaveStatus } from './SaveStatus'
 import { TagEditor } from './TagEditor'
-import { extractTags } from '../../../shared/tags'
 
 interface Props {
   item: NoteItem
-  onSave(patch: StickyItemPatch): void
+  onSave(
+    expectedRevision: number,
+    patch: StickyItemPatch
+  ): Promise<MutationResult<StickyItem>>
   onBack(): void
   onDelete(): void
   detached?: boolean
@@ -21,66 +31,66 @@ export function NoteEditor({
   onDelete,
   detached = false
 }: Props): React.JSX.Element {
-  const [draft, setDraft] = useState(item)
-  const onSaveRef = useRef(onSave)
-  const lastSubmittedRef = useRef<StickyItemPatch | null>(null)
-
-  useEffect(() => {
-    const submitted = lastSubmittedRef.current
-    if (
-      submitted &&
-      submitted.title === item.title &&
-      submitted.contentMarkdown === item.contentMarkdown &&
-      submitted.headerColor === item.headerColor &&
-      submitted.bodyTheme === item.bodyTheme
-      && JSON.stringify(submitted.tags) === JSON.stringify(item.tags)
-    ) {
-      return
-    }
-    if (document.activeElement?.closest('.editor')) return
-    setDraft(item)
-  }, [item])
-  useEffect(() => {
-    onSaveRef.current = onSave
-  }, [onSave])
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      const patch = {
-        title: draft.title,
-        contentMarkdown: draft.contentMarkdown,
-        headerColor: draft.headerColor,
-        bodyTheme: draft.bodyTheme
-        , tags: draft.tags
-      } satisfies StickyItemPatch
-      lastSubmittedRef.current = patch
-      onSaveRef.current(patch)
-    }, 500)
-    return () => window.clearTimeout(timer)
-  }, [draft])
+  const coordinator = useEntitySaveCoordinator({
+    remoteEntity: item,
+    save: onSave
+  })
+  const title = usePersistedField({
+    remoteValue: item.title,
+    makePatch: (value: string): StickyItemPatch => ({ title: value }),
+    coordinator
+  })
+  const content = usePersistedField({
+    remoteValue: item.contentMarkdown,
+    makePatch: (value: string): StickyItemPatch => ({ contentMarkdown: value }),
+    coordinator
+  })
+  const headerColor = usePersistedField({
+    remoteValue: item.headerColor,
+    makePatch: (value: NoteItem['headerColor']): StickyItemPatch => ({
+      headerColor: value
+    }),
+    coordinator
+  })
+  const bodyTheme = usePersistedField({
+    remoteValue: item.bodyTheme,
+    makePatch: (value: NoteItem['bodyTheme']): StickyItemPatch => ({
+      bodyTheme: value
+    }),
+    coordinator
+  })
+  const tags = usePersistedField({
+    remoteValue: JSON.stringify(item.tags),
+    makePatch: (value: string): StickyItemPatch => ({
+      tags: JSON.parse(value) as string[]
+    }),
+    coordinator
+  })
+  const fields = [title, content, headerColor, bodyTheme, tags]
+  const saveState = combinedSaveState(
+    coordinator.state,
+    fields.map((field) => field.state)
+  )
 
   function saveAndBack(): void {
-    const patch = {
-      title: draft.title,
-      contentMarkdown: draft.contentMarkdown,
-      headerColor: draft.headerColor,
-      bodyTheme: draft.bodyTheme
-      , tags: draft.tags
-    } satisfies StickyItemPatch
-    lastSubmittedRef.current = patch
-    onSaveRef.current(patch)
+    void Promise.all(fields.map((field) => field.flush()))
     onBack()
   }
 
+  function discardLocal(): void {
+    fields.forEach((field) => field.discardLocal())
+  }
+
   return (
-    <section className={`editor body-${draft.bodyTheme} ${detached ? 'detached-editor' : ''}`}>
+    <section className={`editor body-${bodyTheme.draft} ${detached ? 'detached-editor' : ''}`}>
       <div
         className={`editor-header ${detached ? 'detached-header' : ''}`}
-        style={{ backgroundColor: draft.headerColor }}
+        style={{ backgroundColor: headerColor.draft }}
       >
         {detached
           ? <span className="editor-header-spacer" />
           : <button className="icon-button" onClick={saveAndBack} aria-label="返回">‹</button>}
-        <span className="editor-header-title">{draft.title || '无标题'}</span>
+        <span className="editor-header-title">{title.draft || '无标题'}</span>
         {detached
           ? <button className="icon-button" onClick={saveAndBack} aria-label="关闭">×</button>
           : <button className="icon-button danger" onClick={onDelete} aria-label="删除">×</button>}
@@ -90,30 +100,55 @@ export function NoteEditor({
           <div className="editor-toolbar editor-identity-toolbar">
             <HeaderColorPicker
               compact
-              value={draft.headerColor}
-              onChange={(headerColor) => setDraft({ ...draft, headerColor })}
+              value={headerColor.draft}
+              onChange={headerColor.change}
             />
             <input
               className="editor-title-input"
               aria-label="标题"
-              value={draft.title}
-              onChange={(event) => setDraft({ ...draft, title: event.target.value })}
+              value={title.draft}
+              onChange={(event) => title.change(event.target.value)}
+              onCompositionStart={title.onCompositionStart}
+              onCompositionEnd={() => void title.onCompositionEnd()}
             />
-            <BodyThemeToggle value={draft.bodyTheme} onChange={(bodyTheme) => setDraft({ ...draft, bodyTheme })} />
+            <BodyThemeToggle value={bodyTheme.draft} onChange={bodyTheme.change} />
           </div>
           <TagEditor
-            value={draft.tags}
-            contentTags={extractTags(draft.contentMarkdown)}
-            onChange={(tags) => setDraft({ ...draft, tags })}
+            value={JSON.parse(tags.draft) as string[]}
+            contentTags={extractTags(content.draft)}
+            onChange={(value) => tags.change(JSON.stringify(value))}
           />
         </>
       )}
       <MarkdownEditor
-        value={draft.contentMarkdown}
-        onChange={(contentMarkdown) => setDraft({ ...draft, contentMarkdown })}
+        value={content.draft}
+        onChange={content.change}
+        onCompositionStart={content.onCompositionStart}
+        onCompositionEnd={() => void content.onCompositionEnd()}
         compact={detached}
       />
-      {!detached && <span className="save-status">自动保存</span>}
+      {!detached && (
+        <SaveStatus
+          state={saveState}
+          onRetry={() => void coordinator.retry()}
+          onCopy={() => {
+            void navigator.clipboard?.writeText(
+              `${title.draft}\n\n${content.draft}`.trim()
+            )
+          }}
+          onLoadLatest={discardLocal}
+        />
+      )}
     </section>
   )
+}
+
+function combinedSaveState(
+  coordinatorState: SaveState,
+  fieldStates: SaveState[]
+): SaveState {
+  for (const state of ['conflict', 'failed', 'saving', 'saved'] as const) {
+    if (coordinatorState === state || fieldStates.includes(state)) return state
+  }
+  return 'idle'
 }

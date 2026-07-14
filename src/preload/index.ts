@@ -18,12 +18,15 @@ const api: StickyApi = {
         title,
         parentFolderId
       ),
-    update: (id, patch) => ipcRenderer.invoke(ipcChannels.notesUpdate, id, patch),
+    update: (id, expectedRevision, patch) =>
+      ipcRenderer.invoke(ipcChannels.notesUpdate, id, expectedRevision, patch),
     delete: (id) => ipcRenderer.invoke(ipcChannels.notesDelete, id),
     addTodoTask: (todoId, contentMarkdown) =>
       ipcRenderer.invoke(ipcChannels.todoTaskAdd, todoId, contentMarkdown),
-    updateTodoTask: (todoId, taskId, patch) =>
-      ipcRenderer.invoke(ipcChannels.todoTaskUpdate, todoId, taskId, patch),
+    updateTodoTask: (todoId, taskId, expectedRevision, patch) =>
+      ipcRenderer.invoke(
+        ipcChannels.todoTaskUpdate, todoId, taskId, expectedRevision, patch
+      ),
     deleteTodoTask: (todoId, taskId) =>
       ipcRenderer.invoke(ipcChannels.todoTaskDelete, todoId, taskId),
     reorderTodoTasks: (todoId, taskIds) =>
@@ -35,12 +38,13 @@ const api: StickyApi = {
         taskId,
         contentMarkdown
       ),
-    updateTodoSubtask: (todoId, taskId, subtaskId, patch) =>
+    updateTodoSubtask: (todoId, taskId, subtaskId, expectedRevision, patch) =>
       ipcRenderer.invoke(
         ipcChannels.todoSubtaskUpdate,
         todoId,
         taskId,
         subtaskId,
+        expectedRevision,
         patch
       ),
     deleteTodoSubtask: (todoId, taskId, subtaskId) =>
@@ -65,8 +69,8 @@ const api: StickyApi = {
     list: () => ipcRenderer.invoke(ipcChannels.foldersList),
     create: (title, parentFolderId) =>
       ipcRenderer.invoke(ipcChannels.foldersCreate, title, parentFolderId),
-    update: (id, patch) =>
-      ipcRenderer.invoke(ipcChannels.foldersUpdate, id, patch),
+    update: (id, expectedRevision, patch) =>
+      ipcRenderer.invoke(ipcChannels.foldersUpdate, id, expectedRevision, patch),
     delete: (id) => ipcRenderer.invoke(ipcChannels.foldersDelete, id),
     moveItem: (itemId, parentFolderId) =>
       ipcRenderer.invoke(ipcChannels.foldersMoveItem, itemId, parentFolderId),
@@ -90,6 +94,10 @@ const api: StickyApi = {
   reminder: {
     respond: (action) =>
       ipcRenderer.invoke(ipcChannels.reminderWindowAction, action)
+  },
+  undo: {
+    latest: () => ipcRenderer.invoke(ipcChannels.undoLatest),
+    execute: () => ipcRenderer.invoke(ipcChannels.undoExecute)
   },
   data: {
     openDirectory: () => ipcRenderer.invoke(ipcChannels.dataOpenDirectory),

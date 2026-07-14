@@ -1,6 +1,7 @@
 import type {
   FolderItem,
   FolderPatch,
+  MutationResult,
   WindowBounds
 } from '../../shared/models'
 import {
@@ -19,7 +20,11 @@ export interface FolderWindowHandle {
 }
 
 interface FolderWindowStore {
-  updateFolder(id: string, patch: FolderPatch): Promise<FolderItem | null>
+  updateFolder(
+    id: string,
+    expectedRevision: number | null,
+    patch: FolderPatch
+  ): Promise<MutationResult<FolderItem>>
 }
 
 interface FolderWindowFactory {
@@ -69,11 +74,11 @@ export class FolderWindowService {
           workAreas
         )
     this.openWindow(folder, bounds)
-    const updated = await this.store.updateFolder(folder.id, {
+    const updated = await this.store.updateFolder(folder.id, null, {
       detached: true,
       windowBounds: bounds
     })
-    if (updated) this.onChanged(updated)
+    if (updated.status === 'ok') this.onChanged(updated.value)
   }
 
   async attach(folderId: string): Promise<void> {
@@ -82,8 +87,8 @@ export class FolderWindowService {
       this.windows.delete(folderId)
       window.close()
     }
-    const updated = await this.store.updateFolder(folderId, { detached: false })
-    if (updated) this.onChanged(updated)
+    const updated = await this.store.updateFolder(folderId, null, { detached: false })
+    if (updated.status === 'ok') this.onChanged(updated.value)
   }
 
   async restore(folders: FolderItem[]): Promise<void> {
@@ -128,9 +133,9 @@ export class FolderWindowService {
         setTimeout(() => {
           this.boundsTimers.delete(folderId)
           void this.store
-            .updateFolder(folderId, { windowBounds: window.getBounds() })
-            .then((folder) => {
-              if (folder) this.onChanged(folder)
+            .updateFolder(folderId, null, { windowBounds: window.getBounds() })
+            .then((result) => {
+              if (result.status === 'ok') this.onChanged(result.value)
             })
         }, 250)
       )
@@ -145,12 +150,12 @@ export class FolderWindowService {
       this.boundsTimers.delete(folderId)
       if (!this.shuttingDown && !this.nonPersistingWindows.has(window)) {
         void this.store
-          .updateFolder(folderId, {
+          .updateFolder(folderId, null, {
             detached: false,
             windowBounds: window.getBounds()
           })
-          .then((folder) => {
-            if (folder) this.onChanged(folder)
+          .then((result) => {
+            if (result.status === 'ok') this.onChanged(result.value)
           })
       }
     })

@@ -67,6 +67,55 @@ describe('NoteStore', () => {
     expect(folder.revision).toBe(1)
   })
 
+  it('accepts the expected revision and rejects a stale item patch', async () => {
+    const note = await store.create('note')
+
+    const first = await store.update(note.id, 1, { title: 'first' })
+    expect(first).toMatchObject({
+      status: 'ok',
+      value: { title: 'first', revision: 2 }
+    })
+
+    const stale = await store.update(note.id, 1, { title: 'stale' })
+    expect(stale).toMatchObject({
+      status: 'conflict',
+      current: { title: 'first', revision: 2 }
+    })
+    expect((await store.list())[0]).toMatchObject({ title: 'first', revision: 2 })
+  })
+
+  it('uses the containing todo revision for task text patches', async () => {
+    const todo = await store.create('todo')
+    const task = todo.type === 'todo' ? todo.tasks[0] : null
+
+    const first = await store.updateTodoTask(todo.id, task!.id, 1, {
+      contentMarkdown: 'first'
+    })
+    expect(first).toMatchObject({
+      status: 'ok',
+      value: { revision: 2 }
+    })
+
+    const stale = await store.updateTodoTask(todo.id, task!.id, 1, {
+      contentMarkdown: 'stale'
+    })
+    expect(stale).toMatchObject({
+      status: 'conflict',
+      current: { revision: 2 }
+    })
+  })
+
+  it('increments the entity revision for a discrete todo command', async () => {
+    const todo = await store.create('todo')
+    const task = todo.type === 'todo' ? todo.tasks[0] : null
+
+    const result = await store.updateTodoTask(todo.id, task!.id, null, {
+      completed: true
+    })
+
+    expect(result).toMatchObject({ status: 'ok', value: { revision: 2 } })
+  })
+
   it('creates todo tasks with advanced defaults', async () => {
     const todo = await store.create('todo')
     const task = await store.addTodoTask(todo.id, 'First')
@@ -98,15 +147,16 @@ describe('NoteStore', () => {
       todo.id,
       task!.id,
       child!.id,
+      null,
       { importance: 'important', completed: true }
     )
-    expect(updated?.tasks[0].children[0]).toMatchObject({
+    expect(updated.status === 'ok' && updated.value.tasks[0].children[0]).toMatchObject({
       importance: 'important',
       completed: true
     })
 
     const deleted = await store.deleteTodoSubtask(todo.id, task!.id, child!.id)
-    expect(deleted?.tasks[0].children).toEqual([])
+    expect(deleted.status === 'ok' && deleted.value.tasks[0].children).toEqual([])
   })
 
   it('completes a parent only when every subtask is complete', async () => {
@@ -119,25 +169,28 @@ describe('NoteStore', () => {
       todo.id,
       task!.id,
       first!.id,
+      null,
       { completed: true }
     )
-    expect(partlyDone?.tasks[0].completed).toBe(false)
+    expect(partlyDone.status === 'ok' && partlyDone.value.tasks[0].completed).toBe(false)
 
     const allDone = await store.updateTodoSubtask(
       todo.id,
       task!.id,
       second!.id,
+      null,
       { completed: true }
     )
-    expect(allDone?.tasks[0].completed).toBe(true)
+    expect(allDone.status === 'ok' && allDone.value.tasks[0].completed).toBe(true)
 
     const reopened = await store.updateTodoSubtask(
       todo.id,
       task!.id,
       first!.id,
+      null,
       { completed: false }
     )
-    expect(reopened?.tasks[0].completed).toBe(false)
+    expect(reopened.status === 'ok' && reopened.value.tasks[0].completed).toBe(false)
   })
 
   it('applies a parent completion toggle to all subtasks', async () => {
@@ -146,15 +199,15 @@ describe('NoteStore', () => {
     await store.addTodoSubtask(todo.id, task!.id, 'First')
     await store.addTodoSubtask(todo.id, task!.id, 'Second')
 
-    const completed = await store.updateTodoTask(todo.id, task!.id, {
+    const completed = await store.updateTodoTask(todo.id, task!.id, null, {
       completed: true
     })
-    expect(completed?.tasks[0].children.every((child) => child.completed)).toBe(true)
+    expect(completed.status === 'ok' && completed.value.tasks[0].children.every((child) => child.completed)).toBe(true)
 
-    const reopened = await store.updateTodoTask(todo.id, task!.id, {
+    const reopened = await store.updateTodoTask(todo.id, task!.id, null, {
       completed: false
     })
-    expect(reopened?.tasks[0].children.every((child) => !child.completed)).toBe(true)
+    expect(reopened.status === 'ok' && reopened.value.tasks[0].children.every((child) => !child.completed)).toBe(true)
   })
 
   it('keeps delivered reminder state but resets it when schedule rules change', async () => {
@@ -171,32 +224,32 @@ describe('NoteStore', () => {
         remindedAt: null
       }]
     }
-    await store.updateTodoTask(todo.id, task!.id, { schedule: baseSchedule })
+    await store.updateTodoTask(todo.id, task!.id, null, { schedule: baseSchedule })
     const deliveredAt = '2026-06-19T12:00:00.000Z'
-    const delivered = await store.updateTodoTask(todo.id, task!.id, {
+    const delivered = await store.updateTodoTask(todo.id, task!.id, null, {
       schedule: {
         ...baseSchedule,
         reminders: [{ ...baseSchedule.reminders[0], remindedAt: deliveredAt }]
       }
     })
-    expect(delivered?.tasks[0].schedule?.reminders[0].remindedAt).toBe(
+    expect(delivered.status === 'ok' && delivered.value.tasks[0].schedule?.reminders[0].remindedAt).toBe(
       deliveredAt
     )
 
-    const changed = await store.updateTodoTask(todo.id, task!.id, {
+    const changed = await store.updateTodoTask(todo.id, task!.id, null, {
       schedule: {
         ...baseSchedule,
         startAt: '2026-06-21T12:00:00.000Z',
         reminders: [{ ...baseSchedule.reminders[0], remindedAt: deliveredAt }]
       }
     })
-    expect(changed?.tasks[0].schedule?.reminders[0].remindedAt).toBeNull()
+    expect(changed.status === 'ok' && changed.value.tasks[0].schedule?.reminders[0].remindedAt).toBeNull()
   })
 
   it('persists snooze on the exact task reminder', async () => {
     const todo = await store.create('todo')
     const task = todo.type === 'todo' ? todo.tasks[0] : null
-    await store.updateTodoTask(todo.id, task!.id, {
+    await store.updateTodoTask(todo.id, task!.id, null, {
       schedule: {
         mode: 'point',
         startAt: '2026-07-13T12:00:00.000Z',
@@ -215,7 +268,7 @@ describe('NoteStore', () => {
       new Date('2026-07-13T10:10:00.000Z')
     )
 
-    expect(updated?.tasks[0].schedule?.reminders[0]).toMatchObject({
+    expect(updated.status === 'ok' && updated.value.tasks[0].schedule?.reminders[0]).toMatchObject({
       id: 'at-time',
       remindedAt: null,
       snoozedUntil: '2026-07-13T10:10:00.000Z'
@@ -227,8 +280,8 @@ describe('NoteStore', () => {
     const second = await store.create('note')
 
     await Promise.all([
-      store.update(first.id, { title: 'First changed' }),
-      store.update(second.id, { title: 'Second changed' })
+      store.update(first.id, first.revision, { title: 'First changed' }),
+      store.update(second.id, second.revision, { title: 'Second changed' })
     ])
 
     const items = await store.list()

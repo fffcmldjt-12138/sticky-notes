@@ -10,6 +10,8 @@ export const ipcChannels = {
   todoSubtaskAdd: 'todo-subtask:add',
   todoSubtaskUpdate: 'todo-subtask:update',
   todoSubtaskDelete: 'todo-subtask:delete',
+  undoLatest: 'undo:latest',
+  undoExecute: 'undo:execute',
   configGet: 'config:get',
   configUpdate: 'config:update',
   assetSelect: 'asset:select',

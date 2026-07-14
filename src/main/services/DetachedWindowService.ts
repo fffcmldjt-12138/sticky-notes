@@ -1,4 +1,5 @@
 import type {
+  MutationResult,
   StickyItem,
   StickyItemPatch,
   WindowBounds
@@ -19,7 +20,11 @@ export interface WindowDropPoint {
 }
 
 interface DetachedWindowStore {
-  update(id: string, patch: StickyItemPatch): Promise<StickyItem | null>
+  update(
+    id: string,
+    expectedRevision: number | null,
+    patch: StickyItemPatch
+  ): Promise<MutationResult<StickyItem>>
 }
 
 interface DetachedWindowFactory {
@@ -112,11 +117,11 @@ export class DetachedWindowService {
           workAreas
         )
     this.openWindow(item, bounds)
-    const updated = await this.store.update(item.id, {
+    const updated = await this.store.update(item.id, null, {
       detached: true,
       windowBounds: bounds
     })
-    if (updated) this.onChanged(updated)
+    if (updated.status === 'ok') this.onChanged(updated.value)
   }
 
   async attach(itemId: string): Promise<void> {
@@ -125,8 +130,8 @@ export class DetachedWindowService {
       this.windows.delete(itemId)
       window.close()
     }
-    const updated = await this.store.update(itemId, { detached: false })
-    if (updated) this.onChanged(updated)
+    const updated = await this.store.update(itemId, null, { detached: false })
+    if (updated.status === 'ok') this.onChanged(updated.value)
   }
 
   async restore(items: StickyItem[]): Promise<void> {
@@ -175,9 +180,9 @@ export class DetachedWindowService {
         setTimeout(() => {
           this.boundsTimers.delete(itemId)
           void this.store
-            .update(itemId, { windowBounds: window.getBounds() })
-            .then((item) => {
-              if (item) this.onChanged(item)
+            .update(itemId, null, { windowBounds: window.getBounds() })
+            .then((result) => {
+              if (result.status === 'ok') this.onChanged(result.value)
             })
         }, 250)
       )
@@ -191,12 +196,12 @@ export class DetachedWindowService {
       this.boundsTimers.delete(itemId)
       if (!this.shuttingDown && !this.nonPersistingWindows.has(window)) {
         void this.store
-          .update(itemId, {
+          .update(itemId, null, {
             detached: false,
             windowBounds: window.getBounds()
           })
-          .then((item) => {
-            if (item) this.onChanged(item)
+          .then((result) => {
+            if (result.status === 'ok') this.onChanged(result.value)
           })
       }
     })

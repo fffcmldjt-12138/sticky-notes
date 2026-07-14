@@ -19,6 +19,8 @@ import { TodoEditor } from '../components/TodoEditor'
 import { TitleDialog } from '../components/TitleDialog'
 import { buildFolderTree } from '../lib/folderTree'
 import type { FolderTreeNode } from '../lib/folderTree'
+import { upsertNewer } from '../lib/entityEvents'
+import { upsertItem } from '../lib/itemList'
 
 function findFolderNode(
   folders: FolderTreeNode[],
@@ -73,19 +75,26 @@ export function DetachedFolder({
   useEffect(() => {
     void load()
     const removeChanged = window.stickyApi.onItemChanged((changed) => {
-      setItems((current) =>
-        current.map((item) => item.id === changed.id ? changed : item)
-      )
+      setItems((current) => upsertItem(current, changed))
     })
     const removeDeleted = window.stickyApi.onItemDeleted((deletedId) => {
       setItems((current) => current.filter((item) => item.id !== deletedId))
       setSelectedItemId((current) => current === deletedId ? null : current)
     })
     const removeReloaded = window.stickyApi.onDataReloaded(() => void load())
+    const removeFolderChanged = window.stickyApi.onFolderChanged?.((changed) => {
+      setFolders((current) => upsertNewer(current, changed))
+    })
+    const removeFolderDeleted = window.stickyApi.onFolderDeleted?.((deletedId) => {
+      setFolders((current) => current.filter((folder) => folder.id !== deletedId))
+      if (deletedId === folderId) setError('文件夹已删除')
+    })
     return () => {
       removeChanged()
       removeDeleted()
       removeReloaded()
+      removeFolderChanged?.()
+      removeFolderDeleted?.()
     }
   }, [load])
 
@@ -95,30 +104,48 @@ export function DetachedFolder({
   )
   const selected = items.find((item) => item.id === selectedItemId) ?? null
 
-  const save = useCallback(async (id: string, patch: StickyItemPatch) => {
-    const updated = await window.stickyApi.notes.update(id, patch)
-    if (updated) {
+  const save = useCallback(async (
+    id: string,
+    expectedRevision: number,
+    patch: StickyItemPatch
+  ) => {
+    const updated = await window.stickyApi.notes.update(
+      id, expectedRevision, patch
+    )
+    if (updated.status === 'ok') {
       setItems((current) =>
-        current.map((item) => item.id === updated.id ? updated : item)
+        current.map((item) =>
+          item.id === updated.value.id ? updated.value : item
+        )
       )
     }
+    return updated
   }, [])
 
   async function updateTask(
     todoId: string,
     taskId: string,
+    expectedRevision: number | null,
     patch: TodoTaskPatch
-  ): Promise<void> {
+  ) {
+    const currentItem = items.find((item) => item.id === todoId)
+    if (!currentItem || currentItem.type !== 'todo') {
+      return { status: 'not-found' as const }
+    }
     const updated = await window.stickyApi.notes.updateTodoTask(
       todoId,
       taskId,
+      expectedRevision,
       patch
     )
-    if (updated) {
+    if (updated.status === 'ok') {
       setItems((current) =>
-        current.map((item) => item.id === updated.id ? updated : item)
+        current.map((item) =>
+          item.id === updated.value.id ? updated.value : item
+        )
       )
     }
+    return updated
   }
 
   async function reorder(
@@ -153,9 +180,9 @@ export function DetachedFolder({
   ): Promise<void> {
     if (action.type === 'edit') setSelectedItemId(item.id)
     if (action.type === 'rename') setPendingRename(item)
-    if (action.type === 'color') await save(item.id, { headerColor: action.color })
-    if (action.type === 'theme') await save(item.id, { bodyTheme: action.theme })
-    if (action.type === 'pin') await save(item.id, { pinned: action.pinned })
+    if (action.type === 'color') await save(item.id, item.revision, { headerColor: action.color })
+    if (action.type === 'theme') await save(item.id, item.revision, { bodyTheme: action.theme })
+    if (action.type === 'pin') await save(item.id, item.revision, { pinned: action.pinned })
     if (action.type === 'add-task' && item.type === 'todo') {
       await window.stickyApi.notes.addTodoTask(item.id)
       await load()
@@ -180,7 +207,7 @@ export function DetachedFolder({
     return (
       <NoteEditor
         item={selected}
-        onSave={(patch) => void save(selected.id, patch)}
+        onSave={(revision, patch) => save(selected.id, revision, patch)}
         onBack={() => setSelectedItemId(null)}
         onDelete={async () => {
           if (!window.confirm(`确定删除“${selected.title}”吗？`)) return
@@ -196,13 +223,10 @@ export function DetachedFolder({
     return (
       <TodoEditor
         item={selected}
-        onSave={(patch) => void save(selected.id, patch)}
-        onAddTask={async () => {
-          await window.stickyApi.notes.addTodoTask(selected.id)
-          await load()
-        }}
-        onUpdateTask={(taskId, patch) =>
-          void updateTask(selected.id, taskId, patch)
+        onSave={(revision, patch) => save(selected.id, revision, patch)}
+        onAddTask={() => window.stickyApi.notes.addTodoTask(selected.id)}
+        onUpdateTask={(taskId, revision, patch) =>
+          updateTask(selected.id, taskId, revision, patch)
         }
         onDeleteTask={async (taskId) => {
           await window.stickyApi.notes.deleteTodoTask(selected.id, taskId)
@@ -216,14 +240,16 @@ export function DetachedFolder({
           await window.stickyApi.notes.addTodoSubtask(selected.id, taskId)
           await load()
         }}
-        onUpdateSubtask={async (taskId, subtaskId, patch) => {
-          await window.stickyApi.notes.updateTodoSubtask(
+        onUpdateSubtask={async (taskId, subtaskId, revision, patch) => {
+          const result = await window.stickyApi.notes.updateTodoSubtask(
             selected.id,
             taskId,
             subtaskId,
+            revision,
             patch
           )
           await load()
+          return result
         }}
         onDeleteSubtask={async (taskId, subtaskId) => {
           await window.stickyApi.notes.deleteTodoSubtask(
@@ -303,7 +329,7 @@ export function DetachedFolder({
             })
           }
           onToggle={async (folder) => {
-            await window.stickyApi.folders.update(folder.id, {
+            await window.stickyApi.folders.update(folder.id, folder.revision, {
               collapsed: !folder.collapsed
             })
             await load()
@@ -377,7 +403,7 @@ export function DetachedFolder({
           type={pendingRename.type}
           initialTitle={pendingRename.title}
           onConfirm={(title) => {
-            void save(pendingRename.id, { title })
+            void save(pendingRename.id, pendingRename.revision, { title })
             setPendingRename(null)
           }}
           onCancel={() => setPendingRename(null)}
@@ -387,9 +413,13 @@ export function DetachedFolder({
         <FolderDialog
           initialTitle={pendingFolderRename.title}
           onConfirm={async (title) => {
-            await window.stickyApi.folders.update(pendingFolderRename.id, {
+            await window.stickyApi.folders.update(
+              pendingFolderRename.id,
+              pendingFolderRename.revision,
+              {
               title
-            })
+              }
+            )
             setPendingFolderRename(null)
             await load()
           }}

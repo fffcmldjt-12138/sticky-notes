@@ -8,13 +8,18 @@ import type {
 } from '../../shared/models'
 import { ipcChannels } from '../../shared/ipcChannels'
 import type { NoteStore } from '../services/NoteStore'
+import type { UndoService } from '../services/UndoService'
 
 interface NoteIpcEvents {
   changed(item: StickyItem): void
   deleted(itemId: string): void
 }
 
-export function registerNoteIpc(store: NoteStore, events: NoteIpcEvents): void {
+export function registerNoteIpc(
+  store: NoteStore,
+  events: NoteIpcEvents,
+  undo?: UndoService
+): void {
   ipcMain.handle(ipcChannels.notesList, () => store.list())
   ipcMain.handle(
     ipcChannels.notesCreate,
@@ -31,15 +36,56 @@ export function registerNoteIpc(store: NoteStore, events: NoteIpcEvents): void {
   )
   ipcMain.handle(
     ipcChannels.notesUpdate,
-    async (_event, id: string, patch: StickyItemPatch) => {
-      const item = await store.update(id, patch)
-      if (item) events.changed(item)
-      return item
+    async (_event, id: string, expectedRevision: number, patch: StickyItemPatch) => {
+      const before = undo
+        ? (await store.list()).find((item) => item.id === id)
+        : undefined
+      const result = await store.update(id, expectedRevision, patch)
+      if (result.status === 'ok') {
+        events.changed(result.value)
+        if (before && Object.hasOwn(patch, 'pinned') && before.pinned !== patch.pinned) {
+          const undoRevision = result.value.revision
+          undo?.push({
+            label: patch.pinned ? '置顶便签' : '取消置顶',
+            execute: async () => {
+              const inverse = await store.update(id, undoRevision, {
+                pinned: before.pinned
+              })
+              if (inverse.status !== 'ok') return 'conflict'
+              events.changed(inverse.value)
+              return 'ok'
+            }
+          })
+        }
+      }
+      return result
     }
   )
   ipcMain.handle(ipcChannels.notesDelete, async (_event, id: string) => {
+    const before = undo
+      ? (await store.list()).find((item) => item.id === id)
+      : undefined
     const deleted = await store.delete(id)
-    if (deleted) events.deleted(id)
+    if (deleted) {
+      events.deleted(id)
+      const deletedRevision = before ? before.revision + 1 : null
+      if (before && deletedRevision !== null) {
+        undo?.push({
+          label: '删除便签',
+          execute: async () => {
+            const current = (await store.listDeleted()).items.find(
+              (item) => item.id === id
+            )
+            if (!current || current.revision !== deletedRevision) return 'conflict'
+            if (!await store.restoreItem(id)) return 'conflict'
+            const restored = (await store.list()).find((item) => item.id === id)
+            if (!restored) return 'conflict'
+            events.changed(restored)
+            return 'ok'
+          }
+        })
+      }
+    }
     return deleted
   })
   ipcMain.handle(
@@ -53,26 +99,63 @@ export function registerNoteIpc(store: NoteStore, events: NoteIpcEvents): void {
   )
   ipcMain.handle(
     ipcChannels.todoTaskUpdate,
-    async (_event, todoId: string, taskId: string, patch: TodoTaskPatch) => {
-      const item = await store.updateTodoTask(todoId, taskId, patch)
-      if (item) events.changed(item)
-      return item
+    async (
+      _event,
+      todoId: string,
+      taskId: string,
+      expectedRevision: number | null,
+      patch: TodoTaskPatch
+    ) => {
+      const before = undo
+        ? (await store.list()).find((item) => item.id === todoId)
+        : undefined
+      const result = await store.updateTodoTask(
+        todoId, taskId, expectedRevision, patch
+      )
+      if (result.status === 'ok') {
+        events.changed(result.value)
+        const previousTask = before?.type === 'todo'
+          ? before.tasks.find((task) => task.id === taskId)
+          : undefined
+        if (
+          previousTask &&
+          Object.hasOwn(patch, 'completed') &&
+          previousTask.completed !== patch.completed
+        ) {
+          const undoRevision = result.value.revision
+          undo?.push({
+            label: patch.completed ? '完成待办' : '重新打开待办',
+            execute: async () => {
+              const inverse = await store.updateTodoTask(
+                todoId,
+                taskId,
+                undoRevision,
+                { completed: previousTask.completed }
+              )
+              if (inverse.status !== 'ok') return 'conflict'
+              events.changed(inverse.value)
+              return 'ok'
+            }
+          })
+        }
+      }
+      return result
     }
   )
   ipcMain.handle(
     ipcChannels.todoTaskDelete,
     async (_event, todoId: string, taskId: string) => {
-      const item = await store.deleteTodoTask(todoId, taskId)
-      if (item) events.changed(item)
-      return item
+      const result = await store.deleteTodoTask(todoId, taskId)
+      if (result.status === 'ok') events.changed(result.value)
+      return result
     }
   )
   ipcMain.handle(
     ipcChannels.todoTaskReorder,
     async (_event, todoId: string, taskIds: string[]) => {
-      const item = await store.reorderTodoTasks(todoId, taskIds)
-      if (item) events.changed(item)
-      return item
+      const result = await store.reorderTodoTasks(todoId, taskIds)
+      if (result.status === 'ok') events.changed(result.value)
+      return result
     }
   )
   ipcMain.handle(
@@ -96,16 +179,18 @@ export function registerNoteIpc(store: NoteStore, events: NoteIpcEvents): void {
       todoId: string,
       taskId: string,
       subtaskId: string,
+      expectedRevision: number | null,
       patch: TodoSubtaskPatch
     ) => {
-      const item = await store.updateTodoSubtask(
+      const result = await store.updateTodoSubtask(
         todoId,
         taskId,
         subtaskId,
+        expectedRevision,
         patch
       )
-      if (item) events.changed(item)
-      return item
+      if (result.status === 'ok') events.changed(result.value)
+      return result
     }
   )
   ipcMain.handle(
@@ -116,9 +201,9 @@ export function registerNoteIpc(store: NoteStore, events: NoteIpcEvents): void {
       taskId: string,
       subtaskId: string
     ) => {
-      const item = await store.deleteTodoSubtask(todoId, taskId, subtaskId)
-      if (item) events.changed(item)
-      return item
+      const result = await store.deleteTodoSubtask(todoId, taskId, subtaskId)
+      if (result.status === 'ok') events.changed(result.value)
+      return result
     }
   )
 }

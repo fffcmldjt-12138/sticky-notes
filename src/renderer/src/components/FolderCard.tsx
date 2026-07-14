@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { useDraggable, useDroppable } from '@dnd-kit/core'
 import { CSS } from '@dnd-kit/utilities'
 import type { StickyItem } from '../../../shared/models'
@@ -6,13 +7,14 @@ import { draggableId } from '../lib/treeDrag'
 import { TreeDragHandle } from './TreeDragHandle'
 import { TreeDropZone } from './TreeDropZone'
 
-export function FolderCard({
+function FolderCardView({
   node,
   onOpenItem,
   onItemContextMenu,
   onToggle,
   onContextMenu,
-  onCreate
+  onCreate,
+  onRender
 }: {
   node: FolderTreeNode
   onOpenItem(item: StickyItem): void
@@ -23,6 +25,7 @@ export function FolderCard({
   onToggle(node: FolderTreeNode): void
   onContextMenu(node: FolderTreeNode, event: React.MouseEvent<HTMLElement>): void
   onCreate(node: FolderTreeNode): void
+  onRender?(id: string, actualDuration: number): void
 }): React.JSX.Element {
   const dragNode = { kind: 'folder' as const, id: node.id }
   const {
@@ -128,6 +131,7 @@ export function FolderCard({
                   onToggle={onToggle}
                   onContextMenu={onContextMenu}
                   onCreate={onCreate}
+                  onRender={onRender}
                 />
               )}
             </div>
@@ -143,6 +147,24 @@ export function FolderCard({
       )}
     </section>
   )
+}
+
+export const FolderCard = memo(
+  FolderCardView,
+  (previous, next) => folderRenderKey(previous.node) === folderRenderKey(next.node)
+)
+
+function folderRenderKey(node: FolderTreeNode): string {
+  return [
+    node.id,
+    node.revision,
+    node.collapsed,
+    ...node.entries.map((entry) =>
+      entry.kind === 'item'
+        ? `item:${entry.item.id}:${entry.item.revision}`
+        : `folder:${folderRenderKey(entry.folder)}`
+    )
+  ].join('|')
 }
 
 function FolderItemTitle({

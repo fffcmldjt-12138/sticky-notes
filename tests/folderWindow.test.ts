@@ -37,7 +37,10 @@ function fakeWindow(): FolderWindowHandle & {
 function createService(window = fakeWindow()) {
   const store = {
     updateFolder: vi.fn().mockImplementation(
-      async (_id: string, patch: Partial<FolderItem>) => ({ ...folder, ...patch })
+      async (_id: string, _revision: null, patch: Partial<FolderItem>) => ({
+        status: 'ok',
+        value: { ...folder, ...patch }
+      })
     )
   }
   const factory = { create: vi.fn().mockReturnValue(window) }
@@ -62,7 +65,7 @@ describe('FolderWindowService', () => {
 
     expect(factory.create).toHaveBeenCalledTimes(1)
     expect(window.focus).toHaveBeenCalledOnce()
-    expect(store.updateFolder).toHaveBeenCalledWith(folder.id, {
+    expect(store.updateFolder).toHaveBeenCalledWith(folder.id, null, {
       detached: true,
       windowBounds: expect.any(Object)
     })
@@ -77,7 +80,7 @@ describe('FolderWindowService', () => {
     window.emit('move')
     await vi.advanceTimersByTimeAsync(250)
 
-    expect(store.updateFolder).toHaveBeenCalledWith(folder.id, {
+    expect(store.updateFolder).toHaveBeenCalledWith(folder.id, null, {
       windowBounds: window.getBounds()
     })
   })
@@ -90,7 +93,7 @@ describe('FolderWindowService', () => {
     window.emit('close')
     await Promise.resolve()
 
-    expect(store.updateFolder).toHaveBeenCalledWith(folder.id, {
+    expect(store.updateFolder).toHaveBeenCalledWith(folder.id, null, {
       detached: false,
       windowBounds: window.getBounds()
     })
@@ -143,7 +146,7 @@ describe('FolderWindowService', () => {
       expect.objectContaining({ id: folder.id }),
       { x: 860, y: 480, width: 380, height: 520 }
     )
-    expect(store.updateFolder).toHaveBeenCalledWith(folder.id, {
+    expect(store.updateFolder).toHaveBeenCalledWith(folder.id, null, {
       detached: true,
       windowBounds: { x: 860, y: 480, width: 380, height: 520 }
     })
@@ -169,7 +172,9 @@ describe('FolderWindowService', () => {
     vi.useFakeTimers()
     const oldWindow = fakeWindow()
     const newWindow = fakeWindow()
-    const store = { updateFolder: vi.fn().mockResolvedValue(folder) }
+    const store = {
+      updateFolder: vi.fn().mockResolvedValue({ status: 'ok', value: folder })
+    }
     const factory = {
       create: vi.fn()
         .mockReturnValueOnce(oldWindow)

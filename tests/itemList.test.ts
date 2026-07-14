@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { NoteItem } from '../src/shared/models'
 import { upsertItem } from '../src/renderer/src/lib/itemList'
+import { acceptNewer } from '../src/renderer/src/lib/entityEvents'
 
 const note: NoteItem = {
   revision: 1,
@@ -31,8 +32,16 @@ describe('upsertItem', () => {
   })
 
   it('replaces an existing item without changing its list position', () => {
-    const updated = { ...note, title: 'Edited note' }
+    const updated = { ...note, title: 'Edited note', revision: 2 }
 
     expect(upsertItem([note], updated)).toEqual([updated])
+  })
+
+  it('ignores an older cross-window entity snapshot', () => {
+    const current = { ...note, title: 'Current', revision: 3 }
+    const stale = { ...note, title: 'Stale', revision: 2 }
+
+    expect(acceptNewer(current, stale)).toBe(current)
+    expect(upsertItem([current], stale)).toEqual([current])
   })
 })

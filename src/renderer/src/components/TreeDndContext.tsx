@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -56,31 +56,31 @@ export function TreeDndContext({
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor)
   )
-  const itemById = useMemo(
-    () => new Map(items.map((item) => [item.id, item])),
-    [items]
-  )
-  const folderById = useMemo(
-    () => new Map(folders.map((folder) => [folder.id, folder])),
-    [folders]
-  )
+  const propsRef = useRef({
+    items, folders, onReorder, onDetachItem, onDetachFolder,
+    onDragStart, onDragStateChange
+  })
+  propsRef.current = {
+    items, folders, onReorder, onDetachItem, onDetachFolder,
+    onDragStart, onDragStateChange
+  }
 
-  function handleStart(event: DragStartEvent): void {
+  const handleStart = useCallback((event: DragStartEvent): void => {
     const data = event.active.data.current as ActiveTreeDrag | undefined
     if (!data) return
     setActive(data)
     setOutside(false)
     window.stickyApi?.window.startDragPreview?.(toDragPreviewPayload(data))
-    onDragStart?.()
-    onDragStateChange?.(true)
-  }
+    propsRef.current.onDragStart?.()
+    propsRef.current.onDragStateChange?.(true)
+  }, [])
 
-  function handleEnd(event: DragEndEvent): void {
+  const handleEnd = useCallback((event: DragEndEvent): void => {
     const data = event.active.data.current as ActiveTreeDrag | undefined
     setActive(null)
     setOutside(false)
     window.stickyApi?.window.stopDragPreview?.()
-    onDragStateChange?.(false)
+    propsRef.current.onDragStateChange?.(false)
     if (!data) return
 
     const activator = event.activatorEvent
@@ -106,36 +106,45 @@ export function TreeDndContext({
 
     if (outcome === 'detach') {
       if (data.node.kind === 'item') {
-        const item = itemById.get(data.node.id)
-        if (item) onDetachItem(item, { atCursor: true })
+        const item = propsRef.current.items.find((entry) => entry.id === data.node.id)
+        if (item) propsRef.current.onDetachItem(item, { atCursor: true })
       } else {
-        const folder = folderById.get(data.node.id)
-        if (folder) onDetachFolder(folder, { atCursor: true })
+        const folder = propsRef.current.folders.find(
+          (entry) => entry.id === data.node.id
+        )
+        if (folder) propsRef.current.onDetachFolder(folder, { atCursor: true })
       }
       return
     }
 
     if (outcome === 'drop' && drop) {
       const siblings = siblingReferences(
-        items,
-        folders,
+        propsRef.current.items,
+        propsRef.current.folders,
         drop.parentFolderId
       )
       const resolved = resolveTreeDrop(data.node, drop, siblings)
       if (resolved) {
-        onReorder(resolved.parentFolderId, resolved.orderedNodes)
+        propsRef.current.onReorder(resolved.parentFolderId, resolved.orderedNodes)
       }
     }
-  }
+  }, [])
 
-  function handleMove(event: DragMoveEvent): void {
+  const handleMove = useCallback((event: DragMoveEvent): void => {
     const start = pointerStart(event.activatorEvent)
     if (!start) return
     setOutside(pointOutsideViewport(
       { x: start.x + event.delta.x, y: start.y + event.delta.y },
       { width: window.innerWidth, height: window.innerHeight }
     ))
-  }
+  }, [])
+
+  const handleCancel = useCallback(() => {
+    setActive(null)
+    setOutside(false)
+    window.stickyApi?.window.stopDragPreview?.()
+    propsRef.current.onDragStateChange?.(false)
+  }, [])
 
   const visual = treeDragVisualState(Boolean(active), outside)
 
@@ -145,12 +154,7 @@ export function TreeDndContext({
       collisionDetection={closestCenter}
       onDragStart={handleStart}
       onDragMove={handleMove}
-      onDragCancel={() => {
-        setActive(null)
-        setOutside(false)
-        window.stickyApi?.window.stopDragPreview?.()
-        onDragStateChange?.(false)
-      }}
+      onDragCancel={handleCancel}
       onDragEnd={handleEnd}
     >
       <div className={visual.className}>{children}</div>

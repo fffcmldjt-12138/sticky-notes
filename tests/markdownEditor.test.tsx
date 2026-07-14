@@ -28,6 +28,24 @@ describe('MarkdownEditor', () => {
     ).toBe(false)
   })
 
+  it('forwards composition boundaries from the editor root', async () => {
+    const onCompositionStart = vi.fn()
+    const onCompositionEnd = vi.fn()
+    render(
+      <MarkdownEditor
+        value=""
+        onChange={vi.fn()}
+        onCompositionStart={onCompositionStart}
+        onCompositionEnd={onCompositionEnd}
+      />
+    )
+    const textbox = await screen.findByRole('textbox')
+    fireEvent.compositionStart(textbox)
+    fireEvent.compositionEnd(textbox)
+    expect(onCompositionStart).toHaveBeenCalledOnce()
+    expect(onCompositionEnd).toHaveBeenCalledOnce()
+  })
+
   it('keeps a formatting toolbar visible and renders Markdown immediately', async () => {
     render(<MarkdownEditor value="## Heading" onChange={vi.fn()} />)
 
