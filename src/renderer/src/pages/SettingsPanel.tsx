@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { AppConfig } from '../../../shared/models'
 import { RecycleBinPanel } from './RecycleBinPanel'
+import { DataManagementPanel } from './DataManagementPanel'
 
 export function SettingsPanel({
   config,
@@ -13,15 +14,18 @@ export function SettingsPanel({
   onBack(): void
   onDataChanged(): void
 }): React.JSX.Element {
-  const [recycleOpen, setRecycleOpen] = useState(false)
+  const [subpage, setSubpage] = useState<'recycle' | 'data' | null>(null)
 
-  if (recycleOpen) {
+  if (subpage === 'recycle') {
     return (
       <RecycleBinPanel
-        onBack={() => setRecycleOpen(false)}
+        onBack={() => setSubpage(null)}
         onChanged={onDataChanged}
       />
     )
+  }
+  if (subpage === 'data') {
+    return <DataManagementPanel onBack={() => setSubpage(null)} />
   }
 
   return (
@@ -48,8 +52,12 @@ export function SettingsPanel({
             onChange={(event) => onChange({ alwaysOnTop: event.target.checked })}
           />
         </label>
-        <button className="settings-row" onClick={() => setRecycleOpen(true)}>
+        <button className="settings-row" onClick={() => setSubpage('recycle')}>
           <span><strong>回收站</strong><small>恢复最近 7 天删除的内容</small></span>
+          <span>›</span>
+        </button>
+        <button className="settings-row" onClick={() => setSubpage('data')}>
+          <span><strong>数据与备份</strong><small>备份、恢复、导入和导出</small></span>
           <span>›</span>
         </button>
         <button

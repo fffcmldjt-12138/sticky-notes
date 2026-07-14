@@ -42,6 +42,24 @@ export interface DetachWindowOptions {
   atCursor?: boolean
 }
 
+export interface BackupSummary {
+  id: string
+  kind: 'change' | 'daily' | 'protected'
+  createdAt: string
+  size: number
+}
+
+export interface ImportSummary {
+  inspectionId: string
+  itemCount: number
+  folderCount: number
+  assetCount: number
+  orphanAssetCount: number
+  expiresAt: string
+}
+
+export type DataReloadReason = 'restore' | 'import'
+
 export interface StickyApi {
   notes: {
     list(): Promise<StickyItem[]>
@@ -106,6 +124,16 @@ export interface StickyApi {
   reminder: {
     respond(action: ReminderWindowAction): Promise<void>
   }
+  data: {
+    openDirectory(): Promise<void>
+    createBackup(): Promise<BackupSummary>
+    listBackups(): Promise<BackupSummary[]>
+    restoreBackup(id: string): Promise<void>
+    exportArchive(): Promise<boolean>
+    inspectImport(): Promise<ImportSummary | null>
+    cancelImport(inspectionId: string): Promise<void>
+    confirmImport(inspectionId: string): Promise<void>
+  }
   window: {
     expand(): void
     scheduleCollapse(): void
@@ -127,4 +155,5 @@ export interface StickyApi {
   onFolderDeleted?(callback: (folderId: string) => void): () => void
   onItemDeleted(callback: (itemId: string) => void): () => void
   onReminderFired?(callback: (payload: ReminderAlertPayload) => void): () => void
+  onDataReloaded(callback: (reason: DataReloadReason) => void): () => void
 }

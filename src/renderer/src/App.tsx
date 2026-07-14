@@ -115,6 +115,10 @@ function PanelApp(): React.JSX.Element {
     void window.stickyApi.config.get().then(setConfig)
   }, [loadFolders, loadItems])
 
+  useEffect(() => window.stickyApi.onDataReloaded(() => {
+    void Promise.all([loadItems(), loadFolders()])
+  }), [loadFolders, loadItems])
+
   useEffect(() => {
     const removeChanged = window.stickyApi.onItemChanged((changed) => {
       setItems((current) => upsertItem(current, changed))

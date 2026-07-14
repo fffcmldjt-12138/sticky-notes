@@ -21,9 +21,11 @@ export function DetachedEditor({ itemId }: { itemId: string }): React.JSX.Elemen
     const removeDeleted = window.stickyApi.onItemDeleted((deletedId) => {
       if (deletedId === itemId) setError('便签已删除')
     })
+    const removeReloaded = window.stickyApi.onDataReloaded(() => void load())
     return () => {
       removeChanged()
       removeDeleted()
+      removeReloaded()
     }
   }, [itemId, load])
 

@@ -126,9 +126,11 @@ export class AssetService {
     await mkdir(this.assetDirectory, { recursive: true })
     await mkdir(this.trashDirectory, { recursive: true })
     const referenced = extractAssetFileNames(markdownValues)
+    const liveFiles = new Set(await readdir(this.assetDirectory))
     const trashFiles = await readdir(this.trashDirectory)
     let restored = 0
     for (const fileName of referenced) {
+      if (liveFiles.has(fileName)) continue
       const trashed = trashFiles
         .filter((candidate) => candidate.endsWith(`--${fileName}`))
         .sort()
@@ -138,9 +140,16 @@ export class AssetService {
         join(this.trashDirectory, trashed),
         join(this.assetDirectory, fileName)
       )
+      liveFiles.add(fileName)
       restored += 1
     }
     return restored
+  }
+
+  async findMissingReferenced(notes: NotesFile): Promise<string[]> {
+    const referenced = this.collectReferencedFileNames(notes)
+    const live = new Set((await this.listLiveAssets()).map((asset) => asset.fileName))
+    return [...referenced].filter((fileName) => !live.has(fileName)).sort()
   }
 
   async purgeTrashBefore(cutoff: Date): Promise<number> {

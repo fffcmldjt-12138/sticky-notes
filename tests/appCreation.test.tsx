@@ -87,7 +87,8 @@ describe('App creation flow', () => {
       },
       onOpenEditor: vi.fn().mockReturnValue(() => undefined),
       onItemChanged: vi.fn().mockReturnValue(() => undefined),
-      onItemDeleted: vi.fn().mockReturnValue(() => undefined)
+      onItemDeleted: vi.fn().mockReturnValue(() => undefined),
+      onDataReloaded: vi.fn().mockReturnValue(() => undefined)
     }
     Object.defineProperty(window, 'stickyApi', {
       configurable: true,

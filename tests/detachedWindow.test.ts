@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { NoteItem, WindowBounds } from '../src/shared/models'
 import {
   DetachedWindowService,
@@ -43,6 +43,7 @@ function fakeWindow(): DetachedWindowHandle & {
 }
 
 describe('DetachedWindowService', () => {
+  afterEach(() => vi.useRealTimers())
   it('creates one window and focuses it on repeated detach', async () => {
     const window = fakeWindow()
     const factory = { create: vi.fn().mockReturnValue(window) }
@@ -145,5 +146,34 @@ describe('DetachedWindowService', () => {
       'note_1',
       expect.objectContaining({ detached: false })
     )
+  })
+
+  it('cancels stale bounds writes and reconciles without persisting close state', async () => {
+    vi.useFakeTimers()
+    const oldWindow = fakeWindow()
+    const newWindow = fakeWindow()
+    const store = { update: vi.fn().mockResolvedValue(item) }
+    const factory = {
+      create: vi.fn()
+        .mockReturnValueOnce(oldWindow)
+        .mockReturnValueOnce(newWindow)
+    }
+    const service = new DetachedWindowService(
+      store,
+      factory,
+      () => [{ x: 0, y: 0, width: 1920, height: 1040 }]
+    )
+    await service.detach(item)
+    store.update.mockClear()
+    oldWindow.emit('move')
+
+    service.freezeForDataReplacement()
+    oldWindow.emit('close')
+    await vi.advanceTimersByTimeAsync(300)
+    await service.reconcile([{ ...item, detached: true }])
+
+    expect(store.update).not.toHaveBeenCalled()
+    expect(oldWindow.close).toHaveBeenCalledOnce()
+    expect(factory.create).toHaveBeenCalledTimes(2)
   })
 })

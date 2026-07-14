@@ -150,6 +150,13 @@ export class ImportTransactionService {
     }
   }
 
+  async cancelInspection(inspectionId: string): Promise<void> {
+    const lease = this.inspections.get(inspectionId)
+    if (!lease) throw new Error('Unknown or already used inspection ID')
+    this.inspections.delete(inspectionId)
+    await rm(lease.prepared.stagingPath, { recursive: true, force: true })
+  }
+
   async recoverInterruptedImport(): Promise<void> {
     let journal: ImportJournal
     try {

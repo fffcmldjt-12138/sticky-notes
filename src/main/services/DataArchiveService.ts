@@ -241,6 +241,10 @@ export class DataArchiveService {
     return this.transaction.confirmImport(inspectionId)
   }
 
+  cancelInspection(inspectionId: string): Promise<void> {
+    return this.transaction.cancelInspection(inspectionId)
+  }
+
   recoverInterruptedImport(): Promise<void> {
     return this.transaction.recoverInterruptedImport()
   }

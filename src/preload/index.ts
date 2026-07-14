@@ -91,6 +91,19 @@ const api: StickyApi = {
     respond: (action) =>
       ipcRenderer.invoke(ipcChannels.reminderWindowAction, action)
   },
+  data: {
+    openDirectory: () => ipcRenderer.invoke(ipcChannels.dataOpenDirectory),
+    createBackup: () => ipcRenderer.invoke(ipcChannels.dataCreateBackup),
+    listBackups: () => ipcRenderer.invoke(ipcChannels.dataListBackups),
+    restoreBackup: (id) =>
+      ipcRenderer.invoke(ipcChannels.dataRestoreBackup, id),
+    exportArchive: () => ipcRenderer.invoke(ipcChannels.dataExportArchive),
+    inspectImport: () => ipcRenderer.invoke(ipcChannels.dataInspectImport),
+    cancelImport: (inspectionId) =>
+      ipcRenderer.invoke(ipcChannels.dataCancelImport, inspectionId),
+    confirmImport: (inspectionId) =>
+      ipcRenderer.invoke(ipcChannels.dataConfirmImport, inspectionId)
+  },
   window: {
     expand: () => ipcRenderer.send(ipcChannels.windowExpand),
     scheduleCollapse: () => ipcRenderer.send(ipcChannels.windowScheduleCollapse),
@@ -157,6 +170,14 @@ const api: StickyApi = {
     ): void => callback(payload)
     ipcRenderer.on(ipcChannels.reminderFired, listener)
     return () => ipcRenderer.removeListener(ipcChannels.reminderFired, listener)
+  },
+  onDataReloaded: (callback) => {
+    const listener = (
+      _event: Electron.IpcRendererEvent,
+      reason: Parameters<typeof callback>[0]
+    ): void => callback(reason)
+    ipcRenderer.on(ipcChannels.dataReloaded, listener)
+    return () => ipcRenderer.removeListener(ipcChannels.dataReloaded, listener)
   }
 }
 

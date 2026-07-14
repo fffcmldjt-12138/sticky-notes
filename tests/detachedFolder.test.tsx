@@ -78,7 +78,8 @@ beforeEach(() => {
         detachFolder: vi.fn()
       },
       onItemChanged: vi.fn(() => vi.fn()),
-      onItemDeleted: vi.fn(() => vi.fn())
+      onItemDeleted: vi.fn(() => vi.fn()),
+      onDataReloaded: vi.fn(() => vi.fn())
     }
   })
 })

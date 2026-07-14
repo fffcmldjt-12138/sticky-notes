@@ -32,6 +32,7 @@ const DEFAULT_HEIGHT = 520
 export class FolderWindowService {
   private readonly windows = new Map<string, FolderWindowHandle>()
   private readonly boundsTimers = new Map<string, NodeJS.Timeout>()
+  private readonly nonPersistingWindows = new WeakSet<FolderWindowHandle>()
   private shuttingDown = false
 
   constructor(
@@ -67,9 +68,7 @@ export class FolderWindowService {
           },
           workAreas
         )
-    const window = this.factory.create(folder, bounds)
-    this.windows.set(folder.id, window)
-    this.bindWindow(folder.id, window)
+    this.openWindow(folder, bounds)
     const updated = await this.store.updateFolder(folder.id, {
       detached: true,
       windowBounds: bounds
@@ -89,8 +88,23 @@ export class FolderWindowService {
 
   async restore(folders: FolderItem[]): Promise<void> {
     for (const folder of folders) {
-      if (folder.detached) await this.detach(folder)
+      if (folder.detached) this.openSnapshotWindow(folder)
     }
+  }
+
+  freezeForDataReplacement(): void {
+    for (const timer of this.boundsTimers.values()) clearTimeout(timer)
+    this.boundsTimers.clear()
+    for (const [folderId, window] of this.windows) {
+      this.windows.delete(folderId)
+      this.nonPersistingWindows.add(window)
+      window.close()
+    }
+  }
+
+  async reconcile(folders: FolderItem[]): Promise<void> {
+    this.freezeForDataReplacement()
+    await this.restore(folders)
   }
 
   closeForDelete(folderId: string): void {
@@ -129,7 +143,7 @@ export class FolderWindowService {
       const timer = this.boundsTimers.get(folderId)
       if (timer) clearTimeout(timer)
       this.boundsTimers.delete(folderId)
-      if (!this.shuttingDown) {
+      if (!this.shuttingDown && !this.nonPersistingWindows.has(window)) {
         void this.store
           .updateFolder(folderId, {
             detached: false,
@@ -140,5 +154,27 @@ export class FolderWindowService {
           })
       }
     })
+  }
+
+  private openSnapshotWindow(folder: FolderItem): void {
+    if (this.windows.has(folder.id)) return
+    const workAreas = this.getWorkAreas()
+    const first = workAreas[0] ?? { x: 0, y: 0, width: 1920, height: 1080 }
+    const bounds = ensureVisibleBounds(
+      folder.windowBounds ?? {
+        x: first.x + first.width - DEFAULT_WIDTH - 32,
+        y: first.y + 64,
+        width: DEFAULT_WIDTH,
+        height: DEFAULT_HEIGHT
+      },
+      workAreas
+    )
+    this.openWindow(folder, bounds)
+  }
+
+  private openWindow(folder: FolderItem, bounds: WindowBounds): void {
+    const window = this.factory.create(folder, bounds)
+    this.windows.set(folder.id, window)
+    this.bindWindow(folder.id, window)
   }
 }

@@ -164,4 +164,33 @@ describe('FolderWindowService', () => {
       expect.objectContaining({ id: folder.id, detached: false })
     )
   })
+
+  it('cancels stale bounds writes and reconciles without persisting close state', async () => {
+    vi.useFakeTimers()
+    const oldWindow = fakeWindow()
+    const newWindow = fakeWindow()
+    const store = { updateFolder: vi.fn().mockResolvedValue(folder) }
+    const factory = {
+      create: vi.fn()
+        .mockReturnValueOnce(oldWindow)
+        .mockReturnValueOnce(newWindow)
+    }
+    const service = new FolderWindowService(
+      store,
+      factory,
+      () => [{ x: 0, y: 0, width: 1920, height: 1040 }]
+    )
+    await service.detach(folder)
+    store.updateFolder.mockClear()
+    oldWindow.emit('resize')
+
+    service.freezeForDataReplacement()
+    oldWindow.emit('close')
+    await vi.advanceTimersByTimeAsync(300)
+    await service.reconcile([{ ...folder, detached: true }])
+
+    expect(store.updateFolder).not.toHaveBeenCalled()
+    expect(oldWindow.close).toHaveBeenCalledOnce()
+    expect(factory.create).toHaveBeenCalledTimes(2)
+  })
 })

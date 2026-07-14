@@ -1,5 +1,6 @@
+import { createHash } from 'node:crypto'
 import { mkdir, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 
 export type BackupSource = 'notes' | 'config'
 export type BackupKind = 'change' | 'daily' | 'protected'
@@ -14,6 +15,18 @@ export interface BackupEntry {
 
 export interface ValidBackup {
   entry: BackupEntry
+  value: unknown
+}
+
+export interface BackupSummary {
+  id: string
+  kind: BackupKind
+  createdAt: string
+  size: number
+}
+
+export interface ResolvedNotesBackup {
+  summary: BackupSummary
   value: unknown
 }
 
@@ -92,6 +105,26 @@ export class BackupService {
       )
       await this.removeExpiredProtected(source, current)
       return entry
+    })
+  }
+
+  async createNotesBackup(value: unknown): Promise<BackupSummary> {
+    return this.toSummary(await this.recordProtected('notes', value))
+  }
+
+  listNotesBackups(): Promise<BackupSummary[]> {
+    return this.enqueue(async () => {
+      const candidates = await this.listValidNotesBackups()
+      return candidates.map(({ entry }) => this.toSummary(entry))
+    })
+  }
+
+  resolveValidNotesBackup(id: string): Promise<ResolvedNotesBackup> {
+    return this.enqueue(async () => {
+      const candidates = await this.listValidNotesBackups()
+      const match = candidates.find(({ entry }) => this.backupId(entry) === id)
+      if (!match) throw new Error('Unknown or invalid backup ID')
+      return { summary: this.toSummary(match.entry), value: match.value }
     })
   }
 
@@ -251,6 +284,55 @@ export class BackupService {
     } catch {
       return false
     }
+  }
+
+  private async listValidNotesBackups(): Promise<ValidBackup[]> {
+    const candidates = (
+      await Promise.all(
+        (['change', 'daily', 'protected'] as const).map(async (kind) =>
+          (await this.listParsedFiles(this.kindPath('notes', kind))).map(
+            (file) => ({ ...file, kind })
+          )
+        )
+      )
+    ).flat().sort((left, right) => right.epoch - left.epoch)
+    const valid: ValidBackup[] = []
+    for (const candidate of candidates) {
+      const path = join(this.kindPath('notes', candidate.kind), candidate.name)
+      try {
+        const value = this.validators.notes(JSON.parse(await readFile(path, 'utf8')))
+        const details = await stat(path)
+        if (!details.isFile()) continue
+        valid.push({
+          entry: {
+            path,
+            source: 'notes',
+            kind: candidate.kind,
+            createdAt: new Date(candidate.epoch).toISOString(),
+            size: details.size
+          },
+          value
+        })
+      } catch {
+        // User-visible lists contain only restorable snapshots.
+      }
+    }
+    return valid
+  }
+
+  private toSummary(entry: BackupEntry): BackupSummary {
+    return {
+      id: this.backupId(entry),
+      kind: entry.kind,
+      createdAt: entry.createdAt,
+      size: entry.size
+    }
+  }
+
+  private backupId(entry: BackupEntry): string {
+    return createHash('sha256')
+      .update(`notes\0${entry.kind}\0${basename(entry.path)}`)
+      .digest('base64url')
   }
 
   private async retainDailyWindow(

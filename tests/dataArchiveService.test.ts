@@ -216,4 +216,18 @@ describe('DataArchiveService', () => {
     await expect(service.exportArchive(join(directory, 'invalid-export.zip')))
       .rejects.toThrow(/missing|缺失/i)
   })
+
+  it('cancels an inspected import and rejects later confirmation', async () => {
+    const archivePath = join(directory, 'cancel.zip')
+    await writeStoredZip(archivePath, archiveEntries(emptyNotes(), []))
+    const summary = await service.inspectImport(archivePath)
+
+    await service.cancelInspection(summary.inspectionId)
+
+    await expect(service.confirmImport(summary.inspectionId))
+      .rejects.toThrow(/unknown|used|inspection/i)
+    expect((await readdir(directory)).some((name) =>
+      name.startsWith('data-import-staging-')
+    )).toBe(false)
+  })
 })

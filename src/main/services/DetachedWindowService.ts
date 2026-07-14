@@ -75,6 +75,7 @@ function intersects(a: WindowBounds, b: WindowBounds): boolean {
 export class DetachedWindowService {
   private readonly windows = new Map<string, DetachedWindowHandle>()
   private readonly boundsTimers = new Map<string, NodeJS.Timeout>()
+  private readonly nonPersistingWindows = new WeakSet<DetachedWindowHandle>()
   private shuttingDown = false
 
   constructor(
@@ -110,9 +111,7 @@ export class DetachedWindowService {
           },
           workAreas
         )
-    const window = this.factory.create(item, bounds)
-    this.windows.set(item.id, window)
-    this.bindWindow(item.id, window)
+    this.openWindow(item, bounds)
     const updated = await this.store.update(item.id, {
       detached: true,
       windowBounds: bounds
@@ -132,8 +131,23 @@ export class DetachedWindowService {
 
   async restore(items: StickyItem[]): Promise<void> {
     for (const item of items) {
-      if (item.detached) await this.detach(item)
+      if (item.detached) this.openSnapshotWindow(item)
     }
+  }
+
+  freezeForDataReplacement(): void {
+    for (const timer of this.boundsTimers.values()) clearTimeout(timer)
+    this.boundsTimers.clear()
+    for (const [itemId, window] of this.windows) {
+      this.windows.delete(itemId)
+      this.nonPersistingWindows.add(window)
+      window.close()
+    }
+  }
+
+  async reconcile(items: StickyItem[]): Promise<void> {
+    this.freezeForDataReplacement()
+    await this.restore(items)
   }
 
   closeForDelete(itemId: string): void {
@@ -175,7 +189,7 @@ export class DetachedWindowService {
       const timer = this.boundsTimers.get(itemId)
       if (timer) clearTimeout(timer)
       this.boundsTimers.delete(itemId)
-      if (!this.shuttingDown) {
+      if (!this.shuttingDown && !this.nonPersistingWindows.has(window)) {
         void this.store
           .update(itemId, {
             detached: false,
@@ -186,5 +200,27 @@ export class DetachedWindowService {
           })
       }
     })
+  }
+
+  private openSnapshotWindow(item: StickyItem): void {
+    if (this.windows.has(item.id)) return
+    const workAreas = this.getWorkAreas()
+    const first = workAreas[0] ?? { x: 0, y: 0, width: 1920, height: 1080 }
+    const bounds = ensureVisibleBounds(
+      item.windowBounds ?? {
+        x: first.x + first.width - DEFAULT_WIDTH - 24,
+        y: first.y + 48,
+        width: DEFAULT_WIDTH,
+        height: DEFAULT_HEIGHT
+      },
+      workAreas
+    )
+    this.openWindow(item, bounds)
+  }
+
+  private openWindow(item: StickyItem, bounds: WindowBounds): void {
+    const window = this.factory.create(item, bounds)
+    this.windows.set(item.id, window)
+    this.bindWindow(item.id, window)
   }
 }

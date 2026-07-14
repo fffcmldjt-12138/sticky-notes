@@ -10,6 +10,7 @@ import {
 } from 'electron'
 import { electronApp, is } from '@electron-toolkit/utils'
 import { registerConfigIpc } from './ipc/configIpc'
+import { registerDataIpc } from './ipc/dataIpc'
 import { registerAssetIpc } from './ipc/assetIpc'
 import { registerFolderIpc } from './ipc/folderIpc'
 import { registerNoteIpc } from './ipc/noteIpc'
@@ -21,6 +22,7 @@ import { AutoLaunchService } from './services/AutoLaunchService'
 import { AssetService } from './services/AssetService'
 import { BackupService } from './services/BackupService'
 import { ConfigStore } from './services/ConfigStore'
+import { DataArchiveService } from './services/DataArchiveService'
 import {
   DetachedWindowService,
   type DetachedWindowHandle
@@ -71,6 +73,9 @@ if (!hasLock) {
     const notes = new NoteStore(userData, backups)
     const assets = new AssetService(userData)
     const importTransaction = new ImportTransactionService(userData, notes, assets)
+    const archives = new DataArchiveService(userData, notes, assets, {
+      transaction: importTransaction
+    })
     const config = new ConfigStore(userData, backups)
     const autoLaunch = new AutoLaunchService()
     const windows = new WindowService()
@@ -292,6 +297,16 @@ if (!hasLock) {
     registerReminderIpc(reminderWindows)
     registerWindowIpc(windows, detachedWindows, folderWindows, notes, dragPreview)
     registerConfigIpc(config, autoLaunch, windows, tray)
+    registerDataIpc({
+      userDataPath: userData,
+      backups,
+      archives,
+      notes,
+      assets,
+      detachedWindows,
+      folderWindows,
+      broadcast: (reason) => broadcast(ipcChannels.dataReloaded, reason)
+    })
     reminder.start()
     await detachedWindows.restore(await notes.list())
     await folderWindows.restore(await notes.listFolders())

@@ -81,9 +81,11 @@ export function DetachedFolder({
       setItems((current) => current.filter((item) => item.id !== deletedId))
       setSelectedItemId((current) => current === deletedId ? null : current)
     })
+    const removeReloaded = window.stickyApi.onDataReloaded(() => void load())
     return () => {
       removeChanged()
       removeDeleted()
+      removeReloaded()
     }
   }, [load])
 

@@ -1,4 +1,4 @@
-import { access, mkdtemp, readFile, readdir } from 'node:fs/promises'
+import { access, mkdir, mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
@@ -56,6 +56,19 @@ describe('AssetService', () => {
 
     expect(await service.restoreReferenced([`![image](${asset.url})`])).toBe(1)
     await expect(access(join(directory, 'assets', asset.fileName))).resolves.toBeUndefined()
+  })
+
+  it('does not overwrite a live image with an older trashed copy', async () => {
+    const liveBytes = Buffer.from([0x89, 0x50, 0x4e, 0x47])
+    const asset = await service.importBuffer(liveBytes, 'image/png')
+    await mkdir(join(directory, 'assets-trash'), { recursive: true })
+    await writeFile(
+      join(directory, 'assets-trash', `1000--${asset.fileName}`),
+      Buffer.from('older')
+    )
+
+    expect(await service.restoreReferenced([asset.url])).toBe(0)
+    expect(await readFile(join(directory, 'assets', asset.fileName))).toEqual(liveBytes)
   })
 
   it('returns null instead of throwing for malformed percent encoding', () => {

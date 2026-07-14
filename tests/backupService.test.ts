@@ -425,4 +425,31 @@ describe('BackupService', () => {
       backups.recordProtected('notes', { kind: 'config', theme: 'dark' })
     ).rejects.toThrow('invalid notes')
   })
+
+  it('lists valid notes backups with opaque ids and resolves them by re-enumeration', async () => {
+    await backups.recordChange('notes', { kind: 'notes', value: 1 })
+    await backups.recordProtected('notes', { kind: 'notes', value: 2 })
+
+    const summaries = await backups.listNotesBackups()
+
+    expect(summaries).toHaveLength(2)
+    expect(summaries[0]).toEqual({
+      id: expect.stringMatching(/^[A-Za-z0-9_-]{43}$/),
+      kind: expect.any(String),
+      createdAt: expect.any(String),
+      size: expect.any(Number)
+    })
+    expect(summaries[0]).not.toHaveProperty('path')
+
+    const resolved = await backups.resolveValidNotesBackup(summaries[0].id)
+    expect(resolved.summary).toEqual(summaries[0])
+    expect(resolved.value).toMatchObject({ kind: 'notes' })
+  })
+
+  it('rejects forged and invalid backup ids', async () => {
+    await backups.recordChange('notes', { kind: 'notes', value: 1 })
+
+    await expect(backups.resolveValidNotesBackup('forged-id'))
+      .rejects.toThrow(/backup|备份/i)
+  })
 })

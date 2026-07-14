@@ -101,6 +101,7 @@ function makeApi(): StickyApi {
     onOpenEditor: vi.fn().mockReturnValue(() => undefined),
     onItemChanged: vi.fn().mockReturnValue(() => undefined),
     onItemDeleted: vi.fn().mockReturnValue(() => undefined),
+    onDataReloaded: vi.fn().mockReturnValue(() => undefined),
     onReminderFired: vi.fn((callback) => {
       reminderCallback = callback
       return () => {
