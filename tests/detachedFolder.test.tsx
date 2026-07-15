@@ -28,6 +28,7 @@ const childFolder: FolderItem = {
 
 const note: NoteItem = {
   id: 'note_1',
+  revision: 1,
   type: 'note',
   title: 'Nested note',
   contentMarkdown: 'Text',
@@ -41,6 +42,7 @@ const note: NoteItem = {
   order: 0,
   deletedAt: null,
   siyuanDelivery: null,
+  siyuanDeliveryDisabled: false,
   createdAt: '2026-06-15T00:00:00.000Z',
   updatedAt: '2026-06-15T00:00:00.000Z'
 }
@@ -55,9 +57,10 @@ beforeEach(() => {
       notes: {
         list: vi.fn().mockResolvedValue([note]),
         create: vi.fn().mockResolvedValue({ ...note, id: 'note_new' }),
-        update: vi.fn().mockImplementation(
-          async (_id, patch) => ({ ...note, ...patch })
-        ),
+        update: vi.fn().mockImplementation(async (_id, _revision, patch) => ({
+          status: 'ok',
+          value: { ...note, ...patch, revision: 2 }
+        })),
         delete: vi.fn(),
         addTodoTask: vi.fn(),
         updateTodoTask: vi.fn(),
@@ -157,6 +160,21 @@ describe('DetachedFolder', () => {
     expect(screen.getByRole('menuitem', { name: '编辑' })).toBeInTheDocument()
     expect(screen.queryByRole('menuitem', { name: '发送到思源' }))
       .not.toBeInTheDocument()
+  })
+
+  it('disables SiYuan delivery from a nested note context menu', async () => {
+    render(<DetachedFolder folderId={rootFolder.id} />)
+
+    fireEvent.contextMenu(await screen.findByText('Nested note'))
+    fireEvent.click(screen.getByRole('menuitem', {
+      name: '禁止投送到思源'
+    }))
+
+    expect(window.stickyApi.notes.update).toHaveBeenCalledWith(
+      note.id,
+      note.revision,
+      { siyuanDeliveryDisabled: true }
+    )
   })
 
   it('sends a nested note from beside its title and reports success', async () => {

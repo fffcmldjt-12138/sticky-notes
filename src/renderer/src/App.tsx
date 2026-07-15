@@ -279,6 +279,11 @@ function PanelApp(): React.JSX.Element {
       await save(item.id, item.revision, { pinned: action.pinned })
       await refreshUndo()
     }
+    if (action.type === 'siyuan-delivery-disabled' && item.type === 'note') {
+      await save(item.id, item.revision, {
+        siyuanDeliveryDisabled: action.disabled
+      })
+    }
     if (action.type === 'add-task' && item.type === 'todo') {
       await window.stickyApi.notes.addTodoTask(item.id)
       await loadItems()

@@ -91,14 +91,15 @@ describe('AssetService', () => {
     const second = '11234567-89ab-4cde-8fab-0123456789ab.jpg'
     const third = '21234567-89ab-4cde-8fab-0123456789ab.webp'
     const notes = {
-      version: 6,
+      version: 7,
       folders: [],
       items: [
         {
           ...baseItem('note-1'),
           type: 'note',
           contentMarkdown: `![one](asset://local/${first}) bad asset://local/%E0%A4%A`,
-          siyuanDelivery: null
+          siyuanDelivery: null,
+          siyuanDeliveryDisabled: false
         },
         {
           ...baseItem('todo-1'),

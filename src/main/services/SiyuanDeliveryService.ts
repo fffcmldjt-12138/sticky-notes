@@ -57,11 +57,7 @@ export class SiyuanDeliveryService {
     noteId: string,
     notebookId: string
   ): Promise<SiyuanSendResult> {
-    const snapshot = await this.dependencies.notes.getSnapshot()
-    const item = snapshot.items.find((candidate) => candidate.id === noteId)
-    if (!item || item.type !== 'note' || item.deletedAt) {
-      throw new Error('找不到要发送的笔记')
-    }
+    const item = await this.deliverableNote(noteId)
     if (!item.title.trim() && !item.contentMarkdown.trim()) {
       throw new Error('空白笔记不能发送到思源')
     }
@@ -84,6 +80,7 @@ export class SiyuanDeliveryService {
       const asset = await this.dependencies.assets.readUrl(url)
       let target = uploaded.get(asset.fileName)
       if (!target) {
+        await this.deliverableNote(noteId)
         target = await this.dependencies.client.uploadAsset(
           asset.fileName,
           asset.mimeType,
@@ -95,7 +92,9 @@ export class SiyuanDeliveryService {
     }
 
     const title = sanitizeTitle(item.title) || `无标题便签 ${formatCompactDate(this.now())}`
+    await this.deliverableNote(noteId)
     const path = await this.availablePath(notebookId, title)
+    await this.deliverableNote(noteId)
     const documentId = await this.dependencies.client.createDocument(
       notebookId,
       path,
@@ -113,6 +112,18 @@ export class SiyuanDeliveryService {
     )
     if (recorded.status !== 'ok') throw new Error('笔记发送成功，但本地状态记录失败')
     return { status: 'sent', documentId, item: recorded.value }
+  }
+
+  private async deliverableNote(noteId: string): Promise<NoteItem> {
+    const snapshot = await this.dependencies.notes.getSnapshot()
+    const item = snapshot.items.find((candidate) => candidate.id === noteId)
+    if (!item || item.type !== 'note' || item.deletedAt) {
+      throw new Error('找不到要发送的笔记')
+    }
+    if (item.siyuanDeliveryDisabled) {
+      throw new Error('该笔记已禁止投送到思源')
+    }
+    return item
   }
 
   private now(): Date {

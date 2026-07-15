@@ -10,6 +10,7 @@ interface EntitySaveCoordinatorOptions<P, E extends { revision: number }> {
     patch: P
   ): Promise<MutationResult<E>>
   mergePatches?(current: P, incoming: P): P
+  recoverConflict?(current: E, failedPatch: P): P | null | undefined
 }
 
 export interface EntitySaveCoordinator<P, E extends { revision: number }> {
@@ -31,10 +32,12 @@ export function useEntitySaveCoordinator<
 >({
   remoteEntity,
   save,
-  mergePatches
+  mergePatches,
+  recoverConflict
 }: EntitySaveCoordinatorOptions<P, E>): EntitySaveCoordinator<P, E> {
   const saveRef = useRef(save)
   const mergeRef = useRef(mergePatches)
+  const recoverConflictRef = useRef(recoverConflict)
   const revisionRef = useRef(remoteEntity.revision)
   const pendingRef = useRef<P | null>(null)
   const failedRef = useRef<P | null>(null)
@@ -45,6 +48,7 @@ export function useEntitySaveCoordinator<
 
   saveRef.current = save
   mergeRef.current = mergePatches
+  recoverConflictRef.current = recoverConflict
 
   useEffect(() => {
     if (remoteEntity.revision <= revisionRef.current) return
@@ -70,6 +74,22 @@ export function useEntitySaveCoordinator<
           lastResult = result
           waiters.forEach(({ resolve }) => resolve(result))
           if (result.status !== 'ok') {
+            if (result.status === 'conflict') {
+              const recovered = recoverConflictRef.current?.(result.current, patch)
+              if (recovered !== undefined) {
+                const pending = pendingRef.current
+                revisionRef.current = result.current.revision
+                setRemoteRevision(result.current.revision)
+                failedRef.current = null
+                if (recovered !== null) {
+                  pendingRef.current = pending
+                    ? mergeRef.current?.(recovered, pending) ?? Object.assign({}, recovered, pending)
+                    : recovered
+                }
+                setState('idle')
+                continue
+              }
+            }
             failedRef.current = patch
             setState(result.status === 'conflict' ? 'conflict' : 'failed')
             break

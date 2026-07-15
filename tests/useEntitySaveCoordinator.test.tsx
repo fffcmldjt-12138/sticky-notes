@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, renderHook } from '@testing-library/react'
+import { act, renderHook, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { useEntitySaveCoordinator } from '../src/renderer/src/hooks/useEntitySaveCoordinator'
 
@@ -73,6 +73,33 @@ describe('useEntitySaveCoordinator', () => {
 
     expect(save).toHaveBeenNthCalledWith(2, 2, {
       operations: ['task', 'subtask']
+    })
+  })
+
+  it('retries only the valid remainder of a conflicted batch', async () => {
+    const save = vi.fn()
+      .mockResolvedValueOnce({
+        status: 'conflict',
+        current: { id: 'n1', revision: 2 }
+      })
+      .mockResolvedValueOnce({ status: 'ok', value: { id: 'n1', revision: 3 } })
+    const { result } = renderHook(() => useEntitySaveCoordinator({
+      remoteEntity: { id: 'n1', revision: 1 },
+      save,
+      recoverConflict: (_current, patch: { operations: string[] }) => ({
+        operations: patch.operations.filter((operation) => operation !== 'deleted-task')
+      })
+    }))
+
+    await act(async () => {
+      await result.current.enqueue({
+        operations: ['deleted-task', 'title-change']
+      })
+    })
+
+    await waitFor(() => expect(save).toHaveBeenCalledTimes(2))
+    expect(save).toHaveBeenNthCalledWith(2, 2, {
+      operations: ['title-change']
     })
   })
 })

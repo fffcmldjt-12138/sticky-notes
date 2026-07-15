@@ -11,7 +11,7 @@ import {
   validateNotesFile
 } from '../src/main/services/storageValidators'
 
-const emptyNotes = { version: 6 as const, items: [], folders: [] }
+const emptyNotes = { version: 7 as const, items: [], folders: [] }
 const config = {
   version: 1 as const,
   autoLaunch: true,
@@ -65,7 +65,7 @@ describe('startup recovery', () => {
   it('restores corrupt notes from the newest valid backup and preserves exact bytes once', async () => {
     await backups.recordChange('notes', emptyNotes)
     const recovered = {
-      version: 6 as const,
+      version: 7 as const,
       items: [],
       folders: [{
         id: 'folder_recovered',
@@ -142,7 +142,7 @@ describe('startup recovery', () => {
       const snapshot = await new NoteStore(directory, backups).getSnapshot()
 
       expect(snapshot).toMatchObject({
-        version: 6,
+        version: 7,
         items: [{ id: `note_v${version}`, revision: 1 }]
       })
       expect(

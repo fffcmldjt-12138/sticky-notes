@@ -44,7 +44,8 @@ siyuanDeliveryDisabled: boolean
 ```
 
 - 新建笔记默认值为 `false`。
-- 旧数据迁移和导入校验缺少该字段时补为 `false`。
+- `NotesFile` 升级到版本 7；版本 6 数据在备份原文件后迁移，并为缺少该字段的笔记补为 `false`。
+- 数据归档清单同步支持版本 7，并继续允许导入旧版本后迁移。
 - 字段通过现有笔记更新 IPC 和 `StickyItemPatch` 持久化。
 - 待办不增加该字段，因为当前思源投送只适用于笔记。
 
@@ -96,4 +97,3 @@ siyuanDeliveryDisabled: boolean
 8. 主面板和独立文件夹窗口均能切换禁止状态。
 
 完成后运行全量测试、类型检查、生产构建、Electron 冒烟测试和 `git diff --check`。
-

@@ -359,7 +359,13 @@ export class NoteStore {
       }
       const item: NoteItem | TodoItem =
         type === 'note'
-          ? { ...base, type, contentMarkdown: '', siyuanDelivery: null }
+          ? {
+              ...base,
+              type,
+              contentMarkdown: '',
+              siyuanDelivery: null,
+              siyuanDeliveryDisabled: false
+            }
           : {
               ...base,
               type,
@@ -386,6 +392,12 @@ export class NoteStore {
       const current = data.items[index]
       if (expectedRevision !== null && current.revision !== expectedRevision) {
         return { status: 'conflict', current }
+      }
+      if (
+        current.type !== 'note' &&
+        Object.hasOwn(patch, 'siyuanDeliveryDisabled')
+      ) {
+        throw new Error('仅笔记可以设置思源投送状态')
       }
       const updated = {
         ...current,
@@ -591,10 +603,13 @@ export class NoteStore {
     todoId: string,
     taskId: string
   ): Promise<MutationResult<TodoItem>> {
-    return this.changeTodo(todoId, (todo) => ({
-      ...todo,
-      tasks: todo.tasks.filter((task) => task.id !== taskId)
-    }))
+    return this.changeTodo(todoId, (todo) => {
+      const remaining = todo.tasks.filter((task) => task.id !== taskId)
+      return {
+        ...todo,
+        tasks: remaining.length > 0 ? remaining : [createTodoTask()]
+      }
+    })
   }
 
   async addTodoSubtask(
@@ -767,10 +782,10 @@ export class NoteStore {
     }
 
     const version = persistedVersion(raw)
-    if (Number.isSafeInteger(version) && Number(version) > 6) {
+    if (Number.isSafeInteger(version) && Number(version) > 7) {
       throw new UnsupportedDataVersionError('notes', version)
     }
-    if (version === 6) {
+    if (version === 7) {
       try {
         validateNotesFile(raw)
       } catch (error) {
@@ -780,7 +795,7 @@ export class NoteStore {
     }
     if (
       version === 1 || version === 2 || version === 3 ||
-      version === 4 || version === 5
+      version === 4 || version === 5 || version === 6
     ) {
       let migrated: NotesFile
       try {
@@ -828,7 +843,7 @@ export class NoteStore {
 }
 
 function createDefaultNotes(): NotesFile {
-  return { version: 6, items: [], folders: [] }
+  return { version: 7, items: [], folders: [] }
 }
 
 function persistedVersion(value: unknown): unknown {

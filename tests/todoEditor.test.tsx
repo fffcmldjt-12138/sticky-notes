@@ -231,4 +231,92 @@ describe('TodoEditor', () => {
 
     expect(onAddTask).toHaveBeenCalledOnce()
   })
+
+  it('edits the persisted replacement after the final task is deleted', async () => {
+    const replacement: TodoItem = {
+      ...todo,
+      revision: 2,
+      tasks: [{
+        id: 'task_replacement',
+        contentMarkdown: '',
+        completed: false,
+        tags: [],
+        importance: 'normal',
+        urgency: 'normal',
+        children: [],
+        schedule: null
+      }]
+    }
+    const onUpdateTask = vi.fn().mockResolvedValue({
+      status: 'ok',
+      value: { ...replacement, revision: 3 }
+    })
+    const props = {
+      onSave: vi.fn(),
+      onAddTask: vi.fn(),
+      onUpdateTask,
+      onDeleteTask: vi.fn(),
+      onReorderTasks: vi.fn(),
+      onAddSubtask: vi.fn(),
+      onUpdateSubtask: vi.fn(),
+      onDeleteSubtask: vi.fn(),
+      onBack: vi.fn(),
+      onDelete: vi.fn()
+    }
+    const view = render(<TodoEditor item={todo} {...props} />)
+
+    fireEvent.click(screen.getByRole('button', { name: '删除任务' }))
+    view.rerender(<TodoEditor item={replacement} {...props} />)
+
+    const input = await screen.findByRole('textbox', { name: '任务内容' })
+    fireEvent.change(input, { target: { value: '现在可以编辑' } })
+    fireEvent.blur(input)
+
+    await waitFor(() => {
+      expect(onUpdateTask).toHaveBeenCalledWith('task_replacement', 2, {
+        contentMarkdown: '现在可以编辑'
+      })
+    })
+  })
+
+  it('unblocks replacement editing after a deleted-task save conflict', async () => {
+    const replacement: TodoItem = {
+      ...todo,
+      revision: 2,
+      tasks: [{
+        id: 'task_replacement', contentMarkdown: '', completed: false,
+        tags: [], importance: 'normal', urgency: 'normal', children: [],
+        schedule: null
+      }]
+    }
+    const onUpdateTask = vi.fn()
+      .mockResolvedValueOnce({ status: 'conflict', current: replacement })
+      .mockResolvedValueOnce({
+        status: 'ok',
+        value: { ...replacement, revision: 3 }
+      })
+    const props = {
+      onSave: vi.fn(), onAddTask: vi.fn(), onUpdateTask,
+      onDeleteTask: vi.fn(), onReorderTasks: vi.fn(), onAddSubtask: vi.fn(),
+      onUpdateSubtask: vi.fn(), onDeleteSubtask: vi.fn(),
+      onBack: vi.fn(), onDelete: vi.fn()
+    }
+    const view = render(<TodoEditor item={todo} {...props} />)
+
+    const staleInput = screen.getByRole('textbox', { name: '任务内容' })
+    fireEvent.change(staleInput, { target: { value: '冲突中的旧任务' } })
+    fireEvent.blur(staleInput)
+    await waitFor(() => expect(onUpdateTask).toHaveBeenCalledTimes(1))
+
+    view.rerender(<TodoEditor item={replacement} {...props} />)
+    const replacementInput = screen.getByRole('textbox', { name: '任务内容' })
+    fireEvent.change(replacementInput, { target: { value: '新的可编辑任务' } })
+    fireEvent.blur(replacementInput)
+
+    await waitFor(() => {
+      expect(onUpdateTask).toHaveBeenLastCalledWith('task_replacement', 2, {
+        contentMarkdown: '新的可编辑任务'
+      })
+    })
+  })
 })

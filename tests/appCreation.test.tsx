@@ -8,6 +8,7 @@ import App from '../src/renderer/src/App'
 
 const createdNote: NoteItem = {
   id: 'note_1',
+  revision: 1,
   type: 'note',
   title: '新建笔记',
   contentMarkdown: '',
@@ -21,16 +22,20 @@ const createdNote: NoteItem = {
   order: 0,
   deletedAt: null,
   siyuanDelivery: null,
+  siyuanDeliveryDisabled: false,
   createdAt: '2026-06-15T00:00:00.000Z',
   updatedAt: '2026-06-15T00:00:00.000Z'
 }
 
 const createdFolder: FolderItem = {
   id: 'folder_1',
+  revision: 1,
   title: '项目资料',
   parentFolderId: null,
   order: 0,
   collapsed: false,
+  detached: false,
+  windowBounds: null,
   deletedAt: null,
   createdAt: '2026-06-15T00:00:00.000Z',
   updatedAt: '2026-06-15T00:00:00.000Z'
@@ -163,6 +168,24 @@ describe('App creation flow', () => {
     expect(await screen.findByRole('status', {
       name: '思源发送结果'
     })).toHaveTextContent('已发送到思源：新建笔记')
+  })
+
+  it('disables SiYuan delivery from the main panel context menu', async () => {
+    vi.mocked(window.stickyApi.notes.list).mockResolvedValue([createdNote])
+    render(<App />)
+
+    fireEvent.contextMenu(await screen.findByText('新建笔记'))
+    fireEvent.click(screen.getByRole('menuitem', {
+      name: '禁止投送到思源'
+    }))
+
+    await waitFor(() => {
+      expect(window.stickyApi.notes.update).toHaveBeenCalledWith(
+        createdNote.id,
+        createdNote.revision,
+        { siyuanDeliveryDisabled: true }
+      )
+    })
   })
 
   it('shows the error and leaves title delivery retryable', async () => {

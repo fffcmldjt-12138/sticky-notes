@@ -65,7 +65,8 @@ describe('SiyuanService', () => {
     }
     const note = {
       id: 'note-1', revision: 1, type: 'note' as const, title: 'Video',
-      contentMarkdown: 'Body', siyuanDelivery: null, headerColor: '#f2c94c' as const,
+      contentMarkdown: 'Body', siyuanDelivery: null,
+      siyuanDeliveryDisabled: false, headerColor: '#f2c94c' as const,
       bodyTheme: 'light' as const, pinned: false, detached: false,
       windowBounds: null, parentFolderId: null, tags: [], order: 0,
       deletedAt: null, createdAt: '2026-07-14T09:00:00.000Z',
@@ -82,7 +83,7 @@ describe('SiyuanService', () => {
       createDocument: vi.fn(async () => 'doc-1')
     }
     const notes = {
-      getSnapshot: vi.fn(async () => ({ version: 6 as const, items: [note], folders: [] })),
+      getSnapshot: vi.fn(async () => ({ version: 7 as const, items: [note], folders: [] })),
       recordSiyuanDelivery: vi.fn(async (_id, delivery) => ({
         status: 'ok' as const,
         value: { ...note, siyuanDelivery: delivery }
@@ -109,6 +110,39 @@ describe('SiyuanService', () => {
       expect.any(String)
     )
     expect(storedConfig.siyuan.inboxNotebookId).toBe('actual-inbox')
+  })
+
+  it('rejects a disabled note before connecting to SiYuan', async () => {
+    const note = { ...makeNote('note-blocked'), siyuanDeliveryDisabled: true }
+    const getToken = vi.fn(async () => '')
+    const client = {
+      listNotebooks: vi.fn(), getIdsByHPath: vi.fn(),
+      uploadAsset: vi.fn(), createDocument: vi.fn()
+    }
+    const service = new SiyuanService({
+      config: {
+        get: vi.fn(async () => ({
+          version: 1, autoLaunch: false, panelPosition: 'right',
+          alwaysOnTop: true
+        }))
+      } as never,
+      credentials: {
+        getToken, setToken: vi.fn(), hasToken: vi.fn(async () => false)
+      },
+      notes: {
+        getSnapshot: vi.fn(async () => ({
+          version: 7 as const, items: [note], folders: []
+        }))
+      } as never,
+      assets: {} as never,
+      clientFactory: vi.fn(() => client as never)
+    })
+
+    await expect(service.sendNote(note.id)).rejects.toThrow(
+      '该笔记已禁止投送到思源'
+    )
+    expect(getToken).not.toHaveBeenCalled()
+    expect(client.listNotebooks).not.toHaveBeenCalled()
   })
 
   it('serializes different notes so equal titles cannot claim the same path', async () => {
@@ -142,7 +176,7 @@ describe('SiyuanService', () => {
     }
     const notes = {
       getSnapshot: vi.fn(async () => ({
-        version: 6 as const,
+        version: 7 as const,
         items: [...notesById.values()],
         folders: []
       })),
@@ -172,7 +206,8 @@ describe('SiyuanService', () => {
 function makeNote(id: string) {
   return {
     id, revision: 1, type: 'note' as const, title: 'Same title',
-    contentMarkdown: id, siyuanDelivery: null, headerColor: '#f2c94c' as const,
+    contentMarkdown: id, siyuanDelivery: null, siyuanDeliveryDisabled: false,
+    headerColor: '#f2c94c' as const,
     bodyTheme: 'light' as const, pinned: false, detached: false,
     windowBounds: null, parentFolderId: null, tags: [], order: 0,
     deletedAt: null, createdAt: '2026-07-14T09:00:00.000Z',

@@ -20,10 +20,10 @@ describe('NoteStore', () => {
     store = new NoteStore(directory)
   })
 
-  it('creates an empty version 6 file on first load', async () => {
+  it('creates an empty version 7 file on first load', async () => {
     expect(await store.list()).toEqual([])
     expect(JSON.parse(await readFile(join(directory, 'notes.json'), 'utf8'))).toEqual({
-      version: 6,
+      version: 7,
       items: [],
       folders: []
     })
@@ -37,6 +37,7 @@ describe('NoteStore', () => {
     expect(note).toMatchObject({
       revision: 1,
       siyuanDelivery: null,
+      siyuanDeliveryDisabled: false,
       parentFolderId: null,
       tags: [],
       order: 0,
@@ -122,6 +123,16 @@ describe('NoteStore', () => {
     expect((await store.list())[0]).toMatchObject({ title: 'first', revision: 2 })
   })
 
+  it('rejects a note-only delivery lock patch for todos', async () => {
+    const todo = await store.create('todo')
+
+    await expect(store.update(todo.id, todo.revision, {
+      siyuanDeliveryDisabled: true
+    })).rejects.toThrow('仅笔记可以设置思源投送状态')
+
+    expect(await store.list()).toEqual([todo])
+  })
+
   it('uses the containing todo revision for task text patches', async () => {
     const todo = await store.create('todo')
     const task = todo.type === 'todo' ? todo.tasks[0] : null
@@ -166,6 +177,47 @@ describe('NoteStore', () => {
       children: [],
       schedule: null
     })
+  })
+
+  it('atomically replaces the final deleted task with an editable blank task', async () => {
+    const todo = await store.create('todo')
+    if (todo.type !== 'todo') throw new Error('expected todo')
+    const original = todo.tasks[0]
+
+    const deleted = await store.deleteTodoTask(todo.id, original.id)
+
+    expect(deleted.status).toBe('ok')
+    if (deleted.status !== 'ok') throw new Error('expected ok')
+    expect(deleted.value.tasks).toHaveLength(1)
+    expect(deleted.value.tasks[0]).toMatchObject({
+      contentMarkdown: '',
+      completed: false,
+      importance: 'normal',
+      urgency: 'normal',
+      children: [],
+      schedule: null
+    })
+    expect(deleted.value.tasks[0].id).not.toBe(original.id)
+    expect((await store.list())[0]).toMatchObject({
+      id: todo.id,
+      tasks: [{ id: deleted.value.tasks[0].id }]
+    })
+  })
+
+  it('does not add a blank task when another task survives deletion', async () => {
+    const todo = await store.create('todo')
+    if (todo.type !== 'todo') throw new Error('expected todo')
+    const first = todo.tasks[0]
+    await store.updateTodoTask(todo.id, first.id, todo.revision, {
+      contentMarkdown: 'First'
+    })
+    const second = await store.addTodoTask(todo.id, 'Second')
+
+    const deleted = await store.deleteTodoTask(todo.id, first.id)
+
+    expect(deleted.status).toBe('ok')
+    if (deleted.status !== 'ok') throw new Error('expected ok')
+    expect(deleted.value.tasks).toEqual([second])
   })
 
   it('adds updates and deletes one-level subtasks', async () => {
@@ -357,7 +409,7 @@ describe('NoteStore', () => {
     expect(files.some((file) => file.startsWith('notes.json.backup-'))).toBe(true)
   })
 
-  it('backs up a version 4 notes file before migrating to version 6', async () => {
+  it('backs up a version 4 notes file before migrating to version 7', async () => {
     const original = JSON.stringify({ version: 4, items: [], folders: [] })
     await writeFile(
       join(directory, 'notes.json'),
@@ -372,11 +424,25 @@ describe('NoteStore', () => {
     expect(backup).toBeDefined()
     expect(await readFile(join(directory, backup!), 'utf8')).toBe(original)
     expect(JSON.parse(await readFile(join(directory, 'notes.json'), 'utf8')).version)
-      .toBe(6)
+      .toBe(7)
   })
 
-  it('does not back up an already migrated version 6 file on startup', async () => {
+  it('backs up and upgrades an existing version 6 file to version 7', async () => {
     const original = JSON.stringify({ version: 6, items: [], folders: [] })
+    await writeFile(join(directory, 'notes.json'), original, 'utf8')
+
+    await store.list()
+
+    const files = await readdir(directory)
+    const backup = files.find((file) => file.startsWith('notes.json.backup-'))
+    expect(backup).toBeDefined()
+    expect(await readFile(join(directory, backup!), 'utf8')).toBe(original)
+    expect(JSON.parse(await readFile(join(directory, 'notes.json'), 'utf8')))
+      .toEqual({ version: 7, items: [], folders: [] })
+  })
+
+  it('does not back up an already migrated version 7 file on startup', async () => {
+    const original = JSON.stringify({ version: 7, items: [], folders: [] })
     await writeFile(
       join(directory, 'notes.json'),
       original,
@@ -391,7 +457,7 @@ describe('NoteStore', () => {
     expect(await readFile(join(directory, 'notes.json'), 'utf8')).toBe(original)
   })
 
-  it('does not replace malformed notes with an empty version 6 file', async () => {
+  it('does not replace malformed notes with an empty version 7 file', async () => {
     await writeFile(join(directory, 'notes.json'), '{broken json', 'utf8')
 
     await expect(store.list()).rejects.toMatchObject({ code: 'DATA_UNAVAILABLE' })
@@ -422,14 +488,14 @@ describe('NoteStore', () => {
 
   it('clones replacement input before queueing and does not deadlock', async () => {
     await store.create('note', 'Original')
-    const replacement: NotesFile = { version: 6, items: [], folders: [] }
+    const replacement: NotesFile = { version: 7, items: [], folders: [] }
 
     const pending = store.replaceSnapshot(replacement, 'restore')
     replacement.items.push((await store.getSnapshot()).items[0])
 
     await expect(pending).resolves.toBeUndefined()
     expect(await store.getSnapshot()).toEqual({
-      version: 6,
+      version: 7,
       items: [],
       folders: []
     })
@@ -441,7 +507,7 @@ describe('NoteStore', () => {
 
     await expect(
       store.replaceSnapshot(
-        { version: 6, items: [{ id: 'broken' }], folders: [] } as never,
+        { version: 7, items: [{ id: 'broken' }], folders: [] } as never,
         'import'
       )
     ).rejects.toThrow()
@@ -463,7 +529,7 @@ describe('NoteStore', () => {
 
     await expect(
       protectedStore.replaceSnapshot(
-        { version: 6, items: [], folders: [] },
+        { version: 7, items: [], folders: [] },
         'restore'
       )
     ).rejects.toThrow('protected backup failed')

@@ -102,6 +102,17 @@ export function TodoEditor({
     mergePatches: (current, incoming) => ({
       operations: [...current.operations, ...incoming.operations]
     }),
+    recoverConflict: (current, failed) => {
+      const operations = failed.operations.filter((operation) => {
+        if (operation.kind === 'item') return true
+        const task = current.tasks.find((entry) => entry.id === operation.taskId)
+        if (!task) return false
+        return operation.kind !== 'subtask' ||
+          task.children.some((child) => child.id === operation.subtaskId)
+      })
+      if (operations.length === failed.operations.length) return undefined
+      return operations.length > 0 ? { operations } : null
+    },
     save: async (expectedRevision, batch) => {
       let revision = expectedRevision
       let latest: MutationResult<TodoItem> = { status: 'ok', value: item }

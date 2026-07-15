@@ -12,6 +12,7 @@ import { NoteCard } from '../src/renderer/src/components/NoteCard'
 
 const note: NoteItem = {
   id: 'note_1',
+  revision: 1,
   type: 'note',
   title: 'Note title',
   contentMarkdown: 'Content',
@@ -21,12 +22,14 @@ const note: NoteItem = {
   detached: false,
   windowBounds: null,
   siyuanDelivery: null,
+  siyuanDeliveryDisabled: false,
   createdAt: '2026-06-14T09:00:00.000Z',
   updatedAt: '2026-06-14T09:00:00.000Z'
 }
 
 const todo: TodoItem = {
   id: 'todo_1',
+  revision: 1,
   type: 'todo',
   title: 'Todo title',
   headerColor: '#5b8def',
@@ -35,6 +38,7 @@ const todo: TodoItem = {
   detached: false,
   windowBounds: null,
   tasks: [],
+  panelExpanded: false,
   createdAt: '2026-06-14T09:00:00.000Z',
   updatedAt: '2026-06-14T09:00:00.000Z'
 }
@@ -149,6 +153,49 @@ describe('card and navigation actions', () => {
       />
     )
     expect(screen.queryByRole('menuitem', { name: '发送到思源' })).not.toBeInTheDocument()
+  })
+
+  it('toggles the SiYuan delivery lock only for notes', () => {
+    const onAction = vi.fn()
+    const first = render(
+      <CardContextMenu
+        item={note}
+        position={{ x: 10, y: 20 }}
+        onAction={onAction}
+        onClose={vi.fn()}
+      />
+    )
+    fireEvent.click(screen.getByRole('menuitem', {
+      name: '禁止投送到思源'
+    }))
+    expect(onAction).toHaveBeenCalledWith({
+      type: 'siyuan-delivery-disabled',
+      disabled: true
+    })
+    first.unmount()
+
+    const second = render(
+      <CardContextMenu
+        item={{ ...note, siyuanDeliveryDisabled: true }}
+        position={{ x: 10, y: 20 }}
+        onAction={onAction}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.getByRole('menuitem', {
+      name: '允许投送到思源'
+    })).toBeInTheDocument()
+    second.unmount()
+
+    render(
+      <CardContextMenu
+        item={todo}
+        position={{ x: 10, y: 20 }}
+        onAction={onAction}
+        onClose={vi.fn()}
+      />
+    )
+    expect(screen.queryByText(/投送到思源/)).not.toBeInTheDocument()
   })
 
   it('offers local creation from a folder context menu', () => {

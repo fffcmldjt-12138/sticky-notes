@@ -51,7 +51,7 @@ describe('DataArchiveService', () => {
     expect(manifest).toMatchObject({
       format: 'sticky-notes-data',
       version: 1,
-      notesVersion: 6,
+      notesVersion: 7,
       itemCount: 1,
       folderCount: 0,
       assetCount: 1
@@ -64,7 +64,7 @@ describe('DataArchiveService', () => {
     expect(manifest.notesSha256).toMatch(/^[0-9a-f]{64}$/)
   })
 
-  it('imports a version 5 archive by migrating its notes to version 6', async () => {
+  it('imports a version 5 archive by migrating its notes to version 7', async () => {
     const archivePath = join(directory, 'version-5.zip')
     const legacy = { version: 5, items: [], folders: [] }
     await writeStoredZip(

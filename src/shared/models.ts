@@ -44,6 +44,7 @@ export interface NoteItem extends BaseItem {
   type: 'note'
   contentMarkdown: string
   siyuanDelivery: SiyuanDelivery | null
+  siyuanDeliveryDisabled: boolean
 }
 
 export type TaskImportance = 'important' | 'normal'
@@ -142,7 +143,7 @@ export type FolderPatch = Partial<
 >
 
 export interface NotesFile {
-  version: 6
+  version: 7
   items: StickyItem[]
   folders: FolderItem[]
 }
@@ -181,6 +182,7 @@ export type StickyItemPatch = Partial<
   >
 > & {
   contentMarkdown?: string
+  siyuanDeliveryDisabled?: boolean
   panelExpanded?: boolean
 }
 

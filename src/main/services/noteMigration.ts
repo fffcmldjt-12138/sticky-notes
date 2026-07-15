@@ -30,6 +30,12 @@ function normalizeBodyTheme(value: unknown): BodyTheme {
 export function migrateNotesFile(value: unknown): NotesFile {
   if (!value || typeof value !== 'object') throw new Error('Invalid notes file')
   const source = value as { version?: number; items?: unknown[]; folders?: unknown[] }
+  if (source.version === 7) {
+    if (!Array.isArray(source.items) || !Array.isArray(source.folders)) {
+      throw new Error('Invalid notes file collections')
+    }
+    return normalizeCurrentVersion(source, false)
+  }
   if (source.version === 6) {
     if (!Array.isArray(source.items) || !Array.isArray(source.folders)) {
       throw new Error('Invalid notes file collections')
@@ -50,7 +56,7 @@ export function migrateNotesFile(value: unknown): NotesFile {
   if (source.version !== 1) throw new Error(`Unsupported notes version: ${source.version}`)
 
   return {
-    version: 6,
+    version: 7,
     folders: [],
     items: (source.items ?? []).map(migrateVersion1Item)
   }
@@ -109,7 +115,8 @@ function migrateVersion1Item(value: unknown, index: number): StickyItem {
     ...base,
     type: 'note',
     contentMarkdown: String(item.contentMarkdown ?? ''),
-    siyuanDelivery: null
+    siyuanDelivery: null,
+    siyuanDeliveryDisabled: false
   }
 }
 
@@ -128,7 +135,7 @@ function normalizeCurrentVersion(
   migrateLegacyDelivery: boolean
 ): NotesFile {
   return {
-    version: 6,
+    version: 7,
     folders: (source.folders ?? []).map((value, index) => {
       const folder = value as NotesFile['folders'][number]
       return {
@@ -162,7 +169,8 @@ function normalizeCurrentVersion(
           ...note,
           siyuanDelivery: migrateLegacyDelivery
             ? null
-            : note.siyuanDelivery ?? null
+            : note.siyuanDelivery ?? null,
+          siyuanDeliveryDisabled: Boolean(note.siyuanDeliveryDisabled)
         }
       }
       return normalizeTodoTasks(normalized)

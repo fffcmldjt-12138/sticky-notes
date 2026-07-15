@@ -109,6 +109,7 @@ export class SiyuanService {
   }
 
   private async sendNoteOnce(noteId: string): Promise<SiyuanSendResult> {
+    await this.assertDeliveryAllowed(noteId)
     const config = await this.getSiyuanConfig()
     const token = await this.dependencies.credentials.getToken()
     const client = this.clientFactory({ endpoint: config.endpoint, token })
@@ -128,6 +129,17 @@ export class SiyuanService {
       now: this.dependencies.now
     })
     return delivery.send(noteId, inbox.id)
+  }
+
+  private async assertDeliveryAllowed(noteId: string): Promise<void> {
+    const snapshot = await this.dependencies.notes.getSnapshot()
+    const item = snapshot.items.find((candidate) => candidate.id === noteId)
+    if (!item || item.type !== 'note' || item.deletedAt) {
+      throw new Error('找不到要发送的笔记')
+    }
+    if (item.siyuanDeliveryDisabled) {
+      throw new Error('该笔记已禁止投送到思源')
+    }
   }
 
   private async createClient(): Promise<{

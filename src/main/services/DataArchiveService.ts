@@ -56,7 +56,7 @@ export interface ArchiveManifest {
   format: 'sticky-notes-data'
   version: 1
   exportedAt: string
-  notesVersion: 5 | 6
+  notesVersion: 5 | 6 | 7
   itemCount: number
   folderCount: number
   assetCount: number
@@ -125,7 +125,7 @@ export class DataArchiveService {
       format: 'sticky-notes-data',
       version: 1,
       exportedAt: this.now().toISOString(),
-      notesVersion: 6,
+      notesVersion: 7,
       itemCount: notes.items.length,
       folderCount: notes.folders.length,
       assetCount: manifestAssets.length,
@@ -369,7 +369,9 @@ function validateManifest(value: unknown): ArchiveManifest {
   ])
   if (
     value.format !== 'sticky-notes-data' || value.version !== 1 ||
-    (value.notesVersion !== 5 && value.notesVersion !== 6) ||
+    (value.notesVersion !== 5 &&
+      value.notesVersion !== 6 &&
+      value.notesVersion !== 7) ||
     !isIsoDate(value.exportedAt) ||
     !Number.isSafeInteger(value.itemCount) || !Number.isSafeInteger(value.folderCount) ||
     !Number.isSafeInteger(value.assetCount) || !isSha256(value.notesSha256) ||

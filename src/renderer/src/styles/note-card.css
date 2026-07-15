@@ -52,6 +52,13 @@
   cursor: default;
   opacity: .72;
 }
+.siyuan-card-send-button.delivery-disabled,
+.siyuan-send-button.delivery-disabled {
+  border-color: #c9ced6;
+  background: #edf0f4;
+  color: #7d8591;
+  opacity: 1;
+}
 .siyuan-card-send-button .lucide-loader-circle {
   animation: siyuan-send-spin .8s linear infinite;
 }

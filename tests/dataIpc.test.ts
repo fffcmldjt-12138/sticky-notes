@@ -22,7 +22,7 @@ import { registerDataIpc } from '../src/main/ipc/dataIpc'
 import { ipcChannels } from '../src/shared/ipcChannels'
 import type { NotesFile } from '../src/shared/models'
 
-const snapshot: NotesFile = { version: 6, items: [], folders: [] }
+const snapshot: NotesFile = { version: 7, items: [], folders: [] }
 
 function setup() {
   const summary = {

@@ -10,6 +10,7 @@ export type CardAction =
   | { type: 'theme'; theme: BodyTheme }
   | { type: 'add-task' }
   | { type: 'pin'; pinned: boolean }
+  | { type: 'siyuan-delivery-disabled'; disabled: boolean }
   | { type: 'delete' }
 
 export function CardContextMenu({
@@ -105,6 +106,19 @@ export function CardContextMenu({
       {item.type === 'todo' && (
         <button role="menuitem" onClick={() => act({ type: 'add-task' })}>
           新增任务
+        </button>
+      )}
+      {item.type === 'note' && (
+        <button
+          role="menuitem"
+          onClick={() => act({
+            type: 'siyuan-delivery-disabled',
+            disabled: !item.siyuanDeliveryDisabled
+          })}
+        >
+          {item.siyuanDeliveryDisabled
+            ? '允许投送到思源'
+            : '禁止投送到思源'}
         </button>
       )}
       <button className="danger-menu-item" role="menuitem" onClick={() => act({ type: 'delete' })}>

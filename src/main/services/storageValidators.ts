@@ -18,7 +18,7 @@ type JsonObject = Record<string, unknown>
 export function validateNotesFile(value: unknown): NotesFile {
   const root = objectAt(value, 'notes')
   exactKeys(root, ['version', 'items', 'folders'], 'notes')
-  if (root.version !== 6) fail('notes.version must be 6')
+  if (root.version !== 7) fail('notes.version must be 7')
   const items = arrayAt(root.items, 'notes.items')
   const folders = arrayAt(root.folders, 'notes.folders')
   const ids = new Set<string>()
@@ -45,13 +45,14 @@ export function migrateAndValidateRecoverableNotesFile(
   value: unknown
 ): NotesFile {
   const root = objectAt(value, 'notes recovery candidate')
-  if (root.version === 6) return validateNotesFile(value)
+  if (root.version === 7) return validateNotesFile(value)
   if (
     root.version === 1 ||
     root.version === 2 ||
     root.version === 3 ||
     root.version === 4 ||
-    root.version === 5
+    root.version === 5 ||
+    root.version === 6
   ) {
     return validateNotesFile(migrateNotesFile(value))
   }
@@ -134,7 +135,12 @@ function validateItem(
   ]
   const type = item.type
   if (type === 'note') {
-    exactKeys(item, [...common, 'contentMarkdown', 'siyuanDelivery'], path)
+    exactKeys(item, [
+      ...common,
+      'contentMarkdown',
+      'siyuanDelivery',
+      'siyuanDeliveryDisabled'
+    ], path)
   } else if (type === 'todo') {
     exactKeys(item, [...common, 'tasks', 'panelExpanded'], path)
   } else {
@@ -159,6 +165,7 @@ function validateItem(
   if (type === 'note') {
     stringAt(item.contentMarkdown, `${path}.contentMarkdown`)
     siyuanDeliveryAt(item.siyuanDelivery, `${path}.siyuanDelivery`)
+    booleanAt(item.siyuanDeliveryDisabled, `${path}.siyuanDeliveryDisabled`)
   } else {
     arrayAt(item.tasks, `${path}.tasks`).forEach((task, index) =>
       validateTask(task, `${path}.tasks[${index}]`, ids)

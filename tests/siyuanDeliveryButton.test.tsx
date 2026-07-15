@@ -63,12 +63,26 @@ describe('SiyuanDeliveryButton', () => {
 
     expect(screen.getByRole('button', { name: '已发送到思源' })).toBeDisabled()
   })
+
+  it('keeps a delivery-disabled note visible but locked', () => {
+    const note = makeNote()
+    note.siyuanDeliveryDisabled = true
+    render(<SiyuanDeliveryButton compact note={note} onSend={vi.fn()} />)
+
+    expect(screen.getByRole('button', {
+      name: '已禁止投送到思源'
+    })).toBeDisabled()
+    expect(screen.getByRole('button', {
+      name: '已禁止投送到思源'
+    })).toHaveClass('delivery-disabled')
+  })
 })
 
 function makeNote(): NoteItem {
   return {
     id: 'note-1', revision: 1, type: 'note', title: 'Video',
-    contentMarkdown: 'Body', siyuanDelivery: null, headerColor: '#f2c94c',
+    contentMarkdown: 'Body', siyuanDelivery: null,
+    siyuanDeliveryDisabled: false, headerColor: '#f2c94c',
     bodyTheme: 'light', pinned: false, detached: false, windowBounds: null,
     parentFolderId: null, tags: [], order: 0, deletedAt: null,
     createdAt: '2026-07-14T09:00:00.000Z',

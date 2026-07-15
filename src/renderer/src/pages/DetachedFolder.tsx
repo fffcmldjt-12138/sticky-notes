@@ -213,6 +213,11 @@ export function DetachedFolder({
     if (action.type === 'color') await save(item.id, item.revision, { headerColor: action.color })
     if (action.type === 'theme') await save(item.id, item.revision, { bodyTheme: action.theme })
     if (action.type === 'pin') await save(item.id, item.revision, { pinned: action.pinned })
+    if (action.type === 'siyuan-delivery-disabled' && item.type === 'note') {
+      await save(item.id, item.revision, {
+        siyuanDeliveryDisabled: action.disabled
+      })
+    }
     if (action.type === 'add-task' && item.type === 'todo') {
       await window.stickyApi.notes.addTodoTask(item.id)
       await load()

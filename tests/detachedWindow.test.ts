@@ -23,6 +23,7 @@ const item: NoteItem = {
   order: 0,
   deletedAt: null,
   siyuanDelivery: null,
+  siyuanDeliveryDisabled: false,
   createdAt: '2026-06-14T09:00:00.000Z',
   updatedAt: '2026-06-14T09:00:00.000Z'
 }

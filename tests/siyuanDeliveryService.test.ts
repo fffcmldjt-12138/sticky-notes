@@ -61,6 +61,26 @@ describe('SiyuanDeliveryService', () => {
     expect(client.createDocument).not.toHaveBeenCalled()
   })
 
+  it('rejects a delivery-disabled note before asset or network work', async () => {
+    const note = makeNote('![image](asset://local/image.png)')
+    note.siyuanDeliveryDisabled = true
+    const client = fakeClient()
+    const readUrl = vi.fn()
+    const service = new SiyuanDeliveryService({
+      notes: noteRepository(note, []),
+      assets: { readUrl },
+      client
+    })
+
+    await expect(service.send(note.id, 'inbox')).rejects.toThrow(
+      '该笔记已禁止投送到思源'
+    )
+    expect(readUrl).not.toHaveBeenCalled()
+    expect(client.getIdsByHPath).not.toHaveBeenCalled()
+    expect(client.uploadAsset).not.toHaveBeenCalled()
+    expect(client.createDocument).not.toHaveBeenCalled()
+  })
+
   it('sends unchanged content when the target notebook has changed', async () => {
     const note = makeNote('Body')
     const client = fakeClient()
@@ -106,6 +126,25 @@ describe('SiyuanDeliveryService', () => {
     )
   })
 
+  it('stops before document creation if delivery is disabled mid-send', async () => {
+    const note = makeNote('Body')
+    const client = fakeClient()
+    client.getIdsByHPath.mockImplementation(async () => {
+      note.siyuanDeliveryDisabled = true
+      return []
+    })
+    const service = new SiyuanDeliveryService({
+      notes: noteRepository(note, []),
+      assets: { readUrl: vi.fn() },
+      client
+    })
+
+    await expect(service.send(note.id, 'inbox')).rejects.toThrow(
+      '该笔记已禁止投送到思源'
+    )
+    expect(client.createDocument).not.toHaveBeenCalled()
+  })
+
   it('coalesces concurrent sends of the same note', async () => {
     const note = makeNote('Body')
     let finish!: (value: string) => void
@@ -130,7 +169,8 @@ describe('SiyuanDeliveryService', () => {
 function makeNote(contentMarkdown: string): NoteItem {
   return {
     id: 'note-1', revision: 1, type: 'note', title: 'Video notes',
-    contentMarkdown, siyuanDelivery: null, headerColor: '#f2c94c',
+    contentMarkdown, siyuanDelivery: null, siyuanDeliveryDisabled: false,
+    headerColor: '#f2c94c',
     bodyTheme: 'light', pinned: false, detached: false, windowBounds: null,
     parentFolderId: null, tags: [], order: 0, deletedAt: null,
     createdAt: '2026-07-14T09:00:00.000Z',
@@ -141,7 +181,7 @@ function makeNote(contentMarkdown: string): NoteItem {
 function noteRepository(note: NoteItem, recorded: SiyuanDelivery[]) {
   return {
     getSnapshot: vi.fn(async (): Promise<NotesFile> => ({
-      version: 6,
+      version: 7,
       items: [note],
       folders: []
     })),
